@@ -1,11 +1,11 @@
 # Base Backend API
 
-A structured, modular backend API boilerplate built with Node.js, Express, TypeScript, and MySQL.
+A structured, modular backend API boilerplate built with Node.js, Express, TypeScript, and PostgreSQL.
 
 ## Prerequisites
-- Node.js (v20+)
+- Node.js (v18+)
 - Docker & Docker Compose
-- MySQL 8.0 (if running locally without Docker)
+- PostgreSQL (if running locally without Docker)
 
 ## Setup & Run
 
