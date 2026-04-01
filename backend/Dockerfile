@@ -7,12 +7,14 @@ COPY package*.json ./
 FROM base AS development
 RUN npm install
 COPY . .
+RUN npx prisma generate
 CMD ["npm", "run", "dev"]
 
 # Stage 3: Builder
 FROM base AS builder
 RUN npm install
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 # Stage 4: Production
