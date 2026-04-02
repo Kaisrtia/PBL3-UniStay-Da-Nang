@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "user" ALTER COLUMN "dob" DROP NOT NULL,
+ALTER COLUMN "status" DROP NOT NULL,
+ALTER COLUMN "emailVerified" DROP NOT NULL,
+ALTER COLUMN "phoneVerified" DROP NOT NULL;
