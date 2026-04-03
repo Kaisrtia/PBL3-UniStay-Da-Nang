@@ -36,17 +36,17 @@ model session {
 }
 
 model user {
-  id             String           @id @db.VarChar(30)
+  id             String           @id @default(uuid())
   email          String           @unique @db.VarChar(255)
-  hashedPassword String
+  hashedPassword String?
   fullName       String           @db.VarChar(100)
-  phone          String?           @unique @db.VarChar(15)
+  phone          String?          @unique @db.VarChar(15)
   dob            DateTime?
-  gender         String?           @db.VarChar(10)
+  gender         String?          @db.VarChar(10)
   avatarUrl      String?          @db.Text
   emailVerified  Boolean?         @default(false)
   phoneVerified  Boolean?         @default(false)
-  status         account_status?   @default(LOCKED)
+  status         account_status?  @default(LOCKED)
   roles          account_role[]   @default([USER])
   createdAt      DateTime         @default(now())
 }
