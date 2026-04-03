@@ -26,6 +26,11 @@ enum account_role {
   HOST
 }
 
+enum provider {
+  GOOGLE
+  SYSTEM
+}
+
 // Models
 model session {
   id        String   @id @default(uuid())
@@ -46,6 +51,7 @@ model user {
   avatarUrl      String?          @db.Text
   emailVerified  Boolean?         @default(false)
   phoneVerified  Boolean?         @default(false)
+  provider       provider?
   status         account_status?  @default(LOCKED)
   roles          account_role[]   @default([USER])
   createdAt      DateTime         @default(now())
