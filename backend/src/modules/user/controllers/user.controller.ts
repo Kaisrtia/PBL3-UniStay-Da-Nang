@@ -3,17 +3,11 @@ import HttpStatus from 'http-status';
 import * as userService from '../service/user.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { account_role } from '@prisma/client';
-import { AppError } from '../../../core/exceptions/AppError';
 
 export const handleSetupProfile = async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-  if (!userId) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Unauthorized');
-  }
-
   const { role, gender, dob, phone, avatarUrl } = req.body;
 
-  const result = await userService.setupProfile(userId, {
+  const result = await userService.setupProfile(req.user!, {
     role: role as account_role,
     gender,
     dob,
@@ -31,10 +25,21 @@ export const handleSetupProfile = async (req: Request, res: Response) => {
         phone: result.phone,
         fullName: result.fullName,
         status: result.status,
-        roles: result.roles,
-        avatarUrl: result.avatarUrl
+        avatarUrl: result.avatarUrl,
+        dob: result.dob,
+        gender: result.gender,
+        roles: result.roles
       }
     },
     'Profile set up successfully'
   );
 };
+
+export const handleChangePassword = async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+
+  await userService.changePassword(req.user!, currentPassword, newPassword);
+
+  sendSuccess(res, HttpStatus.OK, null, 'Password changed successfully');
+};
+

@@ -12,4 +12,12 @@ userRouter.patch(
   asyncHandler(userController.handleSetupProfile)
 );
 
+// Change password
+userRouter.patch(
+  '/password',
+  verifyToken,
+  asyncHandler(userController.handleChangePassword)
+);
+
+
 export default userRouter;
