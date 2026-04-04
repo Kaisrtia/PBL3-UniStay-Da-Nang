@@ -24,3 +24,8 @@ npm-debug.log*
 .env
 .env.test
 .env.production
+
+# Neon 
+.agents/
+.skills/
+skills-lock.json

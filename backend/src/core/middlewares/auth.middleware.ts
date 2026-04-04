@@ -16,8 +16,18 @@ export const verifyToken = async (
       .json({ message: 'Cannot find access token!' });
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret);
-    req.user = decoded;
+    const decoded = jwt.verify(token, config.jwt.secret) as jwt.JwtPayload;
+    const user = await prismaClient.user.findUnique({
+      where: {
+        id: decoded.id
+      }
+    });
+    if (!user) {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ message: 'User not found!' });
+    }
+    req.user = user;
     next();
   } catch (error) {
     return res

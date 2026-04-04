@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
-import jwt from 'jsonwebtoken';
 import * as authService from '../services/authenticate.service';
 import {
   sendEmailOtpCode,

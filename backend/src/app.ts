@@ -27,7 +27,10 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
 
 // ─── API v1 Routes ───────────────────────────────────────────────────────────
 
+// public routes
 app.use('/api/v1/auth', authRouter);
+
+// private routes
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
