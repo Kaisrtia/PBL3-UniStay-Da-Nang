@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import authRouter from './modules/auth/routes/auth.route';
 import { errorHandler } from './core/middlewares/error.handler';
+import userRouter from './modules/user/routes/user.route';
 
 const app: Application = express();
 
@@ -31,6 +32,7 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
 app.use('/api/v1/auth', authRouter);
 
 // private routes
+app.use('/api/v1/users', userRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
