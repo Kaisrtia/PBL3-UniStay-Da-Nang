@@ -3,10 +3,62 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl"]
+  binaryTargets = ["native", "linux-musl", "debian-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// Enums
+enum account_status {
+  ACTIVE
+  LOCKED
+  SET_UP
+  BANNED
+}
+
+enum account_role {
+  ADMIN
+  USER
+  STUDENT
+  HOST
+}
+
+enum provider {
+  GOOGLE
+  SYSTEM
+}
+
+// Models
+model session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model user {
+  id             String           @id @default(uuid())
+  email          String           @unique @db.VarChar(255)
+  hashedPassword String?
+  fullName       String           @db.VarChar(100)
+  phone          String?          @unique @db.VarChar(15)
+  dob            DateTime?
+  gender         String?          @db.VarChar(10)
+  avatarUrl      String?          @db.Text
+  emailVerified  Boolean?         @default(false)
+  phoneVerified  Boolean?         @default(false)
+  provider       provider?
+  status         account_status?  @default(LOCKED)
+  roles          account_role[]   @default([USER])
+  createdAt      DateTime         @default(now())
+}
+
+model email_verification {
+  email     String   @id @unique
+  code      String?
+  expiresAt DateTime?
 }

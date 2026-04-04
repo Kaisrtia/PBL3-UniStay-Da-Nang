@@ -2,30 +2,47 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import authRouter from './modules/auth/routes/auth.route';
+import { errorHandler } from './core/middlewares/error.handler';
 
 const app: Application = express();
 
-// Global Middlewares
+// ─── Global Middlewares ──────────────────────────────────────────────────────
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
+app.use(cookieParser());
 
-// Health Check Route
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'success', message: 'API is running successfully' });
+// ─── Health Check ────────────────────────────────────────────────────────────
+
+app.get('/api/v1/health', (_req: Request, res: Response) => {
+  res
+    .status(200)
+    .json({ success: true, message: 'API is running successfully' });
 });
 
-// 404 Handler for undefined routes
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(404).json({ status: 'error', message: 'Route not found' });
+// ─── API v1 Routes ───────────────────────────────────────────────────────────
+
+// public routes
+app.use('/api/v1/auth', authRouter);
+
+// private routes
+
+// ─── 404 Handler ─────────────────────────────────────────────────────────────
+
+app.use((_req: Request, res: Response, _next: NextFunction) => {
+  res.status(404).json({
+    success: false,
+    error: { code: 404, message: 'Route not found' }
+  });
 });
 
-// Global Error Handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ status: 'error', message: 'Internal server error' });
-});
+// ─── Global Error Handler ────────────────────────────────────────────────────
+
+app.use(errorHandler);
 
 export default app;
