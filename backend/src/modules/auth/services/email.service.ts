@@ -3,6 +3,7 @@ import HttpStatus from 'http-status';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { AppError } from '../../../core/exceptions/AppError';
+import config from '../../../core/config/config';
 
 export const sendEmailOtpCode = async (email: string) => {
   if (!email) {
@@ -45,7 +46,7 @@ export const sendEmailOtpCode = async (email: string) => {
   // Generate a new verification token and save it to the database
   const code = crypto.randomInt(100000, 999999).toString();
   const expiresAt = new Date(
-    Date.now() + Number(process.env.EMAIL_VERIFICATION_TTL)
+    Date.now() + Number(config.email.verification_ttl)
   );
   await prismaClient.email_verification.update({
     where: {
@@ -62,13 +63,13 @@ export const sendEmailOtpCode = async (email: string) => {
     port: 587,
     secure: false,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
+      user: config.email.user,
+      pass: config.email.password
     }
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: config.email.user,
     to: email,
     subject: 'Verify your email',
     text: `Your verification code is: ${code}`

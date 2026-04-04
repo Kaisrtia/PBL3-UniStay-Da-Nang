@@ -9,6 +9,7 @@ import {
 import oauth2Client from '../../../core/config/oauth2Client';
 import { AppError } from '../../../core/exceptions/AppError';
 import { sendSuccess } from '../../../core/utils/response.handler';
+import config from '../../../core/config/config';
 
 // Auth Handlers
 
@@ -32,7 +33,7 @@ export const handleLogin = async (req: Request, res: Response) => {
     httpOnly: true,
     secure: true,
     sameSite: 'strict',
-    maxAge: Number(process.env.REFRESH_TOKEN_TTL)
+    maxAge: Number(config.jwt.refresh_token_ttl)
   });
 
   sendSuccess(res, HttpStatus.OK, {
@@ -52,7 +53,7 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
   const { idToken } = req.body;
   const ticket = await oauth2Client.verifyIdToken({
     idToken,
-    audience: process.env.GOOGLE_CLIENT_ID
+    audience: config.google.client_id
   });
   const payload = ticket.getPayload();
 
@@ -70,7 +71,7 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
     httpOnly: true,
     secure: true,
     sameSite: 'strict',
-    maxAge: Number(process.env.REFRESH_TOKEN_TTL)
+    maxAge: Number(config.jwt.refresh_token_ttl)
   });
 
   sendSuccess(res, HttpStatus.OK, {

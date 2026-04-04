@@ -1,7 +1,9 @@
 import app from './app';
 import { connectDB } from './core/config/database';
 
-const PORT = process.env.SERVER_PORT || 3000;
+import config from './core/config/config';
+
+const PORT = config.server.port;
 
 const startServer = () => {
   try {

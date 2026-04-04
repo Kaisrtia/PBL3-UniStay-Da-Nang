@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto, { randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
+import config from '../../../core/config/config';
 
 export const signUp = async (
   email?: string,
@@ -99,9 +100,9 @@ export const login = async (email?: string, password?: string) => {
   // generate access token
   const accessToken = jwt.sign(
     { id: user.id, roles: user.roles },
-    process.env.JWT_SECRET!,
+    config.jwt.secret,
     {
-      expiresIn: Number(process.env.ACCESS_TOKEN_TTL)
+      expiresIn: Number(config.jwt.access_token_ttl)
     }
   );
 
@@ -113,7 +114,7 @@ export const login = async (email?: string, password?: string) => {
     data: {
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + Number(process.env.REFRESH_TOKEN_TTL))
+      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
     }
   });
 
@@ -152,9 +153,9 @@ export const googleLogin = async (
 
   const accessToken = jwt.sign(
     { id: user.id, roles: user.roles },
-    process.env.JWT_SECRET!,
+    config.jwt.secret,
     {
-      expiresIn: Number(process.env.ACCESS_TOKEN_TTL)
+      expiresIn: Number(config.jwt.access_token_ttl)
     }
   );
 
@@ -164,7 +165,7 @@ export const googleLogin = async (
     data: {
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + Number(process.env.REFRESH_TOKEN_TTL))
+      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
     }
   });
 
@@ -214,9 +215,9 @@ export const refreshToken = async (refreshToken: string) => {
 
   const accessToken = jwt.sign(
     { id: user.id, roles: user.roles },
-    process.env.JWT_SECRET!,
+    config.jwt.secret,
     {
-      expiresIn: Number(process.env.ACCESS_TOKEN_TTL)
+      expiresIn: Number(config.jwt.access_token_ttl)
     }
   );
 
