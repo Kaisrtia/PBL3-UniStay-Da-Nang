@@ -46,4 +46,12 @@ authRouter.patch(
   asyncHandler(authController.handleVerifyEmail)
 );
 
+// -- Forgot Password --
+
+// Reset password directly with email and new password
+authRouter.patch(
+  '/forgot-password',
+  asyncHandler(authController.handleResetPassword)
+);
+
 export default authRouter;

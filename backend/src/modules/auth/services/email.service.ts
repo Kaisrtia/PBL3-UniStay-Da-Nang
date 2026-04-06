@@ -2,6 +2,7 @@ import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import bcrypt from 'bcrypt';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
@@ -137,5 +138,119 @@ export const verifyEmailOtpCode = async (email: string, code: string) => {
     where: {
       email
     }
+  });
+};
+
+export const sendPasswordResetLink = async (email: string) => {
+  if (!email) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Email is required!');
+  }
+
+  const user = await prismaClient.user.findUnique({
+    where: { email },
+    select: { id: true, emailVerified: true, provider: true }
+  });
+
+  if (!user) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Email not found');
+  }
+
+  if (!user.emailVerified) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Email is not verified');
+  }
+
+  if (user.provider === 'GOOGLE') {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Google accounts cannot reset password this way'
+    );
+  }
+
+  // Check if there is an existing token that has not expired
+  const existingRecord = await prismaClient.email_verification.findFirst({
+    where: { email }
+  });
+
+  if (
+    existingRecord &&
+    existingRecord.expiresAt &&
+    existingRecord.expiresAt > new Date()
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Reset link already sent, please wait before requesting again'
+    );
+  }
+
+  // Generate a secure random token and store it in the code field
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + Number(config.email.verification_ttl));
+
+  await prismaClient.email_verification.upsert({
+    where: { email },
+    update: { code: token, expiresAt },
+    create: { email, code: token, expiresAt }
+  });
+
+  const resetLink = `${config.frontend_url}/reset-password?token=${token}`;
+
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: config.email.user,
+      pass: config.email.password
+    }
+  });
+
+  const mailOptions = {
+    from: config.email.user,
+    to: email,
+    subject: 'Reset your password - UniStay',
+    html: `
+      <p>You requested a password reset for your UniStay account.</p>
+      <p>Click the link below to reset your password. This link will expire in 10 minutes.</p>
+      <a href="${resetLink}" target="_blank">${resetLink}</a>
+      <p>If you did not request this, please ignore this email.</p>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+export const resetPasswordWithToken = async (
+  token: string,
+  newPassword: string
+) => {
+  if (!token || !newPassword) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Token and new password are required!'
+    );
+  }
+
+  // Look up the record by token (stored in the code field)
+  const record = await prismaClient.email_verification.findFirst({
+    where: { code: token }
+  });
+
+  if (!record || !record.expiresAt || record.expiresAt <= new Date()) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Reset link is invalid or has expired'
+    );
+  }
+
+  const newHashedPassword = bcrypt.hashSync(newPassword, 10);
+
+  await prismaClient.user.update({
+    where: { email: record.email },
+    data: { hashedPassword: newHashedPassword }
+  });
+
+  // Delete the token so it cannot be reused
+  await prismaClient.email_verification.delete({
+    where: { email: record.email }
   });
 };

@@ -3,7 +3,9 @@ import HttpStatus from 'http-status';
 import * as authService from '../services/authenticate.service';
 import {
   sendEmailOtpCode,
-  verifyEmailOtpCode
+  verifyEmailOtpCode,
+  sendPasswordResetLink,
+  resetPasswordWithToken
 } from '../services/email.service';
 import oauth2Client from '../../../core/config/oauth2Client';
 import { AppError } from '../../../core/exceptions/AppError';
@@ -123,4 +125,21 @@ export const handleVerifyEmail = async (req: Request, res: Response) => {
   const { email, code } = req.body;
   await verifyEmailOtpCode(email, code);
   sendSuccess(res, HttpStatus.OK, null, 'Email verified successfully');
+};
+
+// Forgot Password Handlers
+
+export const handleSendPasswordResetOtp = async (
+  req: Request,
+  res: Response
+) => {
+  const { email } = req.body;
+  await sendPasswordResetLink(email);
+  sendSuccess(res, HttpStatus.OK, null, 'Password reset link sent to your email');
+};
+
+export const handleResetPassword = async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body;
+  await resetPasswordWithToken(token, newPassword);
+  sendSuccess(res, HttpStatus.OK, null, 'Password reset successfully');
 };
