@@ -48,6 +48,12 @@ authRouter.patch(
 
 // -- Forgot Password --
 
+// Send password reset link
+authRouter.post(
+  '/forgot-password',
+  asyncHandler(authController.handleSendForgotPassword)
+);
+
 // Reset password directly with email and new password
 authRouter.patch(
   '/forgot-password',

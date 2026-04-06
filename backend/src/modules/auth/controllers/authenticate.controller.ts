@@ -129,7 +129,7 @@ export const handleVerifyEmail = async (req: Request, res: Response) => {
 
 // Forgot Password Handlers
 
-export const handleSendPasswordResetOtp = async (
+export const handleSendForgotPassword = async (
   req: Request,
   res: Response
 ) => {
