@@ -82,3 +82,24 @@ export const changePassword = async (
     }
   });
 };
+
+export const banUser = async (admin: user, userId: string) => {
+  const user = await prismaClient.user.findUnique({
+    where: { id: userId }
+  });
+
+  if (!user) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
+  }
+
+  if (user.status === account_status.BANNED) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'User is already banned');
+  }
+
+  await prismaClient.user.update({
+    where: { id: userId },
+    data: {
+      status: account_status.BANNED
+    } 
+  });
+};

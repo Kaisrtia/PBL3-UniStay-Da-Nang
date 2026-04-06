@@ -43,3 +43,12 @@ export const handleChangePassword = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, null, 'Password changed successfully');
 };
 
+export const handleBanUser = async (req: Request, res: Response) => {
+  const admin = req.user!;
+  const userId = req.body.userId;
+
+  await userService.banUser(admin, userId);
+
+  sendSuccess(res, HttpStatus.OK, null, 'User banned successfully');
+};
+
