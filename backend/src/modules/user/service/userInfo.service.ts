@@ -18,7 +18,10 @@ export const setupProfile = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role');
   }
 
-  // Check if phone is already used by another user
+  if (user.status !== account_status.SET_UP) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'User profile is already set up or locked');
+  }
+
   if (data.phone) {
     const existingPhone = await prismaClient.user.findFirst({
       where: { phone: data.phone, id: { not: user.id } }
@@ -28,11 +31,7 @@ export const setupProfile = async (
     }
   }
 
-  if (user.status !== account_status.SET_UP) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'User profile is already set up or locked');
-  }
-
-  const updatedUser = await prismaClient.user.update({
+  return prismaClient.user.update({
     where: { id: user.id },
     data: {
       roles: [data.role],
@@ -43,14 +42,36 @@ export const setupProfile = async (
       status: account_status.ACTIVE
     }
   });
+};
 
-  return updatedUser;
+export const updateProfile = async (
+  user: user,
+  data: {
+    fullName?: string;
+    dob?: string;
+    gender?: string;
+    avatarUrl?: string;
+  }
+) => {
+  if (!data.fullName && !data.dob && !data.gender && !data.avatarUrl) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'At least one field is required to update');
+  }
+
+  return prismaClient.user.update({
+    where: { id: user.id },
+    data: {
+      ...(data.fullName && { fullName: data.fullName }),
+      ...(data.gender && { gender: data.gender }),
+      ...(data.dob && { dob: new Date(data.dob) }),
+      ...(data.avatarUrl && { avatarUrl: data.avatarUrl })
+    }
+  });
 };
 
 export const changePassword = async (
   user: user,
-  currentPassword?: string,
-  newPassword?: string
+  currentPassword: string,
+  newPassword: string
 ) => {
   if (!currentPassword) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Current password is required');
@@ -60,7 +81,7 @@ export const changePassword = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'New password is required');
   }
 
-  if (user.provider === 'GOOGLE') { // assuming provider enum handles this or it's system auth only
+  if (user.provider === 'GOOGLE') {
     throw new AppError(
       HttpStatus.BAD_REQUEST,
       'Users logged in with Google cannot change password'
@@ -68,38 +89,12 @@ export const changePassword = async (
   }
 
   const isPasswordValid = await bcrypt.compare(currentPassword, user.hashedPassword!);
-
   if (!isPasswordValid) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid current password');
   }
 
-  const newHashedPassword = bcrypt.hashSync(newPassword, 10);
-
   await prismaClient.user.update({
     where: { id: user.id },
-    data: {
-      hashedPassword: newHashedPassword
-    }
-  });
-};
-
-export const banUser = async (admin: user, userId: string) => {
-  const user = await prismaClient.user.findUnique({
-    where: { id: userId }
-  });
-
-  if (!user) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
-  }
-
-  if (user.status === account_status.BANNED) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'User is already banned');
-  }
-
-  await prismaClient.user.update({
-    where: { id: userId },
-    data: {
-      status: account_status.BANNED
-    } 
+    data: { hashedPassword: bcrypt.hashSync(newPassword, 10) }
   });
 };
