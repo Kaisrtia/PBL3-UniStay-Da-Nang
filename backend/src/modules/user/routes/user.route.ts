@@ -55,4 +55,23 @@ userRouter.patch(
   asyncHandler(userController.handleUnbanUser)
 );
 
+// -- Evaluation --
+
+// Evaluate a host (Student only)
+userRouter.post(
+  '/evaluate',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(userController.handleCreateEvaluation)
+);
+
+// Evaluate system (Any authenticated user)
+userRouter.post(
+  '/system-feedback',
+  verifyToken,
+  authorize([account_role.USER]),
+  asyncHandler(userController.handleCreateSystemFeedback)
+);
+
 export default userRouter;
+

@@ -47,22 +47,23 @@ model email_verification {
 }
 
 model user {
-  id             String          @id @default(uuid())
-  email          String          @unique @db.VarChar(255)
-  hashedPassword String?
-  fullName       String          @db.VarChar(100)
-  phone          String?         @unique @db.VarChar(15)
-  dob            DateTime?
-  gender         String?         @db.VarChar(10)
-  avatarUrl      String?         @db.Text
-  emailVerified  Boolean?        @default(false)
-  phoneVerified  Boolean?        @default(false)
-  provider       provider?
-  status         account_status? @default(LOCKED)
-  roles          account_role[]  @default([USER])
-  createdAt      DateTime        @default(now())
-  student        student?
-  hosts          host[]
+  id              String            @id @default(uuid())
+  email           String            @unique @db.VarChar(255)
+  hashedPassword  String?
+  fullName        String            @db.VarChar(100)
+  phone           String?           @unique @db.VarChar(15)
+  dob             DateTime?
+  gender          String?           @db.VarChar(10)
+  avatarUrl       String?           @db.Text
+  emailVerified   Boolean?          @default(false)
+  phoneVerified   Boolean?          @default(false)
+  provider        provider?
+  status          account_status?   @default(LOCKED)
+  roles           account_role[]    @default([USER])
+  createdAt       DateTime          @default(now())
+  student         student?
+  hosts           host[]
+  systemFeedbacks system_feedback[]
 }
 
 model district {
@@ -90,17 +91,38 @@ model university {
 }
 
 model student {
-  studentId    String     @id @default(uuid())
-  total_post   Int        @default(0)
-  universityId String
-  university   university @relation(fields: [universityId], references: [id])
-  user         user       @relation(fields: [studentId], references: [id])
+  studentId            String                  @id @default(uuid())
+  total_post           Int                     @default(0)
+  universityId         String
+  university           university              @relation(fields: [universityId], references: [id])
+  user                 user                    @relation(fields: [studentId], references: [id])
+  studentEvaluateHosts student_evaluate_host[]
 }
 
 model host {
-  hostId     String  @id @default(uuid())
-  isVerified Boolean @default(false)
-  avgStar    Float   @default(-1)
-  user       user    @relation(fields: [hostId], references: [id])
+  hostId               String                  @id @default(uuid())
+  isVerified           Boolean                 @default(false)
+  avgStar              Float                   @default(-1)
+  user                 user                    @relation(fields: [hostId], references: [id])
+  studentEvaluateHosts student_evaluate_host[]
 }
 
+model student_evaluate_host {
+  id          String   @id @default(uuid())
+  studentId   String
+  hostId      String
+  numberStar  Int
+  description String
+  createdAt   DateTime @default(now())
+  student     student  @relation(fields: [studentId], references: [studentId])
+  host        host     @relation(fields: [hostId], references: [hostId])
+}
+
+model system_feedback {
+  id          String   @id @default(uuid())
+  userId      String
+  numberStar  Int
+  description String
+  createdAt   DateTime @default(now())
+  user        user     @relation(fields: [userId], references: [id])
+}

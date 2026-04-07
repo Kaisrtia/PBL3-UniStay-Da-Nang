@@ -34,7 +34,7 @@ export const setupProfile = async (
   return prismaClient.user.update({
     where: { id: user.id },
     data: {
-      roles: [data.role],
+      roles: Array.from(new Set([...user.roles, data.role])),
       gender: data.gender,
       dob: data.dob ? new Date(data.dob) : null,
       phone: data.phone,
