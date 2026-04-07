@@ -4,7 +4,7 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { user } from '@prisma/client';
 
 export const createEvaluation = async (
-  user: user,
+  currentUser: user,
   data: {
     hostId: string;
     numberStar: number;
@@ -17,7 +17,7 @@ export const createEvaluation = async (
 
   // Check if student exists
   const student = await prismaClient.student.findUnique({
-    where: { studentId: user.id }
+    where: { studentId: currentUser.id }
   });
 
   if (!student) {
@@ -36,7 +36,7 @@ export const createEvaluation = async (
   // Create evaluation
   const evaluation = await prismaClient.student_evaluate_host.create({
     data: {
-      studentId: user.id,
+      studentId: currentUser.id,
       hostId: data.hostId,
       numberStar: data.numberStar,
       description: data.description

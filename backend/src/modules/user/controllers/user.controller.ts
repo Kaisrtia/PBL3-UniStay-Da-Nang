@@ -2,8 +2,6 @@ import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
 import * as userInfoService from '../service/userInfo.service';
 import * as adminService from '../service/admin.service';
-import * as evaluationService from '../service/evaluation.service';
-import * as studentService from '../service/student.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { toUserResponseDto } from '../dto/user-response.dto';
 import { AppError } from '../../../core/exceptions/AppError';
@@ -71,106 +69,4 @@ export const handleUnbanUser = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, null, 'User unbanned successfully');
 };
 
-// -- Evaluation --
 
-export const handleCreateEvaluation = async (req: Request, res: Response) => {
-  const { hostId, numberStar, description } = req.body;
-
-  if (!hostId || !numberStar || !description) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'hostId, numberStar, and description are required');
-  }
-
-  const evaluation = await evaluationService.createEvaluation(req.user!, {
-    hostId,
-    numberStar: Number(numberStar),
-    description
-  });
-
-  sendSuccess(res, HttpStatus.CREATED, evaluation, 'Evaluation submitted successfully');
-};
-
-export const handleCreateSystemFeedback = async (req: Request, res: Response) => {
-  const { numberStar, description } = req.body;
-
-  if (!numberStar || !description) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'numberStar and description are required');
-  }
-
-  const feedback = await evaluationService.createSystemFeedback(req.user!, {
-    numberStar: Number(numberStar),
-    description
-  });
-
-  sendSuccess(res, HttpStatus.CREATED, feedback, 'System feedback submitted successfully');
-};
-
-// -- Student Actions --
-
-export const handleCreateStudentDemand = async (req: Request, res: Response) => {
-  const {
-    wardId,
-    universityId,
-    minPrice,
-    maxPrice,
-    roomType,
-    isLookingForRoommate,
-    roommateGender,
-    rommateCriteria
-  } = req.body;
-
-  if (wardId === undefined || minPrice === undefined || maxPrice === undefined || !roomType) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'wardId, minPrice, maxPrice, and roomType are required'
-    );
-  }
-
-  const demand = await studentService.createStudentDemand(req.user!, {
-    wardId: Number(wardId),
-    universityId: universityId ? String(universityId) : undefined,
-    minPrice: Number(minPrice),
-    maxPrice: Number(maxPrice),
-    roomType,
-    isLookingForRoommate: isLookingForRoommate === true || isLookingForRoommate === 'true',
-    roommateGender,
-    rommateCriteria
-  });
-
-  sendSuccess(res, HttpStatus.CREATED, demand, 'Student demand submitted successfully');
-};
-
-export const handleAddFavouritePost = async (req: Request, res: Response) => {
-  const { postId } = req.body;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  const favourite = await studentService.addFavouritePost(req.user!, postId);
-
-  sendSuccess(res, HttpStatus.CREATED, favourite, 'Post added to favourites');
-};
-
-export const handleRemoveFavouritePost = async (req: Request, res: Response) => {
-  const { postId } = req.params;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  await studentService.removeFavouritePost(req.user!, postId);
-
-  sendSuccess(res, HttpStatus.OK, null, 'Post removed from favourites');
-};
-
-export const handleCreateAccommodationRequest = async (req: Request, res: Response) => {
-  const { postId } = req.body;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  const request = await studentService.createAccommodationRequest(req.user!, postId);
-
-  sendSuccess(res, HttpStatus.CREATED, request, 'Accommodation request submitted successfully');
-};

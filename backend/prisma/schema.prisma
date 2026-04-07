@@ -156,8 +156,8 @@ model university {
 model student {
   studentId            String                  @id @default(uuid())
   totalPost            Int                     @default(0)
-  universityId         String
-  university           university              @relation(fields: [universityId], references: [id])
+  universityId         String?
+  university           university?             @relation(fields: [universityId], references: [id])
   user                 user                    @relation(fields: [studentId], references: [id])
   studentEvaluateHosts student_evaluate_host[]
   studentDemands       student_demand[]
@@ -270,7 +270,7 @@ model post_amenity {
 model student_demand {
   studentId            String     @id
   wardId               Int
-  universityId         String
+  universityId         String?
   minPrice             Decimal    @db.Decimal(15, 2)
   maxPrice             Decimal    @db.Decimal(15, 2)
   roomType             room_type
@@ -279,7 +279,7 @@ model student_demand {
   rommateCriteria      String     @db.Text
   student              student    @relation(fields: [studentId], references: [studentId])
   ward                 ward       @relation(fields: [wardId], references: [id])
-  university           university @relation(fields: [universityId], references: [id])
+  university           university? @relation(fields: [universityId], references: [id])
 }
 
 model demand_amenity {
