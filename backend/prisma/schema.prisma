@@ -40,25 +40,67 @@ model session {
   createdAt DateTime @default(now())
 }
 
-model user {
-  id             String           @id @default(uuid())
-  email          String           @unique @db.VarChar(255)
-  hashedPassword String?
-  fullName       String           @db.VarChar(100)
-  phone          String?          @unique @db.VarChar(15)
-  dob            DateTime?
-  gender         String?          @db.VarChar(10)
-  avatarUrl      String?          @db.Text
-  emailVerified  Boolean?         @default(false)
-  phoneVerified  Boolean?         @default(false)
-  provider       provider?
-  status         account_status?  @default(LOCKED)
-  roles          account_role[]   @default([USER])
-  createdAt      DateTime         @default(now())
-}
-
 model email_verification {
-  email     String   @id @unique
+  email     String    @id @unique
   code      String?
   expiresAt DateTime?
 }
+
+model user {
+  id             String          @id @default(uuid())
+  email          String          @unique @db.VarChar(255)
+  hashedPassword String?
+  fullName       String          @db.VarChar(100)
+  phone          String?         @unique @db.VarChar(15)
+  dob            DateTime?
+  gender         String?         @db.VarChar(10)
+  avatarUrl      String?         @db.Text
+  emailVerified  Boolean?        @default(false)
+  phoneVerified  Boolean?        @default(false)
+  provider       provider?
+  status         account_status? @default(LOCKED)
+  roles          account_role[]  @default([USER])
+  createdAt      DateTime        @default(now())
+  student        student?
+  hosts          host[]
+}
+
+model district {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(100)
+  wards ward[]
+}
+
+model ward {
+  id           Int          @id @default(autoincrement())
+  districtId   Int
+  name         String       @db.VarChar(100)
+  district     district     @relation(fields: [districtId], references: [id])
+  universities university[]
+}
+
+model university {
+  id          String    @id @db.VarChar(10)
+  name        String    @db.VarChar(255)
+  wardId      Int
+  streetName  String    @db.VarChar(255)
+  houseNumber String    @db.VarChar(50)
+  ward        ward      @relation(fields: [wardId], references: [id])
+  students    student[]
+}
+
+model student {
+  studentId    String     @id @default(uuid())
+  total_post   Int        @default(0)
+  universityId String
+  university   university @relation(fields: [universityId], references: [id])
+  user         user       @relation(fields: [studentId], references: [id])
+}
+
+model host {
+  hostId     String  @id @default(uuid())
+  isVerified Boolean @default(false)
+  avgStar    Float   @default(-1)
+  user       user    @relation(fields: [hostId], references: [id])
+}
+
