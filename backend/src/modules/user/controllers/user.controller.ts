@@ -16,27 +16,30 @@ export const handleGetUserInfo = async (req: Request, res: Response) => {
 };
 
 export const handleSetupProfile = async (req: Request, res: Response) => {
-  const { role, gender, dob, phone, avatarUrl } = req.body;
+  const { role, gender, dob, phone, avatarUrl, universityId } = req.body;
 
   const result = await userInfoService.setupProfile(req.user!, {
     role,
     gender,
     dob,
     phone,
-    avatarUrl
+    avatarUrl,
+    universityId
   });
+
 
   sendSuccess(res, HttpStatus.OK, toUserResponseDto(result));
 };
 
 export const handleUpdateProfile = async (req: Request, res: Response) => {
-  const { full_name, dob, gender, avatarUrl } = req.body;
+  const { full_name, dob, gender, avatarUrl, universityId } = req.body;
 
   const result = await userInfoService.updateProfile(req.user!, {
     fullName: full_name,
     dob,
     gender,
-    avatarUrl
+    avatarUrl,
+    universityId
   });
 
   sendSuccess(res, HttpStatus.OK, toUserResponseDto(result), 'Profile updated successfully');
@@ -115,16 +118,16 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
     rommateCriteria
   } = req.body;
 
-  if (wardId === undefined || !universityId || minPrice === undefined || maxPrice === undefined || !roomType) {
+  if (wardId === undefined || minPrice === undefined || maxPrice === undefined || !roomType) {
     throw new AppError(
       HttpStatus.BAD_REQUEST,
-      'wardId, universityId, minPrice, maxPrice, and roomType are required'
+      'wardId, minPrice, maxPrice, and roomType are required'
     );
   }
 
   const demand = await studentService.createStudentDemand(req.user!, {
     wardId: Number(wardId),
-    universityId,
+    universityId: universityId ? String(universityId) : undefined,
     minPrice: Number(minPrice),
     maxPrice: Number(maxPrice),
     roomType,
@@ -134,4 +137,40 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
   });
 
   sendSuccess(res, HttpStatus.CREATED, demand, 'Student demand submitted successfully');
+};
+
+export const handleAddFavouritePost = async (req: Request, res: Response) => {
+  const { postId } = req.body;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const favourite = await studentService.addFavouritePost(req.user!, postId);
+
+  sendSuccess(res, HttpStatus.CREATED, favourite, 'Post added to favourites');
+};
+
+export const handleRemoveFavouritePost = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  await studentService.removeFavouritePost(req.user!, postId);
+
+  sendSuccess(res, HttpStatus.OK, null, 'Post removed from favourites');
+};
+
+export const handleCreateAccommodationRequest = async (req: Request, res: Response) => {
+  const { postId } = req.body;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const request = await studentService.createAccommodationRequest(req.user!, postId);
+
+  sendSuccess(res, HttpStatus.CREATED, request, 'Accommodation request submitted successfully');
 };

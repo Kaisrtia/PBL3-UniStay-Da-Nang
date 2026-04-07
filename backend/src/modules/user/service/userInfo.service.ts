@@ -12,6 +12,7 @@ export const setupProfile = async (
     dob?: string;
     phone?: string;
     avatarUrl?: string;
+    universityId?: string;
   }
 ) => {
   if (!data.role || !Object.values(account_role).includes(data.role)) {
@@ -31,7 +32,7 @@ export const setupProfile = async (
     }
   }
 
-  return prismaClient.user.update({
+  const updatedUser = await prismaClient.user.update({
     where: { id: user.id },
     data: {
       roles: Array.from(new Set([...user.roles, data.role])),
@@ -42,6 +43,32 @@ export const setupProfile = async (
       status: account_status.ACTIVE
     }
   });
+
+  if (data.role === account_role.STUDENT) {
+    if (data.universityId) {
+      const university = await prismaClient.university.findUnique({
+        where: { id: data.universityId }
+      });
+      if (!university) {
+        throw new AppError(HttpStatus.BAD_REQUEST, 'University not found');
+      }
+    }
+    
+    await prismaClient.student.create({
+      data: {
+        studentId: user.id,
+        ...(data.universityId && { universityId: data.universityId })
+      }
+    });
+  } else if (data.role === account_role.HOST) {
+    await prismaClient.host.create({
+      data: {
+        hostId: user.id
+      }
+    });
+  }
+
+  return updatedUser;
 };
 
 export const updateProfile = async (
@@ -51,13 +78,14 @@ export const updateProfile = async (
     dob?: string;
     gender?: string;
     avatarUrl?: string;
+    universityId?: string;
   }
 ) => {
-  if (!data.fullName && !data.dob && !data.gender && !data.avatarUrl) {
+  if (!data.fullName && !data.dob && !data.gender && !data.avatarUrl && !data.universityId) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'At least one field is required to update');
   }
 
-  return prismaClient.user.update({
+  const updatedUser = await prismaClient.user.update({
     where: { id: user.id },
     data: {
       ...(data.fullName && { fullName: data.fullName }),
@@ -66,6 +94,24 @@ export const updateProfile = async (
       ...(data.avatarUrl && { avatarUrl: data.avatarUrl })
     }
   });
+
+  if (data.universityId && user.roles.includes(account_role.STUDENT)) {
+    const university = await prismaClient.university.findUnique({
+      where: { id: data.universityId }
+    });
+    if (!university) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'University not found');
+    }
+    
+    // We use upsert in case the student object wasn't properly created, though it should be.
+    await prismaClient.student.upsert({
+      where: { studentId: user.id },
+      update: { universityId: data.universityId },
+      create: { studentId: user.id, universityId: data.universityId }
+    });
+  }
+
+  return updatedUser;
 };
 
 export const changePassword = async (

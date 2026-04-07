@@ -83,5 +83,33 @@ userRouter.post(
   asyncHandler(userController.handleCreateStudentDemand)
 );
 
+// -- Favourite Posts --
+
+// Add a post to favourites (Student only)
+userRouter.post(
+  '/favourites',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(userController.handleAddFavouritePost)
+);
+
+// Remove a post from favourites (Student only)
+userRouter.delete(
+  '/favourites/:postId',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(userController.handleRemoveFavouritePost)
+);
+
+// -- Accommodation Requests --
+
+// Submit a shared accommodation request (Student only)
+userRouter.post(
+  '/accommodation-requests',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(userController.handleCreateAccommodationRequest)
+);
+
 export default userRouter;
 
