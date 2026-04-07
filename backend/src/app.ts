@@ -9,6 +9,7 @@ import userRouter from './modules/user/routes/user.route';
 import postRouter from './modules/post/routes/post.route';
 import demandRouter from './modules/demand/routes/demand.route';
 import evaluationRouter from './modules/evaluation/routes/evaluation.route';
+import reportRouter from './modules/report/routes/report.route';
 
 const app: Application = express();
 
@@ -39,6 +40,7 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/posts', postRouter);
 app.use('/api/v1/demands', demandRouter);
 app.use('/api/v1/evaluations', evaluationRouter);
+app.use('/api/v1/reports', reportRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
