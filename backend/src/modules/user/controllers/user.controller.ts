@@ -1,54 +1,66 @@
 import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
-import * as userService from '../service/user.service';
+import * as userInfoService from '../service/userInfo.service';
+import * as userManagementService from '../service/userManagement.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
-import { account_role } from '@prisma/client';
+import { toUserResponseDto } from '../dto/user-response.dto';
+
+// -- User Info --
+
+export const handleGetUserInfo = async (req: Request, res: Response) => {
+  const user = toUserResponseDto(req.user!);
+  sendSuccess(res, HttpStatus.OK, user);
+};
 
 export const handleSetupProfile = async (req: Request, res: Response) => {
   const { role, gender, dob, phone, avatarUrl } = req.body;
 
-  const result = await userService.setupProfile(req.user!, {
-    role: role as account_role,
+  const result = await userInfoService.setupProfile(req.user!, {
+    role,
     gender,
     dob,
     phone,
     avatarUrl
   });
 
-  sendSuccess(
-    res,
-    HttpStatus.OK,
-    {
-      user: {
-        id: result.id,
-        email: result.email,
-        phone: result.phone,
-        fullName: result.fullName,
-        status: result.status,
-        avatarUrl: result.avatarUrl,
-        dob: result.dob,
-        gender: result.gender,
-        roles: result.roles
-      }
-    },
-    'Profile set up successfully'
-  );
+  sendSuccess(res, HttpStatus.OK, toUserResponseDto(result));
+};
+
+export const handleUpdateProfile = async (req: Request, res: Response) => {
+  const { full_name, dob, gender, avatarUrl } = req.body;
+
+  const result = await userInfoService.updateProfile(req.user!, {
+    fullName: full_name,
+    dob,
+    gender,
+    avatarUrl
+  });
+
+  sendSuccess(res, HttpStatus.OK, toUserResponseDto(result), 'Profile updated successfully');
 };
 
 export const handleChangePassword = async (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body;
 
-  await userService.changePassword(req.user!, currentPassword, newPassword);
+  await userInfoService.changePassword(req.user!, currentPassword, newPassword);
 
   sendSuccess(res, HttpStatus.OK, null, 'Password changed successfully');
 };
 
-export const handleBanUser = async (req: Request, res: Response) => {
-  const admin = req.user!;
-  const userId = req.body.userId;
+// -- User Management --
 
-  await userService.banUser(admin, userId);
+export const handleBanUser = async (req: Request, res: Response) => {
+  const { userId } = req.body;
+
+  await userManagementService.banUser(req.user!, userId);
 
   sendSuccess(res, HttpStatus.OK, null, 'User banned successfully');
 };
 
+export const handleUnbanUser = async (req: Request, res: Response) => {
+  const { userId } = req.body;
+
+  await userManagementService.unbanUser(req.user!, userId);
+
+  sendSuccess(res, HttpStatus.OK, null, 'User unbanned successfully');
+};

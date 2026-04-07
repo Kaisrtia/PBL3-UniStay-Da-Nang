@@ -7,11 +7,27 @@ import { account_role } from '@prisma/client';
 
 const userRouter = Router();
 
+// -- User Info --
+
+// Get user info
+userRouter.get(
+  '/me',
+  verifyToken,
+  asyncHandler(userController.handleGetUserInfo)
+);
+
 // Setup profile
 userRouter.patch(
   '/setup',
   verifyToken,
   asyncHandler(userController.handleSetupProfile)
+);
+
+// Update profile
+userRouter.patch(
+  '/update',
+  verifyToken,
+  asyncHandler(userController.handleUpdateProfile)
 );
 
 // Change password
@@ -21,6 +37,8 @@ userRouter.patch(
   asyncHandler(userController.handleChangePassword)
 );
 
+// -- User Management --
+
 // Ban user
 userRouter.patch(
   '/ban',
@@ -29,5 +47,12 @@ userRouter.patch(
   asyncHandler(userController.handleBanUser)
 );
 
+// Unban user
+userRouter.patch(
+  '/unban',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(userController.handleUnbanUser)
+);
 
 export default userRouter;
