@@ -11,6 +11,7 @@ import oauth2Client from '../../../core/config/oauth2Client';
 import { AppError } from '../../../core/exceptions/AppError';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import config from '../../../core/config/config';
+import { toUserResponseDto } from '../../user/dto/user-response.dto';
 
 // Auth Handlers
 
@@ -29,7 +30,6 @@ export const handleLogin = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const result = await authService.login(email, password);
 
-  // Set HTTP-only cookie for refresh token
   res.cookie('refreshToken', result.refreshToken, {
     httpOnly: true,
     secure: true,
@@ -39,14 +39,7 @@ export const handleLogin = async (req: Request, res: Response) => {
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
-    user: {
-      id: result.user.id,
-      email: result.user.email,
-      phone: result.user.phone,
-      fullName: result.user.fullName,
-      status: result.user.status,
-      roles: result.user.roles
-    }
+    user: toUserResponseDto(result.user)
   });
 };
 
@@ -77,15 +70,7 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
-    user: {
-      id: result.user.id,
-      email: result.user.email,
-      phone: result.user.phone,
-      fullName: result.user.fullName,
-      status: result.user.status,
-      roles: result.user.roles,
-      avatarUrl: result.user.avatarUrl
-    }
+    user: toUserResponseDto(result.user)
   });
 };
 
@@ -112,10 +97,7 @@ export const handleRefreshSession = async (req: Request, res: Response) => {
 
 // Email Verification Handlers
 
-export const handleSendEmailVerification = async (
-  req: Request,
-  res: Response
-) => {
+export const handleSendEmailVerification = async (req: Request, res: Response) => {
   const { email } = req.body;
   await sendEmailOtpCode(email);
   sendSuccess(res, HttpStatus.OK, null, 'Verification code sent to your email');
@@ -129,10 +111,7 @@ export const handleVerifyEmail = async (req: Request, res: Response) => {
 
 // Forgot Password Handlers
 
-export const handleSendForgotPassword = async (
-  req: Request,
-  res: Response
-) => {
+export const handleSendForgotPassword = async (req: Request, res: Response) => {
   const { email } = req.body;
   await sendPasswordResetLink(email);
   sendSuccess(res, HttpStatus.OK, null, 'Password reset link sent to your email');
