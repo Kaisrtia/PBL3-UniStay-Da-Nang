@@ -17,6 +17,7 @@ enum account_status {
   LOCKED
   SET_UP
   BANNED
+  HIDDEN
 }
 
 enum account_role {
@@ -28,6 +29,58 @@ enum account_role {
 
 enum provider {
   GOOGLE
+  SYSTEM
+}
+
+enum post_status {
+  PENDING
+  APPROVED
+  REJECTED
+  UPDATED
+  HIDDEN
+}
+
+enum post_purpose {
+  RENT
+  FIND_ROOMMATE
+}
+
+enum room_type {
+  ROOM
+  APARTMENT
+  HOUSE
+}
+
+enum accomodation_request_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+  HIDDEN
+}
+
+enum comment_status {
+  DISPLAYED
+  HIDDEN
+}
+
+enum report_status {
+  PENDING
+  RESOLVED
+  REJECTED
+  HIDDEN
+}
+
+enum amenity_condition {
+  NEW
+  GOOD
+  OLD
+}
+
+enum notification_type {
+  POST
+  COMMENT
+  ACCOMODATION_REQUEST
+  REPORT
   SYSTEM
 }
 
@@ -47,23 +100,30 @@ model email_verification {
 }
 
 model user {
-  id              String            @id @default(uuid())
-  email           String            @unique @db.VarChar(255)
-  hashedPassword  String?
-  fullName        String            @db.VarChar(100)
-  phone           String?           @unique @db.VarChar(15)
-  dob             DateTime?
-  gender          String?           @db.VarChar(10)
-  avatarUrl       String?           @db.Text
-  emailVerified   Boolean?          @default(false)
-  phoneVerified   Boolean?          @default(false)
-  provider        provider?
-  status          account_status?   @default(LOCKED)
-  roles           account_role[]    @default([USER])
-  createdAt       DateTime          @default(now())
-  student         student?
-  hosts           host[]
-  systemFeedbacks system_feedback[]
+  id                   String                 @id @default(uuid())
+  email                String                 @unique @db.VarChar(255)
+  hashedPassword       String?                @db.VarChar(255)
+  fullName             String                 @db.VarChar(100)
+  phone                String?                @unique @db.VarChar(15)
+  dob                  DateTime?
+  gender               String?                @db.VarChar(10)
+  avatarUrl            String?                @db.Text
+  emailVerified        Boolean?               @default(false)
+  phoneVerified        Boolean?               @default(false)
+  provider             provider?
+  status               account_status?        @default(LOCKED)
+  roles                account_role[]         @default([USER])
+  createdAt            DateTime               @default(now())
+  student              student?
+  hosts                host[]
+  systemFeedbacks      system_feedback[]
+  posts                post[]
+  comments             comment[]
+  accomodationRequests accomodation_request[]
+  notifications        notification[]
+
+  userReports    report[] @relation("report")
+  reportHandlers report[] @relation("handle")
 }
 
 model district {
@@ -73,42 +133,49 @@ model district {
 }
 
 model ward {
-  id           Int          @id @default(autoincrement())
-  districtId   Int
-  name         String       @db.VarChar(100)
-  district     district     @relation(fields: [districtId], references: [id])
-  universities university[]
+  id             Int              @id @default(autoincrement())
+  districtId     Int
+  name           String           @db.VarChar(100)
+  district       district         @relation(fields: [districtId], references: [id])
+  universities   university[]
+  posts          post[]
+  studentDemands student_demand[]
 }
 
 model university {
-  id          String    @id @db.VarChar(10)
-  name        String    @db.VarChar(255)
-  wardId      Int
-  streetName  String    @db.VarChar(255)
-  houseNumber String    @db.VarChar(50)
-  ward        ward      @relation(fields: [wardId], references: [id])
-  students    student[]
+  id             String           @id @db.VarChar(10)
+  name           String           @db.VarChar(255)
+  wardId         Int
+  streetName     String           @db.VarChar(255)
+  houseNumber    String           @db.VarChar(50)
+  ward           ward             @relation(fields: [wardId], references: [id])
+  students       student[]
+  studentDemands student_demand[]
 }
 
 model student {
   studentId            String                  @id @default(uuid())
-  total_post           Int                     @default(0)
+  totalPost            Int                     @default(0)
   universityId         String
   university           university              @relation(fields: [universityId], references: [id])
   user                 user                    @relation(fields: [studentId], references: [id])
   studentEvaluateHosts student_evaluate_host[]
+  studentDemands       student_demand[]
+  demandAmenities      demand_amenity[]
+  studentFavoritePosts student_favorite_post[]
 }
 
 model host {
   hostId               String                  @id @default(uuid())
+  totalPost            Int                     @default(0)
   isVerified           Boolean                 @default(false)
-  avgStar              Float                   @default(-1)
+  avgStar              Decimal                 @default(-1) @db.Decimal(3, 2)
   user                 user                    @relation(fields: [hostId], references: [id])
   studentEvaluateHosts student_evaluate_host[]
 }
 
 model student_evaluate_host {
-  id          String   @id @default(uuid())
+  id          Int      @id @default(autoincrement())
   studentId   String
   hostId      String
   numberStar  Int
@@ -122,7 +189,154 @@ model system_feedback {
   id          String   @id @default(uuid())
   userId      String
   numberStar  Int
-  description String
+  description String   @db.Text
   createdAt   DateTime @default(now())
   user        user     @relation(fields: [userId], references: [id])
+}
+
+model comment {
+  id        String         @id @db.VarChar(30)
+  userId    String
+  postId    String
+  parentId  String?
+  content   String         @db.Text
+  status    comment_status @default(DISPLAYED)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now())
+  user      user           @relation(fields: [userId], references: [id])
+  post      post           @relation(fields: [postId], references: [id])
+  comment   comment?       @relation("ReplyRelation", fields: [parentId], references: [id])
+  replies   comment[]      @relation("ReplyRelation")
+  reports   report[]
+}
+
+model post {
+  id                   String                  @id @db.VarChar(30)
+  title                String                  @db.VarChar(255)
+  userId               String
+  wardId               Int
+  purpose              String                  @db.VarChar(50)
+  detailAddress        String                  @db.Text
+  area                 Decimal                 @db.Decimal(10, 2)
+  price                Decimal                 @db.Decimal(15, 2)
+  deposit              Decimal                 @db.Decimal(15, 2)
+  viewCount            Int                     @default(0)
+  roomType             room_type               @default(ROOM)
+  postPurpose          post_purpose            @default(RENT)
+  description          String                  @db.Text
+  latitude             Decimal                 @db.Decimal(9, 6)
+  longitude            Decimal                 @db.Decimal(9, 6)
+  status               post_status             @default(PENDING)
+  rejectionReason      String?                 @db.Text
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @default(now())
+  user                 user                    @relation(fields: [userId], references: [id])
+  ward                 ward                    @relation(fields: [wardId], references: [id])
+  comments             comment[]
+  postImages           post_image[]
+  postAmenities        post_amenity[]
+  studentFavoritePosts student_favorite_post[]
+  accomodationRequests accomodation_request[]
+  reports              report[]
+}
+
+model post_image {
+  id       Int    @unique @default(autoincrement())
+  postId   String
+  imageUrl String @db.Text
+  post     post   @relation(fields: [postId], references: [id])
+
+  @@id([id, postId])
+}
+
+model amenity {
+  id              Int              @id @default(autoincrement())
+  name            String           @db.VarChar(100)
+  postAmenities   post_amenity[]
+  demandAmenities demand_amenity[]
+}
+
+model post_amenity {
+  id               Int               @unique @default(autoincrement())
+  postId           String
+  amenityId        Int
+  currentCondition amenity_condition @default(GOOD)
+  post             post              @relation(fields: [postId], references: [id])
+  amenity          amenity           @relation(fields: [amenityId], references: [id])
+
+  @@id([id, postId])
+}
+
+model student_demand {
+  studentId            String     @id
+  wardId               Int
+  universityId         String
+  minPrice             Decimal    @db.Decimal(15, 2)
+  maxPrice             Decimal    @db.Decimal(15, 2)
+  roomType             room_type
+  isLookingForRoommate Boolean    @default(false)
+  roommateGender       String     @db.VarChar(10)
+  rommateCriteria      String     @db.Text
+  student              student    @relation(fields: [studentId], references: [studentId])
+  ward                 ward       @relation(fields: [wardId], references: [id])
+  university           university @relation(fields: [universityId], references: [id])
+}
+
+model demand_amenity {
+  studentId String
+  amenityId Int
+  student   student @relation(fields: [studentId], references: [studentId])
+  amenity   amenity @relation(fields: [amenityId], references: [id])
+
+  @@id([studentId, amenityId])
+}
+
+model student_favorite_post {
+  studentId String
+  postId    String
+  student   student @relation(fields: [studentId], references: [studentId])
+  post      post    @relation(fields: [postId], references: [id])
+
+  @@id([studentId, postId])
+}
+
+model accomodation_request {
+  postId    String
+  userId    String
+  status    accomodation_request_status @default(PENDING)
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @default(now())
+  post      post                        @relation(fields: [postId], references: [id])
+  user      user                        @relation(fields: [userId], references: [id])
+
+  @@id([postId, userId])
+}
+
+model report {
+  id        String        @id @default(uuid())
+  userId    String
+  adminId   String?
+  postId    String?
+  commentId String?
+  reason    String
+  status    report_status @default(PENDING)
+  adminNote String?
+  createdAt DateTime      @default(now())
+  tackledAt DateTime?
+  user      user          @relation("report", fields: [userId], references: [id])
+  admin     user?         @relation("handle", fields: [adminId], references: [id])
+  post      post?         @relation(fields: [postId], references: [id])
+  comment   comment?      @relation(fields: [commentId], references: [id])
+}
+
+model notification {
+  id        String            @id @default(uuid())
+  userId    String
+  title     String            @db.VarChar(255)
+  content   String            @db.Text
+  type      notification_type @default(POST)
+  metaData  Json?             @db.JsonB
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @default(now())
+  user      user              @relation(fields: [userId], references: [id])
 }
