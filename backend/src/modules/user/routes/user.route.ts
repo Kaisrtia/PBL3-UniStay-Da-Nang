@@ -73,5 +73,15 @@ userRouter.post(
   asyncHandler(userController.handleCreateSystemFeedback)
 );
 
+// -- Student Demands --
+
+// Create or update accommodation demand (Student only)
+userRouter.post(
+  '/demand',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(userController.handleCreateStudentDemand)
+);
+
 export default userRouter;
 

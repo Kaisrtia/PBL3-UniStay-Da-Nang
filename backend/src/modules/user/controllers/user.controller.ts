@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
 import * as userInfoService from '../service/userInfo.service';
-import * as userManagementService from '../service/userManagement.service';
+import * as adminService from '../service/admin.service';
 import * as evaluationService from '../service/evaluation.service';
+import * as studentService from '../service/student.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { toUserResponseDto } from '../dto/user-response.dto';
 import { AppError } from '../../../core/exceptions/AppError';
@@ -54,7 +55,7 @@ export const handleChangePassword = async (req: Request, res: Response) => {
 export const handleBanUser = async (req: Request, res: Response) => {
   const { userId } = req.body;
 
-  await userManagementService.banUser(req.user!, userId);
+  await adminService.banUser(req.user!, userId);
 
   sendSuccess(res, HttpStatus.OK, null, 'User banned successfully');
 };
@@ -62,7 +63,7 @@ export const handleBanUser = async (req: Request, res: Response) => {
 export const handleUnbanUser = async (req: Request, res: Response) => {
   const { userId } = req.body;
 
-  await userManagementService.unbanUser(req.user!, userId);
+  await adminService.unbanUser(req.user!, userId);
 
   sendSuccess(res, HttpStatus.OK, null, 'User unbanned successfully');
 };
@@ -98,4 +99,39 @@ export const handleCreateSystemFeedback = async (req: Request, res: Response) =>
   });
 
   sendSuccess(res, HttpStatus.CREATED, feedback, 'System feedback submitted successfully');
+};
+
+// -- Student Actions --
+
+export const handleCreateStudentDemand = async (req: Request, res: Response) => {
+  const {
+    wardId,
+    universityId,
+    minPrice,
+    maxPrice,
+    roomType,
+    isLookingForRoommate,
+    roommateGender,
+    rommateCriteria
+  } = req.body;
+
+  if (wardId === undefined || !universityId || minPrice === undefined || maxPrice === undefined || !roomType) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'wardId, universityId, minPrice, maxPrice, and roomType are required'
+    );
+  }
+
+  const demand = await studentService.createStudentDemand(req.user!, {
+    wardId: Number(wardId),
+    universityId,
+    minPrice: Number(minPrice),
+    maxPrice: Number(maxPrice),
+    roomType,
+    isLookingForRoommate: isLookingForRoommate === true || isLookingForRoommate === 'true',
+    roommateGender,
+    rommateCriteria
+  });
+
+  sendSuccess(res, HttpStatus.CREATED, demand, 'Student demand submitted successfully');
 };
