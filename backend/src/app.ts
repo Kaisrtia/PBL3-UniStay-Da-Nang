@@ -5,6 +5,12 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import authRouter from './modules/auth/routes/auth.route';
 import { errorHandler } from './core/middlewares/error.handler';
+import userRouter from './modules/user/routes/user.route';
+import postRouter from './modules/post/routes/post.route';
+import demandRouter from './modules/demand/routes/demand.route';
+import evaluationRouter from './modules/evaluation/routes/evaluation.route';
+import reportRouter from './modules/report/routes/report.route';
+import commentRouter from './modules/comment/routes/comment.route';
 
 const app: Application = express();
 
@@ -31,6 +37,12 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
 app.use('/api/v1/auth', authRouter);
 
 // private routes
+app.use('/api/v1/users', userRouter);
+app.use('/api/v1/posts', postRouter);
+app.use('/api/v1/demands', demandRouter);
+app.use('/api/v1/evaluations', evaluationRouter);
+app.use('/api/v1/reports', reportRouter);
+app.use('/api/v1/comments', commentRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

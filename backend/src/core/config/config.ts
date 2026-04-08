@@ -21,7 +21,8 @@ const envSchema = Joi.object()
     EMAIL_USER: Joi.string().email().required(),
     EMAIL_PASSWORD: Joi.string().required(),
     GOOGLE_CLIENT_ID: Joi.string().required(),
-    GOOGLE_CLIENT_SECRET: Joi.string().required()
+    GOOGLE_CLIENT_SECRET: Joi.string().required(),
+    FRONTEND_URL: Joi.string().uri().required()
   })
   .unknown();
 
@@ -58,7 +59,8 @@ const config = {
   google: {
     client_id: validatedEnv.GOOGLE_CLIENT_ID,
     client_secret: validatedEnv.GOOGLE_CLIENT_SECRET
-  }
+  },
+  frontend_url: validatedEnv.FRONTEND_URL
 } as const;
 
 export default config;
