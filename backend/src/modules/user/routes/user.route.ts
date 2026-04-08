@@ -7,6 +7,16 @@ import { account_role } from '@prisma/client';
 
 const userRouter = Router();
 
+// -- User Management --
+
+// Get all users (Admin Only)
+userRouter.get(
+  '/',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(userController.handleGetAllUsers)
+);
+
 // -- User Info --
 
 // Get user info
@@ -61,6 +71,22 @@ userRouter.patch(
   verifyToken,
   authorize([account_role.ADMIN]),
   asyncHandler(userController.handleVerifyHost)
+);
+
+// Get Verification Candidates (Admin Only)
+userRouter.get(
+  '/hosts/verification-candidates',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(userController.handleGetVerificationCandidates)
+);
+
+// -- Public User Read --
+
+// Get public profile (MUST be at bottom to prevent overriding static routes like /me or /setup)
+userRouter.get(
+  '/:id',
+  asyncHandler(userController.handleGetUserProfile)
 );
 
 export default userRouter;

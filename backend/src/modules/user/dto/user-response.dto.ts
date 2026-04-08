@@ -1,6 +1,7 @@
 import { user } from '@prisma/client';
 
 export interface UserResponseDto {
+  id: string;
   email: string;
   fullName: string;
   phone: string | null;
@@ -12,6 +13,7 @@ export interface UserResponseDto {
 }
 
 export const toUserResponseDto = (user: user): UserResponseDto => ({
+  id: user.id,
   email: user.email,
   fullName: user.fullName,
   phone: user.phone,

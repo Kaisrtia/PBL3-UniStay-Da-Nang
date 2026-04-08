@@ -13,6 +13,17 @@ export const handleGetUserInfo = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, user);
 };
 
+export const handleGetUserProfile = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'User ID is required');
+  }
+
+  const profile = await userInfoService.getUserProfile(id);
+  sendSuccess(res, HttpStatus.OK, profile);
+};
+
 export const handleSetupProfile = async (req: Request, res: Response) => {
   const { role, gender, dob, phone, avatarUrl, universityId } = req.body;
 
@@ -81,4 +92,20 @@ export const handleVerifyHost = async (req: Request, res: Response) => {
   const verifiedHost = await adminService.verifyHost(req.user!, hostId);
 
   sendSuccess(res, HttpStatus.OK, verifiedHost, 'Host verified successfully (Blue Tick granted)');
+};
+
+export const handleGetVerificationCandidates = async (req: Request, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const result = await adminService.getVerificationCandidates(req.user!, page, limit);
+  sendSuccess(res, HttpStatus.OK, result);
+};
+
+export const handleGetAllUsers = async (req: Request, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const result = await adminService.getAllUsers(req.user!, page, limit);
+  sendSuccess(res, HttpStatus.OK, result);
 };

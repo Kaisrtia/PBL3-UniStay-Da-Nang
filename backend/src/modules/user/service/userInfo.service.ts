@@ -144,3 +144,26 @@ export const changePassword = async (
     data: { hashedPassword: bcrypt.hashSync(newPassword, 10) }
   });
 };
+
+export const getUserProfile = async (targetUserId: string) => {
+  const targetUser = await prismaClient.user.findUnique({
+    where: { id: targetUserId },
+    include: {
+      hosts: true,
+      student: {
+        include: {
+          university: true
+        }
+      }
+    }
+  });
+
+  if (!targetUser) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Remove highly sensitive properties directly
+  const { hashedPassword, ...safeUser } = targetUser;
+  
+  return safeUser;
+};
