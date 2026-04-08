@@ -70,6 +70,18 @@ export const handleCreatePost = async (req: Request, res: Response) => {
   );
 };
 
+export const handleGetPostDetail = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const post = await postService.getPostDetail(postId);
+
+  sendSuccess(res, HttpStatus.OK, post, 'Post detail fetched successfully');
+};
+
 // -- Favourite Posts --
 
 export const handleAddFavouritePost = async (req: Request, res: Response) => {

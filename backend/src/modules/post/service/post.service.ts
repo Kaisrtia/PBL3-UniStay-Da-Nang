@@ -4,6 +4,22 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { user, room_type, post_purpose, amenity_condition } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
 
+export const getPostDetail = async (postId: string) => {
+  const post = await prismaClient.post.findUnique({
+    where: { id: postId },
+    include: {
+      postImages: true,
+      postAmenities: true
+    }
+  });
+
+  if (!post) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  return post;
+};
+
 export const createPost = async (
   currentUser: user,
   data: {

@@ -13,8 +13,16 @@ const postRouter = Router();
 postRouter.post(
   '/',
   verifyToken,
-  authorize([account_role.USER, account_role.STUDENT, account_role.HOST, account_role.ADMIN]),
+  authorize([account_role.USER]),
   asyncHandler(postController.handleCreatePost)
+);
+
+// Get detail post
+postRouter.get(
+  '/:postId',
+  verifyToken,
+  authorize([account_role.USER]),
+  asyncHandler(postController.handleGetPostDetail)
 );
 
 // -- Favourite Posts --
