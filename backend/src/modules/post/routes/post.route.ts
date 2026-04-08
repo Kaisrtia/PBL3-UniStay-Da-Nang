@@ -7,6 +7,16 @@ import { account_role } from '@prisma/client';
 
 const postRouter = Router();
 
+// -- Post Management --
+
+// Create Post (Users, Students, Hosts)
+postRouter.post(
+  '/',
+  verifyToken,
+  authorize([account_role.USER, account_role.STUDENT, account_role.HOST, account_role.ADMIN]),
+  asyncHandler(postController.handleCreatePost)
+);
+
 // -- Favourite Posts --
 
 // Add a post to favourites (Student only)

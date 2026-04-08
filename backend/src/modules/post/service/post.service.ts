@@ -1,7 +1,80 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user } from '@prisma/client';
+import { user, room_type, post_purpose, amenity_condition } from '@prisma/client';
+import { generateHybridId } from '../../../core/utils/generateId';
+
+export const createPost = async (
+  currentUser: user,
+  data: {
+    title: string;
+    wardId: number;
+    purpose: string;
+    detailAddress: string;
+    area: number;
+    price: number;
+    deposit: number;
+    roomType: room_type;
+    postPurpose: post_purpose;
+    description: string;
+    latitude: number;
+    longitude: number;
+    postImages?: string[];
+    postAmenities?: {
+      amenityId: number;
+      currentCondition?: amenity_condition;
+    }[];
+  }
+) => {
+  // Validate ward exists
+  const ward = await prismaClient.ward.findUnique({ where: { id: data.wardId } });
+  if (!ward) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
+  }
+
+  // Create post with nested images and amenities
+  return prismaClient.post.create({
+    data: {
+      id: generateHybridId('POST_'),
+      userId: currentUser.id,
+      title: data.title,
+      wardId: data.wardId,
+      purpose: data.purpose,
+      detailAddress: data.detailAddress,
+      area: data.area,
+      price: data.price,
+      deposit: data.deposit,
+      roomType: data.roomType,
+      postPurpose: data.postPurpose,
+      description: data.description,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      // Default status is PENDING, we wait for AI moderation.
+      
+      ...(data.postImages && data.postImages.length > 0 && {
+        postImages: {
+          create: data.postImages.map((imageUrl) => ({
+            imageUrl
+          }))
+        }
+      }),
+
+      ...(data.postAmenities && data.postAmenities.length > 0 && {
+        postAmenities: {
+          create: data.postAmenities.map((amenity) => ({
+            amenityId: amenity.amenityId,
+            currentCondition: amenity.currentCondition
+          }))
+        }
+      })
+    },
+    include: {
+      postImages: true,
+      postAmenities: true
+    }
+  });
+};
+
 
 const requirePost = async (postId: string) => {
   const post = await prismaClient.post.findUnique({ where: { id: postId } });
