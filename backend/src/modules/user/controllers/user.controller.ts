@@ -69,4 +69,16 @@ export const handleUnbanUser = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, null, 'User unbanned successfully');
 };
 
+// -- Host Management --
 
+export const handleVerifyHost = async (req: Request, res: Response) => {
+  const { hostId } = req.body;
+
+  if (!hostId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'hostId is required');
+  }
+
+  const verifiedHost = await adminService.verifyHost(req.user!, hostId);
+
+  sendSuccess(res, HttpStatus.OK, verifiedHost, 'Host verified successfully (Blue Tick granted)');
+};

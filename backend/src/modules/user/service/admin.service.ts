@@ -36,3 +36,40 @@ export const unbanUser = async (admin: user, userId: string) => {
     data: { status: account_status.ACTIVE }
   });
 };
+
+export const verifyHost = async (admin: user, hostId: string) => {
+  const host = await prismaClient.host.findUnique({
+    where: { hostId }
+  });
+
+  if (!host) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Host not found');
+  }
+
+  if (host.isVerified) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Host is already verified');
+  }
+
+  if (host.avgStar.toNumber() < 4.5) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Host does not meet the minimum rating requirement (>= 4.5)'
+    );
+  }
+
+  const evaluationCount = await prismaClient.student_evaluate_host.count({
+    where: { hostId }
+  });
+
+  if (evaluationCount <= 20) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      `Host has not received enough evaluations (> 20). Currently has ${evaluationCount}.`
+    );
+  }
+
+  return prismaClient.host.update({
+    where: { hostId },
+    data: { isVerified: true }
+  });
+};

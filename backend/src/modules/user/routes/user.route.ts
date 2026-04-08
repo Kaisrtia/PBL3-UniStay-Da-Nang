@@ -55,5 +55,13 @@ userRouter.patch(
   asyncHandler(userController.handleUnbanUser)
 );
 
+// Verify Host (Grant Blue Tick)
+userRouter.patch(
+  '/hosts/verify',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(userController.handleVerifyHost)
+);
+
 export default userRouter;
 
