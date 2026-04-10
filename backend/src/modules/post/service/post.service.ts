@@ -1,8 +1,129 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, room_type, post_purpose, amenity_condition } from '@prisma/client';
+import { user, room_type, post_purpose, amenity_condition, Prisma } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
+
+export interface PostFilters {
+  wardId?: number;
+  districtId?: number;
+  minArea?: number;
+  maxArea?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  roomType?: room_type;
+  verifiedHost?: boolean;
+  amenities?: number[];   // list of amenityIds — match posts containing ANY of these
+  hasMedia?: boolean;     // true = must have at least one image
+  page?: number;
+  limit?: number;
+  sortBy?: 'createdAt' | 'price' | 'area' | 'viewCount';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export const getPosts = async (filters: PostFilters) => {
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 10;
+  const skip = (page - 1) * limit;
+  const sortBy = filters.sortBy ?? 'createdAt';
+  const sortOrder = filters.sortOrder ?? 'desc';
+
+  // Build dynamic where clause — every filter is optional and cumulative (AND)
+  const where: Prisma.postWhereInput = {
+    status: 'APPROVED'
+  };
+
+  // Location — filter by specific ward or by district (all wards within it)
+  if (filters.wardId !== undefined) {
+    where.wardId = filters.wardId;
+  } else if (filters.districtId !== undefined) {
+    where.ward = { districtId: filters.districtId };
+  }
+
+  // Area range
+  if (filters.minArea !== undefined || filters.maxArea !== undefined) {
+    where.area = {};
+    if (filters.minArea !== undefined) (where.area as Prisma.DecimalFilter).gte = filters.minArea;
+    if (filters.maxArea !== undefined) (where.area as Prisma.DecimalFilter).lte = filters.maxArea;
+  }
+
+  // Price range
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    where.price = {};
+    if (filters.minPrice !== undefined) (where.price as Prisma.DecimalFilter).gte = filters.minPrice;
+    if (filters.maxPrice !== undefined) (where.price as Prisma.DecimalFilter).lte = filters.maxPrice;
+  }
+
+  // Room type
+  if (filters.roomType) {
+    where.roomType = filters.roomType;
+  }
+
+  // Verified host — traverse post → user → hosts[] → isVerified
+  if (filters.verifiedHost === true) {
+    where.user = {
+      hosts: {
+        some: { isVerified: true }
+      }
+    };
+  }
+
+  // Amenities — posts must have at least one of the specified amenity IDs
+  if (filters.amenities && filters.amenities.length > 0) {
+    where.postAmenities = {
+      some: {
+        amenityId: { in: filters.amenities }
+      }
+    };
+  }
+
+  // Has media (images)
+  if (filters.hasMedia === true) {
+    where.postImages = { some: {} };
+  }
+
+  const [posts, totalCount] = await Promise.all([
+    prismaClient.post.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { [sortBy]: sortOrder },
+      include: {
+        postImages: true,
+        postAmenities: {
+          include: { amenity: true }
+        },
+        ward: {
+          include: { district: true }
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+            hosts: {
+              select: { isVerified: true }
+            }
+          }
+        },
+        _count: {
+          select: { comments: true }
+        }
+      }
+    }),
+    prismaClient.post.count({ where })
+  ]);
+
+  return {
+    data: posts,
+    meta: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
 
 export const getPostDetail = async (postId: string) => {
   const post = await prismaClient.post.findUnique({

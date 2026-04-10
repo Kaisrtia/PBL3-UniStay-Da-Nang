@@ -3,6 +3,69 @@ import HttpStatus from 'http-status';
 import * as postService from '../service/post.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
+import { room_type } from '@prisma/client';
+
+// -- Post Listing --
+
+export const handleGetPosts = async (req: Request, res: Response) => {
+  const {
+    wardId,
+    districtId,
+    minArea,
+    maxArea,
+    minPrice,
+    maxPrice,
+    roomType,
+    verifiedHost,
+    amenities,
+    hasMedia,
+    page,
+    limit,
+    sortBy,
+    sortOrder
+  } = req.query;
+
+  const filters: postService.PostFilters = {};
+
+  if (wardId !== undefined)      filters.wardId = Number(wardId);
+  if (districtId !== undefined)  filters.districtId = Number(districtId);
+  if (minArea !== undefined)     filters.minArea = Number(minArea);
+  if (maxArea !== undefined)     filters.maxArea = Number(maxArea);
+  if (minPrice !== undefined)    filters.minPrice = Number(minPrice);
+  if (maxPrice !== undefined)    filters.maxPrice = Number(maxPrice);
+
+  if (roomType !== undefined) {
+    const validRoomTypes: room_type[] = ['ROOM', 'APARTMENT', 'HOUSE'];
+    if (!validRoomTypes.includes(roomType as room_type)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid roomType. Must be one of: ${validRoomTypes.join(', ')}`);
+    }
+    filters.roomType = roomType as room_type;
+  }
+
+  if (verifiedHost !== undefined) filters.verifiedHost = verifiedHost === 'true';
+  if (hasMedia !== undefined)     filters.hasMedia = hasMedia === 'true';
+
+  // amenities = "1,3,5" → [1, 3, 5]
+  if (amenities !== undefined && typeof amenities === 'string' && amenities.trim().length > 0) {
+    filters.amenities = amenities.split(',').map(Number).filter(n => !isNaN(n));
+  }
+
+  if (page !== undefined)      filters.page = Math.max(1, Number(page));
+  if (limit !== undefined)     filters.limit = Math.min(100, Math.max(1, Number(limit)));
+
+  const validSortFields = ['createdAt', 'price', 'area', 'viewCount'];
+  if (sortBy !== undefined && validSortFields.includes(sortBy as string)) {
+    filters.sortBy = sortBy as postService.PostFilters['sortBy'];
+  }
+
+  if (sortOrder !== undefined && ['asc', 'desc'].includes(sortOrder as string)) {
+    filters.sortOrder = sortOrder as 'asc' | 'desc';
+  }
+
+  const result = await postService.getPosts(filters);
+
+  sendSuccess(res, HttpStatus.OK, result, 'Posts fetched successfully');
+};
 
 // -- Post Management --
 

@@ -7,6 +7,17 @@ import { account_role } from '@prisma/client';
 
 const postRouter = Router();
 
+// -- Post Listing --
+
+// List posts with optional filters (public — only APPROVED posts are returned)
+// Query params: wardId, districtId, minArea, maxArea, minPrice, maxPrice,
+//               roomType, verifiedHost, amenities (comma-separated IDs),
+//               hasMedia, page, limit, sortBy, sortOrder
+postRouter.get(
+  '/',
+  asyncHandler(postController.handleGetPosts)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)
