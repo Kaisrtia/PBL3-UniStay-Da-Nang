@@ -257,14 +257,13 @@ model amenity {
 }
 
 model post_amenity {
-  id               Int               @unique @default(autoincrement())
   postId           String
   amenityId        Int
   currentCondition amenity_condition @default(GOOD)
   post             post              @relation(fields: [postId], references: [id])
   amenity          amenity           @relation(fields: [amenityId], references: [id])
 
-  @@id([id, postId])
+  @@id([postId, amenityId])
 }
 
 model student_demand {
