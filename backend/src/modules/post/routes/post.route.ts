@@ -26,6 +26,14 @@ postRouter.get(
   asyncHandler(postController.handleGetMyPosts)
 );
 
+// Get all posts for admin (Admin only)
+postRouter.get(
+  '/admin/all',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleGetPostsByStatusForAdmin)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)

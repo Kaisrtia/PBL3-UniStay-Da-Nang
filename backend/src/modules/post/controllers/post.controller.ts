@@ -3,7 +3,7 @@ import HttpStatus from 'http-status';
 import * as postService from '../service/post.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
-import { room_type, post_purpose } from '@prisma/client';
+import { room_type, post_purpose, post_status } from '@prisma/client';
 
 // -- Post Listing --
 
@@ -83,6 +83,25 @@ export const handleGetMyPosts = async (req: Request, res: Response) => {
   const result = await postService.getMyPosts(req.user!, page, limit);
 
   sendSuccess(res, HttpStatus.OK, result, 'My posts fetched successfully');
+};
+
+export const handleGetPostsByStatusForAdmin = async (req: Request, res: Response) => {
+  const { status } = req.query;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  let postStatus: post_status | undefined;
+  if (status) {
+    const validStatuses: post_status[] = Object.values(post_status);
+    if (!validStatuses.includes(status as post_status)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    postStatus = status as post_status;
+  }
+
+  const result = await postService.getPostsForAdmin(postStatus, page, limit);
+
+  sendSuccess(res, HttpStatus.OK, result, 'Posts fetched for admin successfully');
 };
 
 // -- Post Management --

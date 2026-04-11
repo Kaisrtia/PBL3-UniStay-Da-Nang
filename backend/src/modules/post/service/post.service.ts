@@ -1,11 +1,12 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, room_type, post_purpose, amenity_condition, Prisma } from '@prisma/client';
+import { user, room_type, post_purpose, amenity_condition, Prisma, post_status } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
 
 export interface PostFilters {
   purpose?: post_purpose;
+  status?: post_status; // Used for admin-level filtering
   wardId?: number;
   districtId?: number;
   minArea?: number;
@@ -114,6 +115,51 @@ export const getPosts = async (filters: PostFilters) => {
         },
         _count: {
           select: { comments: true }
+        }
+      }
+    }),
+    prismaClient.post.count({ where })
+  ]);
+
+  return {
+    data: posts,
+    meta: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
+
+export const getPostsForAdmin = async (status?: post_status, page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.postWhereInput = {};
+  if (status) {
+    where.status = status;
+  }
+
+  const [posts, totalCount] = await Promise.all([
+    prismaClient.post.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        ward: {
+          include: { district: true }
+        },
+        _count: {
+          select: { comments: true, reports: true }
         }
       }
     }),
