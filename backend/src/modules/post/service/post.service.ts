@@ -5,6 +5,7 @@ import { user, room_type, post_purpose, amenity_condition, Prisma } from '@prism
 import { generateHybridId } from '../../../core/utils/generateId';
 
 export interface PostFilters {
+  purpose?: post_purpose;
   wardId?: number;
   districtId?: number;
   minArea?: number;
@@ -32,6 +33,11 @@ export const getPosts = async (filters: PostFilters) => {
   const where: Prisma.postWhereInput = {
     status: 'APPROVED'
   };
+
+  // Purpose
+  if (filters.purpose) {
+    where.purpose = filters.purpose;
+  }
 
   // Location — filter by specific ward or by district (all wards within it)
   if (filters.wardId !== undefined) {

@@ -3,12 +3,13 @@ import HttpStatus from 'http-status';
 import * as postService from '../service/post.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
-import { room_type } from '@prisma/client';
+import { room_type, post_purpose } from '@prisma/client';
 
 // -- Post Listing --
 
 export const handleGetPosts = async (req: Request, res: Response) => {
   const {
+    purpose,
     wardId,
     districtId,
     minArea,
@@ -26,6 +27,14 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   } = req.query;
 
   const filters: postService.PostFilters = {};
+
+  if (purpose !== undefined) {
+    const validPurposes: post_purpose[] = ['RENT', 'FIND_ROOMMATE'];
+    if (!validPurposes.includes(purpose as post_purpose)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid purpose. Must be one of: ${validPurposes.join(', ')}`);
+    }
+    filters.purpose = purpose as post_purpose;
+  }
 
   if (wardId !== undefined)      filters.wardId = Number(wardId);
   if (districtId !== undefined)  filters.districtId = Number(districtId);
