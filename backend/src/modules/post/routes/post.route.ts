@@ -18,6 +18,14 @@ postRouter.get(
   asyncHandler(postController.handleGetPosts)
 );
 
+// Get my posts (Student, Host)
+postRouter.get(
+  '/me',
+  verifyToken,
+  authorize([account_role.USER]),
+  asyncHandler(postController.handleGetMyPosts)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)

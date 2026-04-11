@@ -141,6 +141,42 @@ export const getPostDetail = async (postId: string) => {
   return post;
 };
 
+export const getMyPosts = async (currentUser: user, page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
+
+  const [posts, totalCount] = await Promise.all([
+    prismaClient.post.findMany({
+      where: { userId: currentUser.id },
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        postImages: true,
+        postAmenities: {
+          include: { amenity: true }
+        },
+        ward: {
+          include: { district: true }
+        },
+        _count: {
+          select: { comments: true, accomodationRequests: true }
+        }
+      }
+    }),
+    prismaClient.post.count({ where: { userId: currentUser.id } })
+  ]);
+
+  return {
+    data: posts,
+    meta: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
+
 export const createPost = async (
   currentUser: user,
   data: {
