@@ -15,8 +15,8 @@ export const setupProfile = async (
     universityId?: string;
   }
 ) => {
-  if (!data.role || !Object.values(account_role).includes(data.role)) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role');
+  if (!data.role || (data.role !== account_role.STUDENT && data.role !== account_role.HOST)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role. Must be either STUDENT or HOST');
   }
 
   if (user.status !== account_status.SET_UP) {
