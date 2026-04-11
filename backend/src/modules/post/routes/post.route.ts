@@ -44,6 +44,14 @@ postRouter.get(
   asyncHandler(postController.handleGetPostDetail)
 );
 
+// Update post (Student, Host)
+postRouter.patch(
+  '/:postId',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST]),
+  asyncHandler(postController.handleUpdatePost)
+);
+
 // -- Favourite Posts --
 
 // Add a post to favourites (Student only)

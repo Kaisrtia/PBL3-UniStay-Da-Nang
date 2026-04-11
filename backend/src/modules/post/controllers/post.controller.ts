@@ -193,3 +193,46 @@ export const handleCreateAccommodationRequest = async (req: Request, res: Respon
 
   sendSuccess(res, HttpStatus.CREATED, request, 'Accommodation request submitted successfully');
 };
+
+export const handleUpdatePost = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+  const {
+    title,
+    wardId,
+    purpose,
+    detailAddress,
+    area,
+    price,
+    deposit,
+    roomType,
+    postPurpose,
+    description,
+    latitude,
+    longitude,
+    postImages,
+    postAmenities
+  } = req.body;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const updatedPost = await postService.updatePost(req.user!, postId, {
+    title,
+    wardId: wardId ? Number(wardId) : undefined,
+    purpose,
+    detailAddress,
+    area: area ? Number(area) : undefined,
+    price: price ? Number(price) : undefined,
+    deposit: deposit ? Number(deposit) : undefined,
+    roomType,
+    postPurpose,
+    description,
+    latitude: latitude ? Number(latitude) : undefined,
+    longitude: longitude ? Number(longitude) : undefined,
+    postImages,
+    postAmenities
+  });
+
+  sendSuccess(res, HttpStatus.OK, updatedPost, 'Post updated successfully. It is now in UPDATED state.');
+};
