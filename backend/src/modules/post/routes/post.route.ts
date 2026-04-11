@@ -34,6 +34,14 @@ postRouter.get(
   asyncHandler(postController.handleGetPostsByStatusForAdmin)
 );
 
+// Get post statistics for admin (Admin only)
+postRouter.get(
+  '/admin/statistics',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleGetPostStatistics)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)

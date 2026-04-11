@@ -177,6 +177,59 @@ export const getPostsForAdmin = async (status?: post_status, page: number = 1, l
   };
 };
 
+export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day') => {
+  const now = new Date();
+  let startDate = new Date();
+
+  if (period === 'day') {
+    startDate.setDate(now.getDate() - 1);
+  } else if (period === 'week') {
+    startDate.setDate(now.getDate() - 7);
+  } else if (period === 'month') {
+    startDate.setMonth(now.getMonth() - 1);
+  }
+
+  const where: Prisma.postWhereInput = {
+    createdAt: {
+      gte: startDate
+    }
+  };
+
+  const [totalPosts, postsByStatus, postsByRoomType, postsByPurpose] = await Promise.all([
+    prismaClient.post.count({ where }),
+    prismaClient.post.groupBy({
+      by: ['status'],
+      where,
+      _count: {
+        id: true
+      }
+    }),
+    prismaClient.post.groupBy({
+      by: ['roomType'],
+      where,
+      _count: {
+        id: true
+      }
+    }),
+    prismaClient.post.groupBy({
+      by: ['postPurpose'],
+      where,
+      _count: {
+        id: true
+      }
+    })
+  ]);
+
+  return {
+    totalPosts,
+    byStatus: postsByStatus.map(item => ({ status: item.status, count: item._count.id })),
+    byRoomType: postsByRoomType.map(item => ({ roomType: item.roomType, count: item._count.id })),
+    byPurpose: postsByPurpose.map(item => ({ purpose: item.postPurpose, count: item._count.id })),
+    period,
+    since: startDate
+  };
+};
+
 export const getPostDetail = async (postId: string) => {
   const post = await prismaClient.post.findUnique({
     where: { id: postId },

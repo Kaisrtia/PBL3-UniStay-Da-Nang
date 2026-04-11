@@ -104,6 +104,19 @@ export const handleGetPostsByStatusForAdmin = async (req: Request, res: Response
   sendSuccess(res, HttpStatus.OK, result, 'Posts fetched for admin successfully');
 };
 
+export const handleGetPostStatistics = async (req: Request, res: Response) => {
+  const { period } = req.query;
+
+  const validPeriods = ['day', 'week', 'month'];
+  const selectedPeriod = validPeriods.includes(period as string) 
+    ? (period as 'day' | 'week' | 'month') 
+    : 'day';
+
+  const stats = await postService.getPostStatistics(selectedPeriod);
+
+  sendSuccess(res, HttpStatus.OK, stats, 'Post statistics fetched successfully');
+};
+
 // -- Post Management --
 
 export const handleCreatePost = async (req: Request, res: Response) => {
