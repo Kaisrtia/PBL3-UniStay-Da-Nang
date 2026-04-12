@@ -1,6 +1,9 @@
 import app from './app';
 import { connectDB } from './core/config/database';
 
+// Initialize Background Workers
+import './wokers/moderation.worker';
+
 import config from './core/config/config';
 
 const PORT = config.server.port;
