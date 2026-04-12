@@ -1,5 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { connection } from '../queues/redis.connection';
+import { prisma } from '../core/config/database';
 
 export const moderationWorker = new Worker('ai-moderation', async (job: Job) => {
   console.log(`Processing job ${job.id} of type ${job.name}`);
@@ -7,6 +8,15 @@ export const moderationWorker = new Worker('ai-moderation', async (job: Job) => 
   
   // Generic scaffold processing 
   // TODO: Add detailed process logic here later
+  const { postId } = job.data;
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    include: {
+      postImages: true,
+      postAmenities: true
+    }
+  });
+  console.log(post);
   
   return { success: true };
 }, { 

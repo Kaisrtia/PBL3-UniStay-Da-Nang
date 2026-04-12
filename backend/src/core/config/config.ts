@@ -24,7 +24,8 @@ const envSchema = Joi.object()
     GOOGLE_CLIENT_SECRET: Joi.string().required(),
     FRONTEND_URL: Joi.string().uri().required(),
     REDIS_HOST: Joi.string().required(),
-    REDIS_PORT: Joi.number().required()
+    REDIS_PORT: Joi.number().required(),
+    REDIS_PASSWORD: Joi.string().required()
   })
   .unknown();
 
@@ -50,7 +51,8 @@ const config = {
   },
   redis: {
     host: validatedEnv.REDIS_HOST,
-    port: validatedEnv.REDIS_PORT
+    port: validatedEnv.REDIS_PORT,
+    password: validatedEnv.REDIS_PASSWORD
   },
   jwt: {
     secret: validatedEnv.JWT_SECRET,
