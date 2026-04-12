@@ -22,7 +22,9 @@ const envSchema = Joi.object()
     EMAIL_PASSWORD: Joi.string().required(),
     GOOGLE_CLIENT_ID: Joi.string().required(),
     GOOGLE_CLIENT_SECRET: Joi.string().required(),
-    FRONTEND_URL: Joi.string().uri().required()
+    FRONTEND_URL: Joi.string().uri().required(),
+    REDIS_HOST: Joi.string().required(),
+    REDIS_PORT: Joi.number().required()
   })
   .unknown();
 
@@ -45,6 +47,10 @@ const config = {
   },
   db: {
     url: validatedEnv.DATABASE_URL
+  },
+  redis: {
+    host: validatedEnv.REDIS_HOST,
+    port: validatedEnv.REDIS_PORT
   },
   jwt: {
     secret: validatedEnv.JWT_SECRET,
