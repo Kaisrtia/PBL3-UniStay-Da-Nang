@@ -4,6 +4,7 @@ import * as postService from '../service/post.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 import { room_type, post_purpose, post_status } from '@prisma/client';
+import { addModerationFlow } from '../../../queues/moderation.queue';
 
 // -- Post Listing --
 
@@ -173,6 +174,11 @@ export const handleCreatePost = async (req: Request, res: Response) => {
     longitude: Number(longitude),
     postImages,
     postAmenities
+  });
+
+  // Enqueue moderation job to check for invalid image or description
+  await addModerationFlow({
+    postId: post.id
   });
 
   sendSuccess(

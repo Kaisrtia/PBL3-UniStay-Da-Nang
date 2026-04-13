@@ -2,7 +2,9 @@ import app from './app';
 import { connectDB } from './core/config/database';
 
 // Initialize Background Workers
-import './wokers/moderation.worker';
+import './wokers/image.moderation.worker';
+import './wokers/text.moderation.worker';
+import './wokers/finalStatus.moderation.worker';
 
 import config from './core/config/config';
 
