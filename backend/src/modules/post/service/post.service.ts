@@ -313,7 +313,7 @@ export const createPost = async (
   // Create post with nested images and amenities
   return prismaClient.post.create({
     data: {
-      id: generateHybridId('POST_'),
+      id: generateHybridId('pst_'),
       userId: currentUser.id,
       title: data.title,
       wardId: data.wardId,
