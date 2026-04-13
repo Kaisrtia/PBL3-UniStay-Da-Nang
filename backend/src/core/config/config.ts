@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
-import Joi from 'joi';
+import Joi, { valid } from 'joi';
 
 dotenv.config({
   path: path.resolve(__dirname, '../../../.env')
@@ -25,7 +25,9 @@ const envSchema = Joi.object()
     FRONTEND_URL: Joi.string().uri().required(),
     REDIS_HOST: Joi.string().required(),
     REDIS_PORT: Joi.number().required(),
-    REDIS_PASSWORD: Joi.string().required()
+    REDIS_PASSWORD: Joi.string().required(),
+    GEMINI_API_KEY: Joi.string().required(),
+    MOONDREAM_API_KEY: Joi.string().required()
   })
   .unknown();
 
@@ -68,7 +70,11 @@ const config = {
     client_id: validatedEnv.GOOGLE_CLIENT_ID,
     client_secret: validatedEnv.GOOGLE_CLIENT_SECRET
   },
-  frontend_url: validatedEnv.FRONTEND_URL
+  frontend_url: validatedEnv.FRONTEND_URL,
+  ai_key: {
+    moondream: validatedEnv.MOONDREAM_API_KEY,
+    gemini: validatedEnv.GEMINI_API_KEY
+  }
 } as const;
 
 export default config;
