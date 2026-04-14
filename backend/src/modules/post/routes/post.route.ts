@@ -42,6 +42,12 @@ postRouter.get(
   asyncHandler(postController.handleGetPostStatistics)
 );
 
+// Get post counts grouped by district
+postRouter.get(
+  '/count-by-district',
+  asyncHandler(postController.handleGetPostsCountByDistrict)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)

@@ -262,6 +262,31 @@ export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day'
   };
 };
 
+export const getPostsCountByDistrict = async () => {
+  const districts = await prismaClient.district.findMany({
+    include: {
+      wards: {
+        include: {
+          _count: {
+            select: { posts: true }
+          }
+        }
+      }
+    }
+  });
+
+  const result = districts.map(district => {
+    const numberOfPosts = district.wards.reduce((acc, ward) => acc + ward._count.posts, 0);
+    return {
+      id: district.id,
+      "name district": district.name,
+      "number of posts": numberOfPosts
+    };
+  });
+
+  return result;
+};
+
 export const getPostDetail = async (postId: string) => {
   const post = await prismaClient.post.findUnique({
     where: { id: postId },

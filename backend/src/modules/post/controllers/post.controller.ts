@@ -117,6 +117,12 @@ export const handleGetPostStatistics = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, stats, 'Post statistics fetched successfully');
 };
 
+export const handleGetPostsCountByDistrict = async (req: Request, res: Response) => {
+  const result = await postService.getPostsCountByDistrict();
+  
+  sendSuccess(res, HttpStatus.OK, result, 'Fetched post counts by district successfully');
+};
+
 // -- Post Management --
 
 export const handleCreatePost = async (req: Request, res: Response) => {
