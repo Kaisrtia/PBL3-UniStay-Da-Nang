@@ -42,6 +42,12 @@ postRouter.get(
   asyncHandler(postController.handleGetPostStatistics)
 );
 
+// Get post counts grouped by district
+postRouter.get(
+  '/count-by-district',
+  asyncHandler(postController.handleGetPostsCountByDistrict)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)
@@ -66,6 +72,14 @@ postRouter.patch(
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(postController.handleUpdatePost)
+);
+
+// Censor post (Admin only)
+postRouter.patch(
+  '/:postId/censor',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleCensorPostManually)
 );
 
 // -- Favourite Posts --

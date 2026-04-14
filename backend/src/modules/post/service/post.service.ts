@@ -177,6 +177,38 @@ export const getPostsForAdmin = async (status?: post_status, page: number = 1, l
   };
 };
 
+export const censorPost = async (admin: user, postId: string, status: post_status, rejectionReason?: string) => {
+  if (!status) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Status is required');
+  }
+
+  if (status !== post_status.APPROVED && status !== post_status.REJECTED) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid status');
+  }
+
+  if (status === post_status.REJECTED && !rejectionReason) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Reject reason is required');
+  }
+  
+  const post = await prismaClient.post.findUnique({
+    where: { id: postId }
+  });
+
+  if (!post) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  const updatedPost = await prismaClient.post.update({
+    where: { id: postId },
+    data: {
+      status,
+      rejectionReason: status === post_status.REJECTED ? rejectionReason : null
+    }
+  });
+
+  return updatedPost;
+}
+
 export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day') => {
   const now = new Date();
   let startDate = new Date();
@@ -228,6 +260,31 @@ export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day'
     period,
     since: startDate
   };
+};
+
+export const getPostsCountByDistrict = async () => {
+  const districts = await prismaClient.district.findMany({
+    include: {
+      wards: {
+        include: {
+          _count: {
+            select: { posts: true }
+          }
+        }
+      }
+    }
+  });
+
+  const result = districts.map(district => {
+    const numberOfPosts = district.wards.reduce((acc, ward) => acc + ward._count.posts, 0);
+    return {
+      id: district.id,
+      "name district": district.name,
+      "number of posts": numberOfPosts
+    };
+  });
+
+  return result;
 };
 
 export const getPostDetail = async (postId: string) => {
@@ -457,7 +514,6 @@ export const updatePost = async (
     });
   });
 };
-
 
 const requirePost = async (postId: string) => {
   const post = await prismaClient.post.findUnique({ where: { id: postId } });
