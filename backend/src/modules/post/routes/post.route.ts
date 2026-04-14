@@ -68,6 +68,14 @@ postRouter.patch(
   asyncHandler(postController.handleUpdatePost)
 );
 
+// Censor post (Admin only)
+postRouter.patch(
+  '/:postId/censor',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleCensorPostManually)
+);
+
 // -- Favourite Posts --
 
 // Add a post to favourites (Student only)

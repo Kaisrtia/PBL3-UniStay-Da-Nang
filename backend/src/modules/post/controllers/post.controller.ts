@@ -195,6 +195,20 @@ export const handleGetPostDetail = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, post, 'Post detail fetched successfully');
 };
 
+export const handleCensorPostManually = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+  const admin = req.user;
+  const { rejectionReason, status } = req.body;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const post = await postService.censorPost(admin!, postId, status, rejectionReason);
+
+  sendSuccess(res, HttpStatus.OK, post, 'Post censored successfully');
+}
+
 // -- Favourite Posts --
 
 export const handleAddFavouritePost = async (req: Request, res: Response) => {
