@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../queues/redis.connection';
+import { connection } from '../core/config/redis.connection';
 import { prisma } from '../core/config/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import config from '../core/config/config';

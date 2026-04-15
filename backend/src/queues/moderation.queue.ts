@@ -1,5 +1,5 @@
 import { FlowProducer, Queue } from 'bullmq';
-import { connection } from './redis.connection';
+import { connection } from '../core/config/redis.connection';
 
 const flowProducer = new FlowProducer({connection});
 export const finalStatusQueue = new Queue('final-status-queue', { connection });
