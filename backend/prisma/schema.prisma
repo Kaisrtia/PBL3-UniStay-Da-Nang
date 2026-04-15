@@ -337,6 +337,7 @@ model notification {
   title     String            @db.VarChar(255)
   content   String            @db.Text
   type      notification_type @default(POST)
+  isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB
   createdAt DateTime          @default(now())
   updatedAt DateTime          @default(now())
