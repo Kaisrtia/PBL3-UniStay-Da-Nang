@@ -5,6 +5,7 @@ import { connectDB } from './core/config/database';
 import './wokers/image.moderation.worker';
 import './wokers/text.moderation.worker';
 import './wokers/finalStatus.moderation.worker';
+import './wokers/censorPost.notification';
 
 import config from './core/config/config';
 

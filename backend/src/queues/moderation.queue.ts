@@ -10,7 +10,7 @@ export const addModerationFlow = async (postId: any) => {
   return flowProducer.add({
     name: 'final-moderation-status',
     queueName: 'final-status-queue',
-    data: { postId },
+    data: postId,
     children: [
       {
         name: 'image-moderation',
