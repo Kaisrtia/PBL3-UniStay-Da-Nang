@@ -1,16 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ['class'],
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
-      borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)'
+      // Định nghĩa font family tại đây
+      fontFamily: {
+        'poppins': ['Poppins', 'sans-serif'],
+        'brand': ['Inter', 'Roboto', 'sans-serif'], // Tất cả đều là font hiện đại, không chân
       },
-      colors: {}
-    }
+      borderRadius: {
+        'circle': '50%', // Ghi đè giá trị mặc định của rounded-md
+      }
+    },
   },
-  plugins: [require('tailwindcss-animate')]
+  plugins: [],
 }
