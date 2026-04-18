@@ -11,6 +11,8 @@ import demandRouter from './modules/demand/routes/demand.route';
 import evaluationRouter from './modules/evaluation/routes/evaluation.route';
 import reportRouter from './modules/report/routes/report.route';
 import commentRouter from './modules/comment/routes/comment.route';
+import locationRouter from './modules/location/routes/location.route';
+import notificationRouter from './modules/notification/routes/notification.route';
 
 const app: Application = express();
 
@@ -35,6 +37,7 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
 
 // public routes
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/locations', locationRouter);
 
 // private routes
 app.use('/api/v1/users', userRouter);
@@ -43,6 +46,7 @@ app.use('/api/v1/demands', demandRouter);
 app.use('/api/v1/evaluations', evaluationRouter);
 app.use('/api/v1/reports', reportRouter);
 app.use('/api/v1/comments', commentRouter);
+app.use('/api/v1/notifications', notificationRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

@@ -15,8 +15,8 @@ export const setupProfile = async (
     universityId?: string;
   }
 ) => {
-  if (!data.role || !Object.values(account_role).includes(data.role)) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role');
+  if (!data.role || (data.role !== account_role.STUDENT && data.role !== account_role.HOST)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role. Must be either STUDENT or HOST');
   }
 
   if (user.status !== account_status.SET_UP) {
@@ -166,4 +166,45 @@ export const getUserProfile = async (targetUserId: string) => {
   const { hashedPassword, ...safeUser } = targetUser;
   
   return safeUser;
+};
+
+export const getVerificationCandidates = async (admin: user, page: number = 1, limit: number = 10) => {
+  const potentialHosts = await prismaClient.host.findMany({
+    where: {
+      isVerified: false,
+      avgStar: {
+        gte: 4.5
+      }
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          avatarUrl: true,
+          phone: true
+        }
+      },
+      _count: {
+        select: { studentEvaluateHosts: true }
+      }
+    }
+  });
+
+  const candidates = potentialHosts.filter(host => host._count.studentEvaluateHosts > 20);
+  
+  const totalCount = candidates.length;
+  const skip = (page - 1) * limit;
+  const paginatedData = candidates.slice(skip, skip + limit);
+
+  return {
+    data: paginatedData,
+    meta: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
+    }
+  };
 };

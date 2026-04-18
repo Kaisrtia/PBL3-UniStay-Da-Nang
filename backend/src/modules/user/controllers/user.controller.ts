@@ -98,7 +98,7 @@ export const handleGetVerificationCandidates = async (req: Request, res: Respons
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 
-  const result = await adminService.getVerificationCandidates(req.user!, page, limit);
+  const result = await userInfoService.getVerificationCandidates(req.user!, page, limit);
   sendSuccess(res, HttpStatus.OK, result);
 };
 

@@ -3,7 +3,7 @@ import config from './config';
 
 const prisma = new PrismaClient({
   log:
-    config.node_env === 'development' ? ['query', 'error', 'warn'] : ['error']
+    config.node_env === 'development' ? ['error', 'warn'] : ['error']
 });
 
 const connectDB = async () => {

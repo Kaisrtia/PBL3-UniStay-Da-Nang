@@ -7,6 +7,47 @@ import { account_role } from '@prisma/client';
 
 const postRouter = Router();
 
+// -- Post Listing --
+
+// List posts with optional filters (public — only APPROVED posts are returned)
+// Query params: wardId, districtId, minArea, maxArea, minPrice, maxPrice,
+//               roomType, verifiedHost, amenities (comma-separated IDs),
+//               hasMedia, page, limit, sortBy, sortOrder
+postRouter.get(
+  '/',
+  asyncHandler(postController.handleGetPosts)
+);
+
+// Get my posts (Student, Host)
+postRouter.get(
+  '/me',
+  verifyToken,
+  authorize([account_role.USER]),
+  asyncHandler(postController.handleGetMyPosts)
+);
+
+// Get all posts for admin (Admin only)
+postRouter.get(
+  '/admin/all',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleGetPostsByStatusForAdmin)
+);
+
+// Get post statistics for admin (Admin only)
+postRouter.get(
+  '/admin/statistics',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleGetPostStatistics)
+);
+
+// Get post counts grouped by district
+postRouter.get(
+  '/count-by-district',
+  asyncHandler(postController.handleGetPostsCountByDistrict)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)
@@ -23,6 +64,22 @@ postRouter.get(
   verifyToken,
   authorize([account_role.USER]),
   asyncHandler(postController.handleGetPostDetail)
+);
+
+// Update post (Student, Host)
+postRouter.patch(
+  '/:postId',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST]),
+  asyncHandler(postController.handleUpdatePost)
+);
+
+// Censor post (Admin only)
+postRouter.patch(
+  '/:postId/censor',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(postController.handleCensorPostManually)
 );
 
 // -- Favourite Posts --

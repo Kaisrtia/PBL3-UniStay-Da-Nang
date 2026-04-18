@@ -32,6 +32,15 @@ services:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       timeout: 10s
       retries: 5
-
+  redis:
+    image: redis
+    container_name: my-redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./src/core/config/redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
 volumes:
   postgres_data:
+  redis_data:

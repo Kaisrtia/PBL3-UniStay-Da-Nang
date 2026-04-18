@@ -77,7 +77,6 @@ userRouter.patch(
 userRouter.get(
   '/hosts/verification-candidates',
   verifyToken,
-  authorize([account_role.ADMIN]),
   asyncHandler(userController.handleGetVerificationCandidates)
 );
 

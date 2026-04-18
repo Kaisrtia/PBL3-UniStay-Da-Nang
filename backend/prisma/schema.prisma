@@ -124,6 +124,7 @@ model user {
 
   userReports    report[] @relation("report")
   reportHandlers report[] @relation("handle")
+  moderatedPosts post[]   @relation("moderator")
 }
 
 model district {
@@ -215,6 +216,7 @@ model post {
   title                String                  @db.VarChar(255)
   userId               String
   wardId               Int
+  moderatorId          String?
   purpose              String                  @db.VarChar(50)
   detailAddress        String                  @db.Text
   area                 Decimal                 @db.Decimal(10, 2)
@@ -231,6 +233,7 @@ model post {
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @default(now())
   user                 user                    @relation(fields: [userId], references: [id])
+  moderator            user?                   @relation("moderator", fields: [moderatorId], references: [id])
   ward                 ward                    @relation(fields: [wardId], references: [id])
   comments             comment[]
   postImages           post_image[]
@@ -257,28 +260,27 @@ model amenity {
 }
 
 model post_amenity {
-  id               Int               @unique @default(autoincrement())
   postId           String
   amenityId        Int
   currentCondition amenity_condition @default(GOOD)
   post             post              @relation(fields: [postId], references: [id])
   amenity          amenity           @relation(fields: [amenityId], references: [id])
 
-  @@id([id, postId])
+  @@id([postId, amenityId])
 }
 
 model student_demand {
-  studentId            String     @id
+  studentId            String      @id
   wardId               Int
   universityId         String?
-  minPrice             Decimal    @db.Decimal(15, 2)
-  maxPrice             Decimal    @db.Decimal(15, 2)
+  minPrice             Decimal     @db.Decimal(15, 2)
+  maxPrice             Decimal     @db.Decimal(15, 2)
   roomType             room_type
-  isLookingForRoommate Boolean    @default(false)
-  roommateGender       String     @db.VarChar(10)
-  rommateCriteria      String     @db.Text
-  student              student    @relation(fields: [studentId], references: [studentId])
-  ward                 ward       @relation(fields: [wardId], references: [id])
+  isLookingForRoommate Boolean     @default(false)
+  roommateGender       String      @db.VarChar(10)
+  rommateCriteria      String      @db.Text
+  student              student     @relation(fields: [studentId], references: [studentId])
+  ward                 ward        @relation(fields: [wardId], references: [id])
   university           university? @relation(fields: [universityId], references: [id])
 }
 
@@ -335,6 +337,7 @@ model notification {
   title     String            @db.VarChar(255)
   content   String            @db.Text
   type      notification_type @default(POST)
+  isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB
   createdAt DateTime          @default(now())
   updatedAt DateTime          @default(now())
