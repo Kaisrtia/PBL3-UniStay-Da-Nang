@@ -12,6 +12,7 @@ import evaluationRouter from './modules/evaluation/routes/evaluation.route';
 import reportRouter from './modules/report/routes/report.route';
 import commentRouter from './modules/comment/routes/comment.route';
 import locationRouter from './modules/location/routes/location.route';
+import notificationRouter from './modules/notification/routes/notification.route';
 
 const app: Application = express();
 
@@ -45,6 +46,7 @@ app.use('/api/v1/demands', demandRouter);
 app.use('/api/v1/evaluations', evaluationRouter);
 app.use('/api/v1/reports', reportRouter);
 app.use('/api/v1/comments', commentRouter);
+app.use('/api/v1/notifications', notificationRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
