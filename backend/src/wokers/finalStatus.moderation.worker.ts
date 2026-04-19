@@ -36,6 +36,7 @@ export const finalModerationWorker = new Worker(
       });
       const notification = await prisma.notification.create({
         data: {
+          id: job.id!,
           title: `Your post with id ${job.data.postId} was rejected by system`,
           content: `Your post: ${post.title} was rejected. The reason is ${imageModerationResult.reason}`,
           type: notification_type.POST,
@@ -61,6 +62,7 @@ export const finalModerationWorker = new Worker(
       });
       const notification = await prisma.notification.create({
         data: {
+          id: job.id!,
           title: `Your post with id ${job.data.postId} was rejected by system`,
           content: `Your post: ${post.title} was rejected. The reason is ${textModerationResult.reason}`,
           type: notification_type.POST,
@@ -85,6 +87,7 @@ export const finalModerationWorker = new Worker(
       });
       const notification = await prisma.notification.create({
         data: {
+          id: job.id!,
           title: `Your post with id ${job.data.postId} was approved by system`,
           content: `Your post: ${post.title} was approved`,
           type: notification_type.POST,
