@@ -1,8 +1,17 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, room_type, post_purpose, amenity_condition, Prisma, post_status } from '@prisma/client';
+import {
+  user,
+  room_type,
+  post_purpose,
+  amenity_condition,
+  Prisma,
+  post_status
+} from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
+import { addModerationFlow } from '../../../queues/moderation.queue';
+import { addCensorPostNotificationJob } from '../../../queues/notification.queue';
 
 export interface PostFilters {
   purpose?: post_purpose;
@@ -15,8 +24,8 @@ export interface PostFilters {
   maxPrice?: number;
   roomType?: room_type;
   verifiedHost?: boolean;
-  amenities?: number[];   // list of amenityIds — match posts containing ANY of these
-  hasMedia?: boolean;     // true = must have at least one image
+  amenities?: number[]; // list of amenityIds — match posts containing ANY of these
+  hasMedia?: boolean; // true = must have at least one image
   page?: number;
   limit?: number;
   sortBy?: 'createdAt' | 'price' | 'area' | 'viewCount';
@@ -50,15 +59,19 @@ export const getPosts = async (filters: PostFilters) => {
   // Area range
   if (filters.minArea !== undefined || filters.maxArea !== undefined) {
     where.area = {};
-    if (filters.minArea !== undefined) (where.area as Prisma.DecimalFilter).gte = filters.minArea;
-    if (filters.maxArea !== undefined) (where.area as Prisma.DecimalFilter).lte = filters.maxArea;
+    if (filters.minArea !== undefined)
+      (where.area as Prisma.DecimalFilter).gte = filters.minArea;
+    if (filters.maxArea !== undefined)
+      (where.area as Prisma.DecimalFilter).lte = filters.maxArea;
   }
 
   // Price range
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
     where.price = {};
-    if (filters.minPrice !== undefined) (where.price as Prisma.DecimalFilter).gte = filters.minPrice;
-    if (filters.maxPrice !== undefined) (where.price as Prisma.DecimalFilter).lte = filters.maxPrice;
+    if (filters.minPrice !== undefined)
+      (where.price as Prisma.DecimalFilter).gte = filters.minPrice;
+    if (filters.maxPrice !== undefined)
+      (where.price as Prisma.DecimalFilter).lte = filters.maxPrice;
   }
 
   // Room type
@@ -132,7 +145,11 @@ export const getPosts = async (filters: PostFilters) => {
   };
 };
 
-export const getPostsForAdmin = async (status?: post_status, page: number = 1, limit: number = 10) => {
+export const getPostsForAdmin = async (
+  status?: post_status,
+  page: number = 1,
+  limit: number = 10
+) => {
   const skip = (page - 1) * limit;
 
   const where: Prisma.postWhereInput = {};
@@ -177,7 +194,12 @@ export const getPostsForAdmin = async (status?: post_status, page: number = 1, l
   };
 };
 
-export const censorPost = async (admin: user, postId: string, status: post_status, rejectionReason?: string) => {
+export const censorPost = async (
+  admin: user,
+  postId: string,
+  status: post_status,
+  rejectionReason?: string
+) => {
   if (!status) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Status is required');
   }
@@ -189,7 +211,7 @@ export const censorPost = async (admin: user, postId: string, status: post_statu
   if (status === post_status.REJECTED && !rejectionReason) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Reject reason is required');
   }
-  
+
   const post = await prismaClient.post.findUnique({
     where: { id: postId }
   });
@@ -202,14 +224,24 @@ export const censorPost = async (admin: user, postId: string, status: post_statu
     where: { id: postId },
     data: {
       status,
-      rejectionReason: status === post_status.REJECTED ? rejectionReason : null
+      rejectionReason: status === post_status.REJECTED ? rejectionReason : null,
+      moderator: {
+        connect: { id: admin.id }
+      }
     }
   });
-
+  await addCensorPostNotificationJob('manual_censoring', {
+    postId: post.id,
+    userId: post.userId,
+    status,
+    rejectionReason
+  });
   return updatedPost;
-}
+};
 
-export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day') => {
+export const getPostStatistics = async (
+  period: 'day' | 'week' | 'month' = 'day'
+) => {
   const now = new Date();
   let startDate = new Date();
 
@@ -227,36 +259,46 @@ export const getPostStatistics = async (period: 'day' | 'week' | 'month' = 'day'
     }
   };
 
-  const [totalPosts, postsByStatus, postsByRoomType, postsByPurpose] = await Promise.all([
-    prismaClient.post.count({ where }),
-    prismaClient.post.groupBy({
-      by: ['status'],
-      where,
-      _count: {
-        id: true
-      }
-    }),
-    prismaClient.post.groupBy({
-      by: ['roomType'],
-      where,
-      _count: {
-        id: true
-      }
-    }),
-    prismaClient.post.groupBy({
-      by: ['postPurpose'],
-      where,
-      _count: {
-        id: true
-      }
-    })
-  ]);
+  const [totalPosts, postsByStatus, postsByRoomType, postsByPurpose] =
+    await Promise.all([
+      prismaClient.post.count({ where }),
+      prismaClient.post.groupBy({
+        by: ['status'],
+        where,
+        _count: {
+          id: true
+        }
+      }),
+      prismaClient.post.groupBy({
+        by: ['roomType'],
+        where,
+        _count: {
+          id: true
+        }
+      }),
+      prismaClient.post.groupBy({
+        by: ['postPurpose'],
+        where,
+        _count: {
+          id: true
+        }
+      })
+    ]);
 
   return {
     totalPosts,
-    byStatus: postsByStatus.map(item => ({ status: item.status, count: item._count.id })),
-    byRoomType: postsByRoomType.map(item => ({ roomType: item.roomType, count: item._count.id })),
-    byPurpose: postsByPurpose.map(item => ({ purpose: item.postPurpose, count: item._count.id })),
+    byStatus: postsByStatus.map((item) => ({
+      status: item.status,
+      count: item._count.id
+    })),
+    byRoomType: postsByRoomType.map((item) => ({
+      roomType: item.roomType,
+      count: item._count.id
+    })),
+    byPurpose: postsByPurpose.map((item) => ({
+      purpose: item.postPurpose,
+      count: item._count.id
+    })),
     period,
     since: startDate
   };
@@ -275,12 +317,15 @@ export const getPostsCountByDistrict = async () => {
     }
   });
 
-  const result = districts.map(district => {
-    const numberOfPosts = district.wards.reduce((acc, ward) => acc + ward._count.posts, 0);
+  const result = districts.map((district) => {
+    const numberOfPosts = district.wards.reduce(
+      (acc, ward) => acc + ward._count.posts,
+      0
+    );
     return {
       id: district.id,
-      "name district": district.name,
-      "number of posts": numberOfPosts
+      'name district': district.name,
+      'number of posts': numberOfPosts
     };
   });
 
@@ -303,7 +348,11 @@ export const getPostDetail = async (postId: string) => {
   return post;
 };
 
-export const getMyPosts = async (currentUser: user, page: number = 1, limit: number = 10) => {
+export const getMyPosts = async (
+  currentUser: user,
+  page: number = 1,
+  limit: number = 10
+) => {
   const skip = (page - 1) * limit;
 
   const [posts, totalCount] = await Promise.all([
@@ -362,13 +411,15 @@ export const createPost = async (
   }
 ) => {
   // Validate ward exists
-  const ward = await prismaClient.ward.findUnique({ where: { id: data.wardId } });
+  const ward = await prismaClient.ward.findUnique({
+    where: { id: data.wardId }
+  });
   if (!ward) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
   }
 
   // Create post with nested images and amenities
-  return prismaClient.post.create({
+  const post = await prismaClient.post.create({
     data: {
       id: generateHybridId('pst_'),
       userId: currentUser.id,
@@ -385,29 +436,36 @@ export const createPost = async (
       latitude: data.latitude,
       longitude: data.longitude,
       // Default status is PENDING, we wait for AI moderation.
-      
-      ...(data.postImages && data.postImages.length > 0 && {
-        postImages: {
-          create: data.postImages.map((imageUrl) => ({
-            imageUrl
-          }))
-        }
-      }),
 
-      ...(data.postAmenities && data.postAmenities.length > 0 && {
-        postAmenities: {
-          create: data.postAmenities.map((amenity) => ({
-            amenityId: amenity.amenityId,
-            currentCondition: amenity.currentCondition
-          }))
-        }
-      })
+      ...(data.postImages &&
+        data.postImages.length > 0 && {
+          postImages: {
+            create: data.postImages.map((imageUrl) => ({
+              imageUrl
+            }))
+          }
+        }),
+
+      ...(data.postAmenities &&
+        data.postAmenities.length > 0 && {
+          postAmenities: {
+            create: data.postAmenities.map((amenity) => ({
+              amenityId: amenity.amenityId,
+              currentCondition: amenity.currentCondition
+            }))
+          }
+        })
     },
     include: {
       postImages: true,
       postAmenities: true
     }
   });
+  // Enqueue moderation job to check for invalid image or description
+  await addModerationFlow({
+    postId: post.id
+  });
+  return post;
 };
 
 export const updatePost = async (
@@ -442,18 +500,29 @@ export const updatePost = async (
   }
 
   if (post.userId !== currentUser.id) {
-    throw new AppError(HttpStatus.FORBIDDEN, 'You can only update your own posts');
+    throw new AppError(
+      HttpStatus.FORBIDDEN,
+      'You can only update your own posts'
+    );
   }
 
   if (data.wardId) {
-    const ward = await prismaClient.ward.findUnique({ where: { id: data.wardId } });
+    const ward = await prismaClient.ward.findUnique({
+      where: { id: data.wardId }
+    });
     if (!ward) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
     }
   }
 
-  if (new Date().getTime() - post.createdAt.getTime() > 7 * 24 * 60 * 60 * 1000) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Post cannot be updated after 7 days');
+  if (
+    new Date().getTime() - post.createdAt.getTime() >
+    7 * 24 * 60 * 60 * 1000
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Post cannot be updated after 7 days'
+    );
   }
 
   return prismaClient.$transaction(async (tx) => {
@@ -531,7 +600,10 @@ export const addFavouritePost = async (currentUser: user, postId: string) => {
   });
 
   if (existing) {
-    throw new AppError(HttpStatus.CONFLICT, 'Post is already in your favourites');
+    throw new AppError(
+      HttpStatus.CONFLICT,
+      'Post is already in your favourites'
+    );
   }
 
   return prismaClient.student_favorite_post.create({
@@ -539,13 +611,19 @@ export const addFavouritePost = async (currentUser: user, postId: string) => {
   });
 };
 
-export const removeFavouritePost = async (currentUser: user, postId: string) => {
+export const removeFavouritePost = async (
+  currentUser: user,
+  postId: string
+) => {
   const existing = await prismaClient.student_favorite_post.findUnique({
     where: { studentId_postId: { studentId: currentUser.id, postId } }
   });
 
   if (!existing) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found in your favourites');
+    throw new AppError(
+      HttpStatus.NOT_FOUND,
+      'Post not found in your favourites'
+    );
   }
 
   await prismaClient.student_favorite_post.delete({
@@ -555,11 +633,17 @@ export const removeFavouritePost = async (currentUser: user, postId: string) => 
 
 // ─── Accommodation Request ────────────────────────────────────────────────────
 
-export const createAccommodationRequest = async (currentUser: user, postId: string) => {
+export const createAccommodationRequest = async (
+  currentUser: user,
+  postId: string
+) => {
   const post = await requirePost(postId);
 
   if (post.userId === currentUser.id) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'You cannot request your own post');
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'You cannot request your own post'
+    );
   }
 
   const existing = await prismaClient.accomodation_request.findUnique({
@@ -567,7 +651,10 @@ export const createAccommodationRequest = async (currentUser: user, postId: stri
   });
 
   if (existing) {
-    throw new AppError(HttpStatus.CONFLICT, 'You have already submitted a request for this post');
+    throw new AppError(
+      HttpStatus.CONFLICT,
+      'You have already submitted a request for this post'
+    );
   }
 
   return prismaClient.accomodation_request.create({

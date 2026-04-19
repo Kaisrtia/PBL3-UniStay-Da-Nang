@@ -4,7 +4,6 @@ import * as postService from '../service/post.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 import { room_type, post_purpose, post_status } from '@prisma/client';
-import { addModerationFlow } from '../../../queues/moderation.queue';
 
 // -- Post Listing --
 
@@ -32,43 +31,61 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   if (purpose !== undefined) {
     const validPurposes: post_purpose[] = ['RENT', 'FIND_ROOMMATE'];
     if (!validPurposes.includes(purpose as post_purpose)) {
-      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid purpose. Must be one of: ${validPurposes.join(', ')}`);
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        `Invalid purpose. Must be one of: ${validPurposes.join(', ')}`
+      );
     }
     filters.purpose = purpose as post_purpose;
   }
 
-  if (wardId !== undefined)      filters.wardId = Number(wardId);
-  if (districtId !== undefined)  filters.districtId = Number(districtId);
-  if (minArea !== undefined)     filters.minArea = Number(minArea);
-  if (maxArea !== undefined)     filters.maxArea = Number(maxArea);
-  if (minPrice !== undefined)    filters.minPrice = Number(minPrice);
-  if (maxPrice !== undefined)    filters.maxPrice = Number(maxPrice);
+  if (wardId !== undefined) filters.wardId = Number(wardId);
+  if (districtId !== undefined) filters.districtId = Number(districtId);
+  if (minArea !== undefined) filters.minArea = Number(minArea);
+  if (maxArea !== undefined) filters.maxArea = Number(maxArea);
+  if (minPrice !== undefined) filters.minPrice = Number(minPrice);
+  if (maxPrice !== undefined) filters.maxPrice = Number(maxPrice);
 
   if (roomType !== undefined) {
     const validRoomTypes: room_type[] = ['ROOM', 'APARTMENT', 'HOUSE'];
     if (!validRoomTypes.includes(roomType as room_type)) {
-      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid roomType. Must be one of: ${validRoomTypes.join(', ')}`);
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        `Invalid roomType. Must be one of: ${validRoomTypes.join(', ')}`
+      );
     }
     filters.roomType = roomType as room_type;
   }
 
-  if (verifiedHost !== undefined) filters.verifiedHost = verifiedHost === 'true';
-  if (hasMedia !== undefined)     filters.hasMedia = hasMedia === 'true';
+  if (verifiedHost !== undefined)
+    filters.verifiedHost = verifiedHost === 'true';
+  if (hasMedia !== undefined) filters.hasMedia = hasMedia === 'true';
 
   // amenities = "1,3,5" → [1, 3, 5]
-  if (amenities !== undefined && typeof amenities === 'string' && amenities.trim().length > 0) {
-    filters.amenities = amenities.split(',').map(Number).filter(n => !isNaN(n));
+  if (
+    amenities !== undefined &&
+    typeof amenities === 'string' &&
+    amenities.trim().length > 0
+  ) {
+    filters.amenities = amenities
+      .split(',')
+      .map(Number)
+      .filter((n) => !isNaN(n));
   }
 
-  if (page !== undefined)      filters.page = Math.max(1, Number(page));
-  if (limit !== undefined)     filters.limit = Math.min(100, Math.max(1, Number(limit)));
+  if (page !== undefined) filters.page = Math.max(1, Number(page));
+  if (limit !== undefined)
+    filters.limit = Math.min(100, Math.max(1, Number(limit)));
 
   const validSortFields = ['createdAt', 'price', 'area', 'viewCount'];
   if (sortBy !== undefined && validSortFields.includes(sortBy as string)) {
     filters.sortBy = sortBy as postService.PostFilters['sortBy'];
   }
 
-  if (sortOrder !== undefined && ['asc', 'desc'].includes(sortOrder as string)) {
+  if (
+    sortOrder !== undefined &&
+    ['asc', 'desc'].includes(sortOrder as string)
+  ) {
     filters.sortOrder = sortOrder as 'asc' | 'desc';
   }
 
@@ -86,7 +103,10 @@ export const handleGetMyPosts = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, result, 'My posts fetched successfully');
 };
 
-export const handleGetPostsByStatusForAdmin = async (req: Request, res: Response) => {
+export const handleGetPostsByStatusForAdmin = async (
+  req: Request,
+  res: Response
+) => {
   const { status } = req.query;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -95,33 +115,54 @@ export const handleGetPostsByStatusForAdmin = async (req: Request, res: Response
   if (status) {
     const validStatuses: post_status[] = Object.values(post_status);
     if (!validStatuses.includes(status as post_status)) {
-      throw new AppError(HttpStatus.BAD_REQUEST, `Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      );
     }
     postStatus = status as post_status;
   }
 
   const result = await postService.getPostsForAdmin(postStatus, page, limit);
 
-  sendSuccess(res, HttpStatus.OK, result, 'Posts fetched for admin successfully');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    result,
+    'Posts fetched for admin successfully'
+  );
 };
 
 export const handleGetPostStatistics = async (req: Request, res: Response) => {
   const { period } = req.query;
 
   const validPeriods = ['day', 'week', 'month'];
-  const selectedPeriod = validPeriods.includes(period as string) 
-    ? (period as 'day' | 'week' | 'month') 
+  const selectedPeriod = validPeriods.includes(period as string)
+    ? (period as 'day' | 'week' | 'month')
     : 'day';
 
   const stats = await postService.getPostStatistics(selectedPeriod);
 
-  sendSuccess(res, HttpStatus.OK, stats, 'Post statistics fetched successfully');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    stats,
+    'Post statistics fetched successfully'
+  );
 };
 
-export const handleGetPostsCountByDistrict = async (req: Request, res: Response) => {
+export const handleGetPostsCountByDistrict = async (
+  req: Request,
+  res: Response
+) => {
   const result = await postService.getPostsCountByDistrict();
-  
-  sendSuccess(res, HttpStatus.OK, result, 'Fetched post counts by district successfully');
+
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    result,
+    'Fetched post counts by district successfully'
+  );
 };
 
 // -- Post Management --
@@ -182,11 +223,6 @@ export const handleCreatePost = async (req: Request, res: Response) => {
     postAmenities
   });
 
-  // Enqueue moderation job to check for invalid image or description
-  await addModerationFlow({
-    postId: post.id
-  });
-
   sendSuccess(
     res,
     HttpStatus.CREATED,
@@ -216,10 +252,15 @@ export const handleCensorPostManually = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const post = await postService.censorPost(admin!, postId, status, rejectionReason);
+  const post = await postService.censorPost(
+    admin!,
+    postId,
+    status,
+    rejectionReason
+  );
 
   sendSuccess(res, HttpStatus.OK, post, 'Post censored successfully');
-}
+};
 
 // -- Favourite Posts --
 
@@ -235,7 +276,10 @@ export const handleAddFavouritePost = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.CREATED, favourite, 'Post added to favourites');
 };
 
-export const handleRemoveFavouritePost = async (req: Request, res: Response) => {
+export const handleRemoveFavouritePost = async (
+  req: Request,
+  res: Response
+) => {
   const { postId } = req.params;
 
   if (!postId) {
@@ -249,16 +293,27 @@ export const handleRemoveFavouritePost = async (req: Request, res: Response) => 
 
 // -- Accommodation Requests --
 
-export const handleCreateAccommodationRequest = async (req: Request, res: Response) => {
+export const handleCreateAccommodationRequest = async (
+  req: Request,
+  res: Response
+) => {
   const { postId } = req.body;
 
   if (!postId) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const request = await postService.createAccommodationRequest(req.user!, postId);
+  const request = await postService.createAccommodationRequest(
+    req.user!,
+    postId
+  );
 
-  sendSuccess(res, HttpStatus.CREATED, request, 'Accommodation request submitted successfully');
+  sendSuccess(
+    res,
+    HttpStatus.CREATED,
+    request,
+    'Accommodation request submitted successfully'
+  );
 };
 
 export const handleUpdatePost = async (req: Request, res: Response) => {
@@ -301,5 +356,10 @@ export const handleUpdatePost = async (req: Request, res: Response) => {
     postAmenities
   });
 
-  sendSuccess(res, HttpStatus.OK, updatedPost, 'Post updated successfully. It is now in UPDATED state.');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    updatedPost,
+    'Post updated successfully. It is now in UPDATED state.'
+  );
 };
