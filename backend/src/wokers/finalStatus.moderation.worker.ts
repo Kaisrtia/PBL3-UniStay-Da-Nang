@@ -3,6 +3,7 @@ import { connection } from '../core/config/redis.connection';
 import { prisma } from '../core/config/database';
 import { notification_type } from '@prisma/client';
 import { addCensorPostNotificationJob } from '../queues/notification.queue';
+import { createPostCensorNotification } from '../modules/notification/services/notification.service';
 
 export const finalModerationWorker = new Worker(
   'final-status-queue',
@@ -34,20 +35,13 @@ export const finalModerationWorker = new Worker(
           rejectionReason: imageModerationResult.reason
         }
       });
-      const notification = await prisma.notification.create({
-        data: {
-          id: job.id!,
-          title: `Your post with id ${job.data.postId} was rejected by system`,
-          content: `Your post: ${post.title} was rejected. The reason is ${imageModerationResult.reason}`,
-          type: notification_type.POST,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          user: {
-            connect: { id: post.userId }
-          }
-        }
-      });
-      addCensorPostNotificationJob('notify-censor-status-of-post', {
+      const notification = await createPostCensorNotification(
+        post.userId,
+        job.data.postId,
+        'REJECTED',
+        imageModerationResult.reason
+      );
+      addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
       });
     } else if (!textModerationResult.isApproved) {
@@ -60,20 +54,13 @@ export const finalModerationWorker = new Worker(
           rejectionReason: textModerationResult.reason
         }
       });
-      const notification = await prisma.notification.create({
-        data: {
-          id: job.id!,
-          title: `Your post with id ${job.data.postId} was rejected by system`,
-          content: `Your post: ${post.title} was rejected. The reason is ${textModerationResult.reason}`,
-          type: notification_type.POST,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          user: {
-            connect: { id: post.userId }
-          }
-        }
-      });
-      addCensorPostNotificationJob('notify-censor-status-of-post', {
+      const notification = await createPostCensorNotification(
+        post.userId,
+        job.data.postId,
+        'REJECTED',
+        textModerationResult.reason
+      );
+      addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
       });
     } else {
@@ -85,20 +72,12 @@ export const finalModerationWorker = new Worker(
           status: 'APPROVED'
         }
       });
-      const notification = await prisma.notification.create({
-        data: {
-          id: job.id!,
-          title: `Your post with id ${job.data.postId} was approved by system`,
-          content: `Your post: ${post.title} was approved`,
-          type: notification_type.POST,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          user: {
-            connect: { id: post.userId }
-          }
-        }
-      });
-      await addCensorPostNotificationJob('notify-censor-status-of-post', {
+      const notification = await createPostCensorNotification(
+        post.userId,
+        job.data.postId,
+        'APPROVED'
+      );
+      await addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
       });
     }

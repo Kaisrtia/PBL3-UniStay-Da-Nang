@@ -38,7 +38,6 @@ new Worker(
     console.log(`Processing job ${job.id} of type ${job.name}`);
     const { postId, userId, status, rejectionReason } = job.data;
     const notification = await createPostCensorNotification(
-      job.id!,
       userId,
       postId,
       status,
