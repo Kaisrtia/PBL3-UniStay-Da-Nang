@@ -11,7 +11,10 @@ import {
 } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
 import { addModerationFlow } from '../../../queues/moderation.queue';
-import { addCensorPostNotificationJob } from '../../../queues/notification.queue';
+import { 
+  addCensorPostNotificationJob,
+  addRequestSharedAccommodationNotificationJob 
+} from '../../../queues/notification.queue';
 
 export interface PostFilters {
   purpose?: post_purpose;
@@ -657,7 +660,11 @@ export const createAccommodationRequest = async (
     );
   }
 
-  return prismaClient.accomodation_request.create({
+  const request = await prismaClient.accomodation_request.create({
     data: { postId, userId: currentUser.id }
   });
+
+  await addRequestSharedAccommodationNotificationJob(postId, post.userId);
+
+  return request;
 };

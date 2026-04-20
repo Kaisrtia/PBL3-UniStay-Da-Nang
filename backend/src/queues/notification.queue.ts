@@ -1,14 +1,15 @@
 import { Queue } from 'bullmq';
 import { connection } from '../core/config/redis.connection';
 
-export const censorAutomaticalNotificationQueue = new Queue(
+// Notification queues for post censoring results (automated and manual)
+const censorAutomaticalNotificationQueue = new Queue(
   'censor-post-notification-queue',
   {
     connection
   }
 );
 
-export const censorManualNotificationQueue = new Queue(
+const censorManualNotificationQueue = new Queue(
   'censor-manual-notification-queue',
   {
     connection
@@ -33,4 +34,33 @@ export const addCensorPostNotificationJob = async (name: string, data: any) => {
       }
     });
   }
+};
+
+// Request notification queue for accommodation requests
+const requestSharedAccommodationNotificationQueue = new Queue(
+  'request-shared-accommodation-notification-queue',
+  {
+    connection
+  }
+);
+
+export const addRequestSharedAccommodationNotificationJob = async (
+  postId: string,
+  postOwnerId: string
+) => {
+  const jobId = `accom-notif:${postId}`;
+
+  return await requestSharedAccommodationNotificationQueue.add(
+    'request-shared-accommodation',
+    { postId, postOwnerId },
+    {
+      jobId,
+      delay: 30000,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 3000
+      }
+    }
+  );
 };

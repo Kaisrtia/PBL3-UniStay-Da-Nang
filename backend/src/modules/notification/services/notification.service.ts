@@ -87,11 +87,83 @@ export const createPostCensorNotification = async (
 };
 
 export const createRequestSharedAccommodationNotification = async (
-  id: string,
-  senderId: string,
-  receiverId: string,
   postId: string,
-  accommodationRequestId: string
+  postOwnerId: string
 ) => {
-  // Implementation for creating request shared accommodation notification
+  // 1. Fetch all PENDING requesters for this post
+  const requests = await prisma.accomodation_request.findMany({
+    where: { postId, status: 'PENDING' },
+    include: { user: { select: { fullName: true } } },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  if (requests.length === 0) return null;
+
+  // 2. Build grouped message
+  const count = requests.length;
+  let content: string;
+  if (count === 1) {
+    content = `${requests[0].user.fullName} has requested to share accommodation with your post.`;
+  } else if (count === 2) {
+    content = `${requests[0].user.fullName} and ${requests[1].user.fullName} have requested to share accommodation with your post.`;
+  } else {
+    const first = requests[0].user.fullName;
+    content = `${first} and ${count - 1} others have requested to share accommodation with your post.`;
+  }
+
+  const title = count === 1
+    ? '1 new accommodation request'
+    : `${count} new accommodation requests`;
+
+  // 3. Find existing notification
+  const existingNotifs = await prisma.notification.findMany({
+    where: {
+      type: notification_type.ACCOMODATION_REQUEST,
+      userId: postOwnerId,
+      metaData: {
+        path: ['postId'],
+        equals: postId
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 1
+  });
+  const existingNoti = existingNotifs[0];
+
+  if (existingNoti) {
+    return await prisma.notification.update({
+      where: { id: existingNoti.id },
+      data: {
+        title,
+        content,
+        isRead: false,
+        updatedAt: new Date(),
+        metaData: {
+          ...((existingNoti.metaData as any) || {}),
+          postId,
+          requestCount: count,
+          requesterIds: requests.map(r => r.userId)
+        }
+      }
+    });
+  }
+
+  return await prisma.notification.create({
+    data: {
+      title,
+      content,
+      type: notification_type.ACCOMODATION_REQUEST,
+      isRead: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metaData: {
+        postId,
+        requestCount: count,
+        requesterIds: requests.map(r => r.userId)
+      },
+      user: {
+        connect: { id: postOwnerId }
+      }
+    }
+  });
 };
