@@ -77,7 +77,7 @@ enum amenity_condition {
 }
 
 enum notification_type {
-  POST
+  CENSOR_POST
   COMMENT
   ACCOMODATION_REQUEST
   REPORT
@@ -332,11 +332,11 @@ model report {
 }
 
 model notification {
-  id        String            @id @default(uuid())
+  id        Int            @id @default(autoincrement())
   userId    String
   title     String            @db.VarChar(255)
   content   String            @db.Text
-  type      notification_type @default(POST)
+  type      notification_type 
   isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB
   createdAt DateTime          @default(now())
