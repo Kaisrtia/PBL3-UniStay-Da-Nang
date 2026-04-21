@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { connection } from '../core/config/redis.connection';
-import { prisma } from '../core/config/database';
+import prismaClient from '../core/config/prisma';
 import { notification_type } from '@prisma/client';
 import { addCensorPostNotificationJob } from '../queues/notification.queue';
 import { createPostCensorNotification } from '../modules/notification/services/notification.service';
@@ -16,7 +16,7 @@ export const finalModerationWorker = new Worker(
     const textModerationResult = JSON.parse(
       Object.entries(childrenData).at(1)?.[1]
     );
-    const post = await prisma.post.findUnique({
+    const post = await prismaClient.post.findUnique({
       where: {
         id: job.data.postId
       }
@@ -26,7 +26,7 @@ export const finalModerationWorker = new Worker(
       return;
     }
     if (!imageModerationResult.isApproved) {
-      await prisma.post.update({
+      await prismaClient.post.update({
         where: {
           id: job.data.postId
         },
@@ -45,7 +45,7 @@ export const finalModerationWorker = new Worker(
         notificationId: notification.id
       });
     } else if (!textModerationResult.isApproved) {
-      await prisma.post.update({
+      await prismaClient.post.update({
         where: {
           id: job.data.postId
         },
@@ -64,7 +64,7 @@ export const finalModerationWorker = new Worker(
         notificationId: notification.id
       });
     } else {
-      await prisma.post.update({
+      await prismaClient.post.update({
         where: {
           id: job.data.postId
         },

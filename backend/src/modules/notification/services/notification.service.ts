@@ -1,5 +1,5 @@
 import { notification_type, post, post_status } from '@prisma/client';
-import { prisma } from '../../../core/config/database';
+import prismaClient from '../../../core/config/prisma';
 import { AppError } from '../../../core/exceptions/AppError';
 import HttpStatus from 'http-status';
 
@@ -18,7 +18,7 @@ export const createPostCensorNotification = async (
       'Rejection reason is required for rejected posts'
     );
   }
-  const user = await prisma.user.findUnique({
+  const user = await prismaClient.user.findUnique({
     where: {
       id: userId
     }
@@ -26,7 +26,7 @@ export const createPostCensorNotification = async (
   if (!user) {
     throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
   }
-  const post = await prisma.post.findUnique({
+  const post = await prismaClient.post.findUnique({
     where: {
       id: postId
     }
@@ -38,7 +38,7 @@ export const createPostCensorNotification = async (
   const title = `Your post with id ${postId} was ${status === post_status.REJECTED ? 'rejected' : 'approved'} by system`;
   const content = `Your post: ${post.title} was ${status === post_status.REJECTED ? 'rejected' : 'approved'}. ${status === post_status.REJECTED ? 'The reason is: ' + rejectionReason : 'Your post is now live on our platform.'}`;
 
-  const existingNotifs = await prisma.notification.findMany({
+  const existingNotifs = await prismaClient.notification.findMany({
     where: {
       type: notification_type.CENSOR_POST,
       userId: userId,
@@ -53,7 +53,7 @@ export const createPostCensorNotification = async (
   const existingNoti = existingNotifs[0];
 
   if (existingNoti) {
-    return await prisma.notification.update({
+    return await prismaClient.notification.update({
       where: { id: existingNoti.id },
       data: {
         title,
@@ -68,7 +68,7 @@ export const createPostCensorNotification = async (
     });
   }
 
-  return await prisma.notification.create({
+  return await prismaClient.notification.create({
     data: {
       title,
       content,
@@ -91,7 +91,7 @@ export const createRequestSharedAccommodationNotification = async (
   postOwnerId: string
 ) => {
   // 1. Fetch all PENDING requesters for this post
-  const requests = await prisma.accomodation_request.findMany({
+  const requests = await prismaClient.accomodation_request.findMany({
     where: { postId, status: 'PENDING' },
     include: { user: { select: { fullName: true } } },
     orderBy: { createdAt: 'asc' }
@@ -116,7 +116,7 @@ export const createRequestSharedAccommodationNotification = async (
     : `${count} new accommodation requests`;
 
   // 3. Find existing notification
-  const existingNotifs = await prisma.notification.findMany({
+  const existingNotifs = await prismaClient.notification.findMany({
     where: {
       type: notification_type.ACCOMODATION_REQUEST,
       userId: postOwnerId,
@@ -131,7 +131,7 @@ export const createRequestSharedAccommodationNotification = async (
   const existingNoti = existingNotifs[0];
 
   if (existingNoti) {
-    return await prisma.notification.update({
+    return await prismaClient.notification.update({
       where: { id: existingNoti.id },
       data: {
         title,
@@ -148,7 +148,7 @@ export const createRequestSharedAccommodationNotification = async (
     });
   }
 
-  return await prisma.notification.create({
+  return await prismaClient.notification.create({
     data: {
       title,
       content,
