@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { connection } from '../core/config/redis.connection';
+import { connection } from '../../../core/config/redis.connection';
 
 // Notification queues for post censoring results (automated and manual)
 const censorAutomaticalNotificationQueue = new Queue(

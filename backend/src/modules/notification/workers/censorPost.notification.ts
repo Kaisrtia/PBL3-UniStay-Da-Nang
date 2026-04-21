@@ -1,8 +1,8 @@
 import { create } from 'domain';
-import prisma from '../core/config/prisma';
-import { connection } from '../core/config/redis.connection';
+import prisma from '../../../core/config/prisma';
+import { connection } from '../../../core/config/redis.connection';
 import { Worker, Job } from 'bullmq';
-import { createPostCensorNotification } from '../modules/notification/services/notification.service';
+import { createPostCensorNotification } from '../services/notification.service';
 
 new Worker(
   'censor-post-notification-queue',

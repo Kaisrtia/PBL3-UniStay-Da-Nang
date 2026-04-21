@@ -1,9 +1,9 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../core/config/redis.connection';
-import prismaClient from '../core/config/prisma';
+import { connection } from '../../../core/config/redis.connection';
+import prismaClient from '../../../core/config/prisma';
 import { notification_type } from '@prisma/client';
-import { addCensorPostNotificationJob } from '../queues/notification.queue';
-import { createPostCensorNotification } from '../modules/notification/services/notification.service';
+import { addCensorPostNotificationJob } from '../../notification/queues/notification.queue';
+import { createPostCensorNotification } from '../../notification/services/notification.service';
 
 export const finalModerationWorker = new Worker(
   'final-status-queue',

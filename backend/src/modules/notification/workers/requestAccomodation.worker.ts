@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../core/config/redis.connection';
-import { createRequestSharedAccommodationNotification } from '../modules/notification/services/notification.service';
+import { connection } from '../../../core/config/redis.connection';
+import { createRequestSharedAccommodationNotification } from '../services/notification.service';
 
 new Worker(
   'request-shared-accommodation-notification-queue',

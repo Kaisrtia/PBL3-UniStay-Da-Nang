@@ -1,8 +1,8 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../core/config/redis.connection';
-import prismaClient from '../core/config/prisma';
+import { connection } from '../../../core/config/redis.connection';
+import prismaClient from '../../../core/config/prisma';
 import { vl } from 'moondream';
-import config from '../core/config/config';
+import config from '../../../core/config/config';
 import { finalStatusQueue } from '../queues/moderation.queue';
 
 const moondreamClient = new vl({ apiKey: config.ai_key.moondream });

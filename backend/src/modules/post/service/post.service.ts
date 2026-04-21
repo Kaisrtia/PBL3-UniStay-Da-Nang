@@ -10,11 +10,11 @@ import {
   post_status
 } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
-import { addModerationFlow } from '../../../queues/moderation.queue';
+import { addModerationFlow } from '../queues/moderation.queue';
 import { 
   addCensorPostNotificationJob,
   addRequestSharedAccommodationNotificationJob 
-} from '../../../queues/notification.queue';
+} from '../../notification/queues/notification.queue';
 
 export interface PostFilters {
   purpose?: post_purpose;
