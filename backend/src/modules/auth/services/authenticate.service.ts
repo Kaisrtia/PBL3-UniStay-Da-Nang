@@ -7,6 +7,29 @@ import crypto, { randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
+const generateAccessToken = (user: any) => {
+  return jwt.sign(
+    { id: user.id, roles: user.roles },
+    config.jwt.secret,
+    { expiresIn: Number(config.jwt.access_token_ttl) }
+  );
+};
+
+const generateAuthTokens = async (user: any) => {
+  const accessToken = generateAccessToken(user);
+  const refreshToken = crypto.randomBytes(64).toString('hex');
+
+  await prismaClient.session.create({
+    data: {
+      userId: user.id,
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
+    }
+  });
+
+  return { accessToken, refreshToken };
+};
+
 export const signUp = async (
   email?: string,
   password?: string,
@@ -31,21 +54,20 @@ export const signUp = async (
     throw new AppError(HttpStatus.CONFLICT, 'Email already exists');
   }
 
-  const user = await prismaClient.user.create({
-    data: {
-      id: randomUUID(),
-      email,
-      hashedPassword: bcrypt.hashSync(password, 10),
-      fullName,
-      provider: provider.SYSTEM
-    }
-  });
-
-  await prismaClient.email_verification.create({
-    data: {
-      email
-    }
-  });
+  await prismaClient.$transaction([
+    prismaClient.user.create({
+      data: {
+        id: randomUUID(),
+        email,
+        hashedPassword: bcrypt.hashSync(password, 10),
+        fullName,
+        provider: provider.SYSTEM
+      }
+    }),
+    prismaClient.email_verification.create({
+      data: { email }
+    })
+  ]);
 };
 
 export const login = async (email?: string, password?: string) => {
@@ -97,28 +119,8 @@ export const login = async (email?: string, password?: string) => {
     }
   }
 
-  // generate access token
-  const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles },
-    config.jwt.secret,
-    {
-      expiresIn: Number(config.jwt.access_token_ttl)
-    }
-  );
-
-  // generate refresh token
-  const refreshToken = crypto.randomBytes(64).toString('hex');
-
-  // save refresh token to database
-  await prismaClient.session.create({
-    data: {
-      userId: user.id,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
-    }
-  });
-
-  return { accessToken, refreshToken, user };
+  const tokens = await generateAuthTokens(user);
+  return { ...tokens, user };
 };
 
 export const googleLogin = async (
@@ -151,25 +153,8 @@ export const googleLogin = async (
     });
   }
 
-  const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles },
-    config.jwt.secret,
-    {
-      expiresIn: Number(config.jwt.access_token_ttl)
-    }
-  );
-
-  const refreshToken = crypto.randomBytes(64).toString('hex');
-
-  await prismaClient.session.create({
-    data: {
-      userId: user.id,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
-    }
-  });
-
-  return { accessToken, refreshToken, user };
+  const tokens = await generateAuthTokens(user);
+  return { ...tokens, user };
 };
 
 export const logout = async (refreshToken: string) => {
@@ -213,13 +198,5 @@ export const refreshToken = async (refreshToken: string) => {
     throw new AppError(HttpStatus.UNAUTHORIZED, 'User not found');
   }
 
-  const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles },
-    config.jwt.secret,
-    {
-      expiresIn: Number(config.jwt.access_token_ttl)
-    }
-  );
-
-  return accessToken;
+  return generateAccessToken(user);
 };

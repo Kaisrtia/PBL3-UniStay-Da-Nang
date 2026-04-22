@@ -5,6 +5,9 @@ import nodemailer from 'nodemailer';
 import bcrypt from 'bcrypt';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
+import transporter from '../../../core/config/nodemailer';
+
+
 
 export const sendEmailOtpCode = async (email: string) => {
   if (!email) {
@@ -59,15 +62,6 @@ export const sendEmailOtpCode = async (email: string) => {
     }
   });
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: config.email.user,
-      pass: config.email.password
-    }
-  });
 
   const mailOptions = {
     from: config.email.user,
@@ -194,15 +188,6 @@ export const sendPasswordResetLink = async (email: string) => {
 
   const resetLink = `${config.frontend_url}/reset-password?token=${token}`;
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: config.email.user,
-      pass: config.email.password
-    }
-  });
 
   const mailOptions = {
     from: config.email.user,
