@@ -1,10 +1,10 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, report_status, post_status, comment_status } from '@prisma/client';
+import { report_status, post_status, comment_status } from '@prisma/client';
 
 export const tackleReport = async (
-  adminUser: user,
+  adminId: string,
   reportId: string,
   data: {
     status: report_status;
@@ -30,37 +30,39 @@ export const tackleReport = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Report has already been tackled');
   }
 
-  const updatedReport = await prismaClient.report.update({
-    where: { id: reportId },
-    data: {
-      status: data.status,
-      adminNote: data.adminNote,
-      adminId: adminUser.id,
-      tackledAt: new Date()
+  return prismaClient.$transaction(async (tx) => {
+    const updatedReport = await tx.report.update({
+      where: { id: reportId },
+      data: {
+        status: data.status,
+        adminNote: data.adminNote,
+        adminId,
+        tackledAt: new Date()
+      }
+    });
+
+    if (data.status === report_status.RESOLVED) {
+      if (existingReport.postId) {
+        await tx.post.update({
+          where: { id: existingReport.postId },
+          data: { status: post_status.HIDDEN }
+        });
+      }
+
+      if (existingReport.commentId) {
+        await tx.comment.update({
+          where: { id: existingReport.commentId },
+          data: { status: comment_status.HIDDEN }
+        });
+      }
     }
+
+    return updatedReport;
   });
-
-  if (data.status === report_status.RESOLVED) {
-    if (existingReport.postId) {
-      await prismaClient.post.update({
-        where: { id: existingReport.postId },
-        data: { status: post_status.HIDDEN }
-      });
-    }
-
-    if (existingReport.commentId) {
-      await prismaClient.comment.update({
-        where: { id: existingReport.commentId },
-        data: { status: comment_status.HIDDEN }
-      });
-    }
-  }
-
-  return updatedReport;
 };
 
 export const createReport = async (
-  currentUser: user,
+  userId: string,
   data: {
     reason: string;
     postId?: string;
@@ -91,7 +93,7 @@ export const createReport = async (
 
   return prismaClient.report.create({
     data: {
-      userId: currentUser.id,
+      userId,
       reason: data.reason,
       postId: data.postId,
       commentId: data.commentId
