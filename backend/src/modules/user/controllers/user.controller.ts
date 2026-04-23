@@ -67,7 +67,7 @@ export const handleChangePassword = async (req: Request, res: Response) => {
 export const handleBanUser = async (req: Request, res: Response) => {
   const { userId } = req.body;
 
-  await adminService.banUser(req.user!, userId);
+  await adminService.banUser(userId);
 
   sendSuccess(res, HttpStatus.OK, null, 'User banned successfully');
 };
@@ -75,7 +75,7 @@ export const handleBanUser = async (req: Request, res: Response) => {
 export const handleUnbanUser = async (req: Request, res: Response) => {
   const { userId } = req.body;
 
-  await adminService.unbanUser(req.user!, userId);
+  await adminService.unbanUser(userId);
 
   sendSuccess(res, HttpStatus.OK, null, 'User unbanned successfully');
 };
@@ -89,7 +89,7 @@ export const handleVerifyHost = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'hostId is required');
   }
 
-  const verifiedHost = await adminService.verifyHost(req.user!, hostId);
+  const verifiedHost = await adminService.verifyHost(hostId);
 
   sendSuccess(res, HttpStatus.OK, verifiedHost, 'Host verified successfully (Blue Tick granted)');
 };
@@ -98,7 +98,7 @@ export const handleGetVerificationCandidates = async (req: Request, res: Respons
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 
-  const result = await userInfoService.getVerificationCandidates(req.user!, page, limit);
+  const result = await userInfoService.getVerificationCandidates(page, limit);
   sendSuccess(res, HttpStatus.OK, result);
 };
 
@@ -106,6 +106,6 @@ export const handleGetAllUsers = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 
-  const result = await adminService.getAllUsers(req.user!, page, limit);
+  const result = await adminService.getAllUsers(page, limit);
   sendSuccess(res, HttpStatus.OK, result);
 };

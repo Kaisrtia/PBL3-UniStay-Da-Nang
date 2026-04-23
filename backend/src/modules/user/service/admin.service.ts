@@ -3,7 +3,7 @@ import { account_status, user } from '@prisma/client';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 
-export const banUser = async (admin: user, userId: string) => {
+export const banUser = async (userId: string) => {
   const target = await prismaClient.user.findUnique({ where: { id: userId } });
 
   if (!target) {
@@ -20,7 +20,7 @@ export const banUser = async (admin: user, userId: string) => {
   });
 };
 
-export const unbanUser = async (admin: user, userId: string) => {
+export const unbanUser = async (userId: string) => {
   const target = await prismaClient.user.findUnique({ where: { id: userId } });
 
   if (!target) {
@@ -37,7 +37,7 @@ export const unbanUser = async (admin: user, userId: string) => {
   });
 };
 
-export const verifyHost = async (admin: user, hostId: string) => {
+export const verifyHost = async (hostId: string) => {
   const host = await prismaClient.host.findUnique({
     where: { hostId }
   });
@@ -74,7 +74,7 @@ export const verifyHost = async (admin: user, hostId: string) => {
   });
 };
 
-export const getAllUsers = async (admin: user, page: number = 1, limit: number = 10) => {
+export const getAllUsers = async (page: number = 1, limit: number = 10) => {
   const skip = (page - 1) * limit;
 
   const [users, totalCount] = await Promise.all([

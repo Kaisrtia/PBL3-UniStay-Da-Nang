@@ -32,41 +32,45 @@ export const setupProfile = async (
     }
   }
 
-  const updatedUser = await prismaClient.user.update({
-    where: { id: user.id },
-    data: {
-      roles: Array.from(new Set([...user.roles, data.role])),
-      gender: data.gender,
-      dob: data.dob ? new Date(data.dob) : null,
-      phone: data.phone,
-      avatarUrl: data.avatarUrl,
-      status: account_status.ACTIVE
-    }
-  });
-
-  if (data.role === account_role.STUDENT) {
-    if (data.universityId) {
-      const university = await prismaClient.university.findUnique({
-        where: { id: data.universityId }
-      });
-      if (!university) {
-        throw new AppError(HttpStatus.BAD_REQUEST, 'University not found');
-      }
-    }
-    
-    await prismaClient.student.create({
-      data: {
-        studentId: user.id,
-        ...(data.universityId && { universityId: data.universityId })
-      }
+  if (data.role === account_role.STUDENT && data.universityId) {
+    const university = await prismaClient.university.findUnique({
+      where: { id: data.universityId }
     });
-  } else if (data.role === account_role.HOST) {
-    await prismaClient.host.create({
-      data: {
-        hostId: user.id
-      }
-    });
+    if (!university) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'University not found');
+    }
   }
+
+  const updatedUser = await prismaClient.$transaction(async (tx) => {
+    const userUpdated = await tx.user.update({
+      where: { id: user.id },
+      data: {
+        roles: Array.from(new Set([...user.roles, data.role])),
+        gender: data.gender,
+        dob: data.dob ? new Date(data.dob) : null,
+        phone: data.phone,
+        avatarUrl: data.avatarUrl,
+        status: account_status.ACTIVE
+      }
+    });
+
+    if (data.role === account_role.STUDENT) {
+      await tx.student.create({
+        data: {
+          studentId: user.id,
+          ...(data.universityId && { universityId: data.universityId })
+        }
+      });
+    } else if (data.role === account_role.HOST) {
+      await tx.host.create({
+        data: {
+          hostId: user.id
+        }
+      });
+    }
+
+    return userUpdated;
+  });
 
   return updatedUser;
 };
@@ -85,16 +89,6 @@ export const updateProfile = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'At least one field is required to update');
   }
 
-  const updatedUser = await prismaClient.user.update({
-    where: { id: user.id },
-    data: {
-      ...(data.fullName && { fullName: data.fullName }),
-      ...(data.gender && { gender: data.gender }),
-      ...(data.dob && { dob: new Date(data.dob) }),
-      ...(data.avatarUrl && { avatarUrl: data.avatarUrl })
-    }
-  });
-
   if (data.universityId && user.roles.includes(account_role.STUDENT)) {
     const university = await prismaClient.university.findUnique({
       where: { id: data.universityId }
@@ -102,14 +96,29 @@ export const updateProfile = async (
     if (!university) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'University not found');
     }
-    
-    // We use upsert in case the student object wasn't properly created, though it should be.
-    await prismaClient.student.upsert({
-      where: { studentId: user.id },
-      update: { universityId: data.universityId },
-      create: { studentId: user.id, universityId: data.universityId }
-    });
   }
+
+  const updatedUser = await prismaClient.$transaction(async (tx) => {
+    const userUpdated = await tx.user.update({
+      where: { id: user.id },
+      data: {
+        ...(data.fullName && { fullName: data.fullName }),
+        ...(data.gender && { gender: data.gender }),
+        ...(data.dob && { dob: new Date(data.dob) }),
+        ...(data.avatarUrl && { avatarUrl: data.avatarUrl })
+      }
+    });
+
+    if (data.universityId && user.roles.includes(account_role.STUDENT)) {
+      await tx.student.upsert({
+        where: { studentId: user.id },
+        update: { universityId: data.universityId },
+        create: { studentId: user.id, universityId: data.universityId }
+      });
+    }
+
+    return userUpdated;
+  });
 
   return updatedUser;
 };
@@ -168,35 +177,59 @@ export const getUserProfile = async (targetUserId: string) => {
   return safeUser;
 };
 
-export const getVerificationCandidates = async (admin: user, page: number = 1, limit: number = 10) => {
-  const potentialHosts = await prismaClient.host.findMany({
-    where: {
-      isVerified: false,
-      avgStar: {
-        gte: 4.5
-      }
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatarUrl: true,
-          phone: true
+export const getVerificationCandidates = async (page: number = 1, limit: number = 10) => {
+  const skip = (page - 1) * limit;
+
+  // Find hostIds with > 20 evaluations
+  const evaluationGroups = await prismaClient.student_evaluate_host.groupBy({
+    by: ['hostId'],
+    having: {
+      hostId: {
+        _count: {
+          gt: 20
         }
-      },
-      _count: {
-        select: { studentEvaluateHosts: true }
       }
     }
   });
 
-  const candidates = potentialHosts.filter(host => host._count.studentEvaluateHosts > 20);
-  
-  const totalCount = candidates.length;
-  const skip = (page - 1) * limit;
-  const paginatedData = candidates.slice(skip, skip + limit);
+  const validHostIds = evaluationGroups.map(g => g.hostId);
+
+  const [paginatedData, totalCount] = await Promise.all([
+    prismaClient.host.findMany({
+      skip,
+      take: limit,
+      where: {
+        isVerified: false,
+        avgStar: {
+          gte: 4.5
+        },
+        hostId: { in: validHostIds }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true,
+            phone: true
+          }
+        },
+        _count: {
+          select: { studentEvaluateHosts: true }
+        }
+      }
+    }),
+    prismaClient.host.count({
+      where: {
+        isVerified: false,
+        avgStar: {
+          gte: 4.5
+        },
+        hostId: { in: validHostIds }
+      }
+    })
+  ]);
 
   return {
     data: paginatedData,
