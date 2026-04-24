@@ -13,7 +13,7 @@ export const handleCreateEvaluation = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'hostId, numberStar, and description are required');
   }
 
-  const evaluation = await evaluationService.createEvaluation(req.user!, {
+  const evaluation = await evaluationService.createEvaluation(req.user!.id, {
     hostId,
     numberStar: Number(numberStar),
     description
@@ -29,7 +29,7 @@ export const handleCreateSystemFeedback = async (req: Request, res: Response) =>
     throw new AppError(HttpStatus.BAD_REQUEST, 'numberStar and description are required');
   }
 
-  const feedback = await evaluationService.createSystemFeedback(req.user!, {
+  const feedback = await evaluationService.createSystemFeedback(req.user!.id, {
     numberStar: Number(numberStar),
     description
   });

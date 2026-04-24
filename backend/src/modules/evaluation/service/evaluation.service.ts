@@ -1,10 +1,9 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user } from '@prisma/client';
 
 export const createEvaluation = async (
-  currentUser: user,
+  userId: string,
   data: {
     hostId: string;
     numberStar: number;
@@ -17,7 +16,7 @@ export const createEvaluation = async (
 
   // Check if student exists
   const student = await prismaClient.student.findUnique({
-    where: { studentId: currentUser.id }
+    where: { studentId: userId }
   });
 
   if (!student) {
@@ -33,39 +32,41 @@ export const createEvaluation = async (
     throw new AppError(HttpStatus.NOT_FOUND, 'Host not found');
   }
 
-  // Create evaluation
-  const evaluation = await prismaClient.student_evaluate_host.create({
-    data: {
-      studentId: currentUser.id,
-      hostId: data.hostId,
-      numberStar: data.numberStar,
-      description: data.description
-    }
+  return prismaClient.$transaction(async (tx) => {
+    // Create evaluation
+    const evaluation = await tx.student_evaluate_host.create({
+      data: {
+        studentId: userId,
+        hostId: data.hostId,
+        numberStar: data.numberStar,
+        description: data.description
+      }
+    });
+
+    // Calculate new average star for the host
+    const aggregates = await tx.student_evaluate_host.aggregate({
+      where: { hostId: data.hostId },
+      _avg: {
+        numberStar: true
+      }
+    });
+
+    const newAvgStar = aggregates._avg.numberStar || data.numberStar;
+
+    // Update host
+    await tx.host.update({
+      where: { hostId: data.hostId },
+      data: {
+        avgStar: newAvgStar
+      }
+    });
+
+    return evaluation;
   });
-
-  // Calculate new average star for the host
-  const aggregates = await prismaClient.student_evaluate_host.aggregate({
-    where: { hostId: data.hostId },
-    _avg: {
-      numberStar: true
-    }
-  });
-
-  const newAvgStar = aggregates._avg.numberStar || data.numberStar;
-
-  // Update host
-  await prismaClient.host.update({
-    where: { hostId: data.hostId },
-    data: {
-      avgStar: newAvgStar
-    }
-  });
-
-  return evaluation;
 };
 
 export const createSystemFeedback = async (
-  currentUser: user,
+  userId: string,
   data: {
     numberStar: number;
     description: string;
@@ -78,7 +79,7 @@ export const createSystemFeedback = async (
   // Create system feedback
   const feedback = await prismaClient.system_feedback.create({
     data: {
-      userId: currentUser.id,
+      userId,
       numberStar: data.numberStar,
       description: data.description
     }
