@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { connection } from '../../../core/config/redis.connection';
 import { createRequestSharedAccommodationNotification } from '../services/notification.service';
+import { pushNotificationIfOnline } from '../utils/pushNotification';
 
 new Worker(
   'request-shared-accommodation-notification-queue',
@@ -14,12 +15,8 @@ new Worker(
     
     if (!notification) return;
 
-    const isOnline = await connection.sismember('online_users', postOwnerId);
-    if (isOnline) {
-      await connection.publish(
-        `user_notif:${postOwnerId}`,
-        JSON.stringify(notification)
-      );
+    const sent = await pushNotificationIfOnline(postOwnerId, notification);
+    if (sent) {
       console.log(`Job ${job.id} processed successfully`);
     }
   },

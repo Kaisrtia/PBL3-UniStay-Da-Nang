@@ -1,8 +1,8 @@
-import { create } from 'domain';
 import prisma from '../../../core/config/prisma';
 import { connection } from '../../../core/config/redis.connection';
 import { Worker, Job } from 'bullmq';
 import { createPostCensorNotification } from '../services/notification.service';
+import { pushNotificationIfOnline } from '../utils/pushNotification';
 
 new Worker(
   'censor-post-notification-queue',
@@ -17,15 +17,8 @@ new Worker(
     if (!notification) {
       return;
     }
-    const isOnline = await connection.sismember(
-      'online_users',
-      notification.userId
-    );
-    if (isOnline) {
-      await connection.publish(
-        `user_notif:${notification.userId}`,
-        JSON.stringify(notification)
-      );
+    const sent = await pushNotificationIfOnline(notification.userId, notification);
+    if (sent) {
       console.log(`Job ${job.id} processed successfully`);
     }
   },
@@ -43,13 +36,9 @@ new Worker(
       status,
       rejectionReason
     );
-    const isOnline = await connection.sismember('online_users', userId);
-    console.log(`User ${userId} is ${isOnline ? 'online' : 'offline'}`);
-    if (isOnline) {
-      await connection.publish(
-        `user_notif:${userId}`,
-        JSON.stringify(notification)
-      );
+    const sent = await pushNotificationIfOnline(userId, notification);
+    console.log(`User ${userId} is ${sent ? 'online' : 'offline'}`);
+    if (sent) {
       console.log(`Job ${job.id} processed successfully`);
     }
   },
