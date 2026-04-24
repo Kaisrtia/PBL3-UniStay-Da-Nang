@@ -1,10 +1,10 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, room_type } from '@prisma/client';
+import { room_type } from '@prisma/client';
 
 export const createStudentDemand = async (
-  currentUser: user,
+  studentId: string,
   data: {
     wardId: number;
     universityId?: string;
@@ -46,7 +46,7 @@ export const createStudentDemand = async (
 
   // Upsert the demand limit to 1 per student (since studentId is @id in student_demand)
   const demand = await prismaClient.student_demand.upsert({
-    where: { studentId: currentUser.id },
+    where: { studentId },
     update: {
       wardId: data.wardId,
       ...(data.universityId ? { universityId: data.universityId } : { universityId: null }),
@@ -58,7 +58,7 @@ export const createStudentDemand = async (
       rommateCriteria: data.rommateCriteria ?? ''
     },
     create: {
-      studentId: currentUser.id,
+      studentId,
       wardId: data.wardId,
       ...(data.universityId && { universityId: data.universityId }),
       minPrice: data.minPrice,

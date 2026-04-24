@@ -25,7 +25,7 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
     );
   }
 
-  const demand = await demandService.createStudentDemand(req.user!, {
+  const demand = await demandService.createStudentDemand(req.user!.id, {
     wardId: Number(wardId),
     universityId: universityId ? String(universityId) : undefined,
     minPrice: Number(minPrice),
