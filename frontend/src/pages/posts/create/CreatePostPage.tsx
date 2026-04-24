@@ -1,12 +1,22 @@
-import { type FormEvent, type ReactNode } from 'react'
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'
 
+import axios from 'axios'
 import { FaChevronDown, FaImage } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import locationService, { type District } from '@/services/locationService'
+import postService, { type PostPurpose, type RoomType } from '@/services/postService'
 
-const stayTypes = ['Trọ', 'Nhà nguyên căn', 'Chung cư']
-const listingPurposes = ['Cho thuê', 'Cho ở ghép']
+const stayTypes: { label: string; value: RoomType }[] = [
+  { label: 'Trọ', value: 'ROOM' },
+  { label: 'Nhà nguyên căn', value: 'HOUSE' },
+  { label: 'Chung cư', value: 'APARTMENT' }
+]
+const listingPurposes: { label: string; value: PostPurpose }[] = [
+  { label: 'Cho thuê', value: 'RENT' },
+  { label: 'Cho ở ghép', value: 'FIND_ROOMMATE' }
+]
 
 const amenities = [
   'Ban công rộng',
@@ -50,31 +60,67 @@ const FormSection = ({ children, title }: FormSectionProps) => (
   </section>
 )
 
-const PillButton = ({ children }: { children: ReactNode }) => (
+const PillButton = ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
   <button
     type='button'
+    onClick={onClick}
     className='min-w-36 rounded-full bg-[#E2E1DD] px-8 py-3 text-sm font-extrabold text-[#111111] transition hover:bg-[#F7DE8B]'
   >
     {children}
   </button>
 )
 
-const SelectField = ({ label }: { label: string }) => (
+type SelectOption = {
+  label: string
+  value: string | number
+}
+
+type SelectFieldProps = {
+  label: string
+  name?: string
+  value?: string
+  options?: SelectOption[]
+  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void
+}
+
+const SelectField = ({ label, name, value, options = [], onChange }: SelectFieldProps) => (
   <label className='flex items-center gap-3'>
     <span className='w-36 shrink-0 whitespace-nowrap text-base font-extrabold text-[#111111]'>{label}</span>
     <span className='relative flex-1'>
-      <select className='h-11 w-full appearance-none rounded-full border border-[#001D3D] bg-white px-5 pr-11 text-sm font-semibold text-[#111111] outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'>
-        <option>Chọn {label.toLowerCase()}</option>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        className='h-11 w-full appearance-none rounded-full border border-[#001D3D] bg-white px-5 pr-11 text-sm font-semibold text-[#111111] outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+      >
+        <option value=''>Chọn {label.toLowerCase()}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
       </select>
       <FaChevronDown className='pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-sm text-[#111111]' />
     </span>
   </label>
 )
 
-const TextField = ({ label, placeholder }: { label?: string; placeholder?: string }) => (
+const TextField = ({
+  label,
+  name,
+  placeholder,
+  type = 'text'
+}: {
+  label?: string
+  name?: string
+  placeholder?: string
+  type?: string
+}) => (
   <label className={label ? 'flex items-center gap-3' : 'block'}>
     {label && <span className='w-36 shrink-0 whitespace-nowrap text-base font-extrabold text-[#111111]'>{label}</span>}
     <input
+      name={name}
+      type={type}
       className='h-11 w-full rounded-full border border-[#001D3D] bg-white px-6 text-sm font-semibold text-[#111111] outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
       placeholder={placeholder}
     />
@@ -93,8 +139,74 @@ const CheckboxGrid = ({ items }: { items: string[] }) => (
 )
 
 const CreatePostPage = () => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const navigate = useNavigate()
+  const [roomType, setRoomType] = useState<RoomType>('ROOM')
+  const [postPurpose, setPostPurpose] = useState<PostPurpose>('RENT')
+  const [wardId, setWardId] = useState('')
+  const [wardOptions, setWardOptions] = useState<District[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const loadWardOptions = async () => {
+      try {
+        const data = await locationService.getDistricts()
+        setWardOptions(data)
+      } catch {
+        alert('Không tải được danh sách xã/phường.')
+      }
+    }
+
+    loadWardOptions()
+  }, [])
+
+  const getBackendErrorMessage = (error: unknown) => {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
+      return data?.error?.message || data?.message || 'Tạo bài đăng thất bại.'
+    }
+
+    return 'Tạo bài đăng thất bại.'
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (loading) {
+      return
+    }
+
+    const formData = new FormData(event.currentTarget)
+
+    if (!wardId) {
+      alert('Vui lòng chọn xã/phường.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const response = await postService.createPost({
+        title: String(formData.get('title') || ''),
+        wardId: Number(wardId),
+        purpose: postPurpose,
+        detailAddress: String(formData.get('detailAddress') || ''),
+        area: Number(formData.get('area') || 0),
+        price: Number(formData.get('price') || 0),
+        deposit: Number(formData.get('deposit') || 0),
+        roomType,
+        postPurpose,
+        description: String(formData.get('description') || ''),
+        latitude: Number(formData.get('latitude') || 0),
+        longitude: Number(formData.get('longitude') || 0)
+      })
+
+      alert(response.message || 'Tạo bài đăng thành công.')
+      navigate('/home')
+    } catch (error) {
+      alert(getBackendErrorMessage(error))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -109,7 +221,9 @@ const CreatePostPage = () => {
             <div className='grid gap-4'>
               <div className='flex flex-wrap gap-5 pl-8'>
                 {stayTypes.map((type) => (
-                  <PillButton key={type}>{type}</PillButton>
+                  <PillButton key={type.value} onClick={() => setRoomType(type.value)}>
+                    {type.label}
+                  </PillButton>
                 ))}
               </div>
 
@@ -117,7 +231,9 @@ const CreatePostPage = () => {
                 <h3 className='text-2xl font-extrabold text-[#111111]'>Tôi muốn</h3>
                 <div className='mt-4 flex flex-wrap gap-5 pl-8'>
                   {listingPurposes.map((purpose) => (
-                    <PillButton key={purpose}>{purpose}</PillButton>
+                    <PillButton key={purpose.value} onClick={() => setPostPurpose(purpose.value)}>
+                      {purpose.label}
+                    </PillButton>
                   ))}
                 </div>
               </div>
@@ -126,18 +242,26 @@ const CreatePostPage = () => {
 
           <FormSection title='Vị trí'>
             <div className='grid gap-5 px-8'>
-              <div className='grid gap-6 md:grid-cols-2'>
-                <SelectField label='Quận/Huyện' />
-                <SelectField label='Xã/Phường' />
+              <div className='grid gap-6'>
+                <SelectField
+                  label='Xã/Phường'
+                  name='wardId'
+                  value={wardId}
+                  onChange={(event) => setWardId(event.target.value)}
+                  options={wardOptions.map((ward) => ({ label: ward.name, value: ward.id }))}
+                />
               </div>
-              <TextField label='Địa chỉ' />
+              <TextField label='Địa chỉ' name='detailAddress' />
             </div>
           </FormSection>
 
           <FormSection title='Đặc điểm'>
             <div className='grid gap-6 px-8 md:grid-cols-2'>
-              <TextField label='Diện tích' />
+              <TextField label='Diện tích' name='area' type='number' />
               <SelectField label='Tình trạng nội thất' />
+              <TextField label='Tiền cọc' name='deposit' type='number' />
+              <TextField label='Vĩ độ' name='latitude' type='number' />
+              <TextField label='Kinh độ' name='longitude' type='number' />
             </div>
           </FormSection>
 
@@ -154,9 +278,10 @@ const CreatePostPage = () => {
                 <input id='post-media-upload' type='file' multiple accept='image/*,video/*' className='sr-only' />
               </label>
 
-              <TextField placeholder='Tiêu đề' />
-              <TextField placeholder='Giá thuê' />
+              <TextField name='title' placeholder='Tiêu đề' />
+              <TextField name='price' type='number' placeholder='Giá thuê' />
               <textarea
+                name='description'
                 className='min-h-52 resize-none rounded-2xl border border-[#001D3D] bg-white px-6 py-5 text-sm font-semibold text-[#111111] outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
                 placeholder='Mô tả'
               />
@@ -180,6 +305,7 @@ const CreatePostPage = () => {
             </Link>
             <button
               type='submit'
+              disabled={loading}
               className='rounded-2xl bg-[#FFE9A6] px-8 py-5 text-2xl font-extrabold text-[#111111] shadow-md shadow-[#001D3D]/15 transition hover:-translate-y-0.5 hover:bg-[#F7DE8B]'
             >
               ĐĂNG BÀI

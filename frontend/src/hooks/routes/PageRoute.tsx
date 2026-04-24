@@ -7,7 +7,8 @@ import {
   LoginPage,
   PostDetailPage,
   RegisterPage,
-  SearchResultsPage
+  SearchResultsPage,
+  VerifyEmailPage
 } from '@/pages/index.tsx'
 
 const AppRoutes = () => {
@@ -21,6 +22,7 @@ const AppRoutes = () => {
       <Route path='/posts/search' element={<SearchResultsPage />}></Route>
       <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
       <Route path='/register' element={<RegisterPage />} />
+      <Route path='/verify-email' element={<VerifyEmailPage />} />
     </Routes>
   )
 }

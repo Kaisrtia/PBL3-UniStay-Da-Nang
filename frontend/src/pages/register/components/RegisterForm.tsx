@@ -3,13 +3,54 @@ import { type FormEvent } from 'react'
 import { FaGoogle } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
+import useAuth from '@/hooks/useAuth'
+import authService from '@/services/authService'
+
 export const RegisterForm = () => {
+  const { loading, register } = useAuth()
+
   // Logic xử lý khi nhấn Đăng ký
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    // Xử lý logic đăng ký tại đây
-    console.log("Đang đăng ký...");
-  };
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+
+    if (loading) {
+      return
+    }
+
+    const formData = new FormData(e.currentTarget)
+    const password = String(formData.get('password') || '')
+    const confirmPassword = String(formData.get('confirmPassword') || '')
+
+    if (password !== confirmPassword) {
+      alert('Mật khẩu xác nhận không khớp.')
+      return
+    }
+
+    const response = await register({
+      fullName: String(formData.get('fullName') || ''),
+      email: String(formData.get('email') || ''),
+      password
+    })
+
+    if (response) {
+      const message = response.message || 'Đăng ký thành công.'
+      const shouldVerifyEmail = message.toLowerCase().includes('verify your email')
+
+      try {
+        await authService.sendEmailVerification({
+          email: String(formData.get('email') || '')
+        })
+      } catch {
+        alert('Đăng ký thành công nhưng chưa gửi được email xác thực. Vui lòng thử gửi lại mã xác thực sau.')
+        return
+      }
+
+      alert(shouldVerifyEmail ? `${message}\nVui lòng kiểm tra email để xác thực tài khoản.` : message)
+      return
+    }
+
+    alert('Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.')
+  }
 
   return (
     <form onSubmit={handleSubmit} className='flex flex-col gap-2 w-full'> 
@@ -17,6 +58,7 @@ export const RegisterForm = () => {
       <div>
         <label className='block text-xs font-semibold mb-1 text-gray-700'>Họ và tên</label>
         <input
+          name='fullName'
           type='text'
           placeholder='Nhập họ và tên của bạn'
           className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
@@ -27,6 +69,7 @@ export const RegisterForm = () => {
       <div>
         <label className='block text-xs font-semibold mb-1 text-gray-700'>Email</label>
         <input
+          name='email'
           type='email'
           placeholder='Nhập địa chỉ email'
           className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
@@ -37,6 +80,7 @@ export const RegisterForm = () => {
       <div>
         <label className='block text-xs font-semibold mb-1 text-gray-700'>Mật khẩu</label>
         <input
+          name='password'
           type='password'
           placeholder='********'
           className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
@@ -47,6 +91,7 @@ export const RegisterForm = () => {
       <div>
         <label className='block text-xs font-semibold mb-1 text-gray-700'>Xác nhận mật khẩu</label>
         <input
+          name='confirmPassword'
           type='password'
           placeholder='********'
           className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
@@ -77,7 +122,7 @@ export const RegisterForm = () => {
         </Link>
       </div>
     </form>
-  );
-};
+  )
+}
 
-export default RegisterForm;
+export default RegisterForm

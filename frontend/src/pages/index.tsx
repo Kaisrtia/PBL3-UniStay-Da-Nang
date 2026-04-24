@@ -5,5 +5,6 @@ import CreatePostPage from '@/pages/posts/create/CreatePostPage'
 import PostDetailPage from '@/pages/posts/detail/PostDetailPage'
 import SearchResultsPage from '@/pages/posts/search/SearchResultsPage'
 import RegisterPage from '@/pages/register/RegisterPage'
+import VerifyEmailPage from '@/pages/verify-email/VerifyEmailPage'
 
-export { CreatePostPage, HomePage, LandingPage, LoginPage, PostDetailPage, RegisterPage, SearchResultsPage }
+export { CreatePostPage, HomePage, LandingPage, LoginPage, PostDetailPage, RegisterPage, SearchResultsPage, VerifyEmailPage }
