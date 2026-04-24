@@ -1,5 +1,3 @@
-import React from 'react'
-
 import { background, dutPicture } from '@/assets/images'
 
 import LoginForm from './components/LoginForm'

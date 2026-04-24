@@ -1,177 +1,244 @@
-import React from 'react'
-
-import { FaSearch, FaUserFriends, FaClock, FaHome } from 'react-icons/fa'
+import {
+  FaBolt,
+  FaChevronDown,
+  FaMapMarkerAlt,
+  FaParking,
+  FaRegHeart,
+  FaShieldAlt,
+  FaStar,
+  FaWifi
+} from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
-import { background, logo } from '@/assets/images'
+import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 
-// import { Login } from '@/login'
+type Listing = {
+  title: string
+  location: string
+  price: string
+  meta: string[]
+  purpose: string
+  accent: string
+}
+
+type Area = {
+  name: string
+  count: string
+  color: string
+}
+
+const listings: Listing[] = [
+  {
+    title: 'Căn hộ mini gần DUT, đầy đủ nội thất',
+    location: 'Liên Chiểu, Đà Nẵng',
+    price: '3.000.000đ/tháng',
+    meta: ['28m²', 'Máy giặt', 'Ban công'],
+    purpose: 'Đã duyệt',
+    accent: 'from-[#0D63C2] to-[#003566]'
+  },
+  {
+    title: 'Phòng trọ yên tĩnh cho sinh viên',
+    location: 'Hải Châu, Đà Nẵng',
+    price: '2.200.000đ/tháng',
+    meta: ['22m²', 'Wifi', 'An ninh'],
+    purpose: 'Mới đăng',
+    accent: 'from-[#003566] to-[#001D3D]'
+  },
+  {
+    title: 'Tìm nữ ở ghép gần trường Kinh tế',
+    location: 'Ngũ Hành Sơn, Đà Nẵng',
+    price: '1.500.000đ/tháng',
+    meta: ['Ở ghép', 'Tự do', 'Gần trường'],
+    purpose: 'Ở ghép',
+    accent: 'from-[#FFD60A] to-[#FFC300]'
+  }
+]
+
+const areas: Area[] = [
+  { name: 'Hải Châu', count: '312 bài đăng phù hợp', color: '#0D63C2' },
+  { name: 'Liên Chiểu', count: '286 bài đăng phù hợp', color: '#FFC300' },
+  { name: 'Cẩm Lệ', count: '154 bài đăng phù hợp', color: '#003566' },
+  { name: 'Sơn Trà', count: '129 bài đăng phù hợp', color: '#22C55E' }
+]
+
+const amenities = [
+  { icon: FaWifi, label: 'Wifi mạnh' },
+  { icon: FaParking, label: 'Chỗ để xe' },
+  { icon: FaShieldAlt, label: 'An ninh tốt' },
+  { icon: FaBolt, label: 'Giờ giấc tự do' }
+]
+
+const ListingCard = ({ listing }: { listing: Listing }) => (
+  <Link
+    to='/posts/demo-post'
+    className='block overflow-hidden rounded-2xl border border-[#E6EAF0] bg-white shadow-lg shadow-[#001D3D]/5 transition hover:-translate-y-1 hover:shadow-xl hover:shadow-[#001D3D]/10'
+  >
+    <div className={`relative h-48 bg-gradient-to-br ${listing.accent}`}>
+      <div className='absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(255,255,255,0.18),transparent_34%)]' />
+      <span className='absolute left-4 top-4 rounded-full bg-[#FFC300] px-4 py-1.5 text-xs font-extrabold text-[#001D3D]'>
+        {listing.purpose}
+      </span>
+      <span className='absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-[#003566]'>
+        <FaRegHeart />
+      </span>
+    </div>
+    <div className='p-5'>
+      <h3 className='min-h-[56px] text-xl font-extrabold leading-7 text-[#181A20]'>{listing.title}</h3>
+      <p className='mt-3 flex items-center gap-2 text-sm font-medium text-gray-500'>
+        <FaMapMarkerAlt className='text-[#FFC300]' />
+        {listing.location}
+      </p>
+      <div className='mt-5 flex items-center justify-between'>
+        <p className='text-xl font-extrabold text-[#003566]'>{listing.price}</p>
+        <div className='flex items-center gap-1 text-sm font-bold text-[#FFC300]'>
+          <FaStar />
+          4.8
+        </div>
+      </div>
+      <div className='mt-4 flex flex-wrap gap-2'>
+        {listing.meta.map((item) => (
+          <span key={item} className='rounded-full bg-[#F5F7FA] px-3 py-1 text-xs font-semibold text-gray-600'>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  </Link>
+)
 
 const HomePage = () => {
   return (
-    <div className='min-h-screen relative'>
-      <img src={background} alt='Background' className='absolute inset-0 w-cover h-cover object-cover -z-10' />
-      {/* Overlay for dark effect
-  <div className='absolute inset-0 bg-gradient-to-br from-[#0a183d]/90 to-[#1a2a4f]/90 -z-10'></div> */}
-      {/* Header */}
-      <header className='whitespace-nowrap  flex items-center justify-between px-8 py-6 bg-transparent'>
-        <div className='flex items-center gap-2'>
-          <img src={logo} alt='Unistay Logo' style={{ width: '10%', height: '10%' }} />
-          <span className='text-white font-bold text-xl font-serif'>UNISTAY</span>
-        </div>
-        <nav className='flex gap-6 text-white text-sm'>
-          <a href='#info-section' className='hover:text-yellow-400 px-4 py-2'>
-            Giới thiệu
-          </a>
-          <a href='#feature-section' className='hover:text-yellow-400 px-4 py-2'>
-            Lợi ích
-          </a>
-          <a href='#footer' className='hover:text-yellow-400 px-4 py-2'>
-            Thông tin
-          </a>
-          <Link
-            to='/login'
-            className='bg-white text-[#0a183d] px-4 py-2 rounded-md font-bold hover:bg-yellow-400 hover:text-white transition inline-block'
-          >
-            Đăng nhập / Đăng ký
-          </Link>
-        </nav>
-        {/* <div className='flex items-center gap-20'>
-          
-          <button className='bg-white text-[#0a183d] px-4 py-2 rounded-circle font-semibold hover:bg-yellow-400 hover:text-white transition'>
-            Add Property
-          </button>
-        </div> */}
-      </header>
+    <div className='min-h-screen bg-[#F5F7FA] text-[#181A20]'>
+      <SiteHeader />
 
-      {/* Hero Section */}
-      <section className='flex flex-col items-center justify-center text-center pt-20 pb-32'>
-        <h2 className='text-white text-lg tracking-widest mb-2 font-brand font-semibold'>
-          TÌM KIẾM NHÀ TRỌ VÀ KẾT NỐI SINH VIÊN
-        </h2>
-        <h1 className='text-5xl font-bold text-yellow-400 mb-2 font-serif'>UNISTAY</h1>
-        <h3 className='text-white text-xl mb-8 font-brand font-semibold'>TẠI ĐÀ NẴNG</h3>
-        {/* Search Bar */}
-        <div className='bg-white rounded-lg shadow-lg flex items-center w-full max-w-2xl mx-auto p-2'>
-          <div className='flex gap-2 mr-4'>
-            <button className='px-3 py-1 rounded bg-gray-200 text-xs font-semibold'>Tất cả</button>
-            <button className='px-3 py-1 rounded text-xs font-semibold hover:bg-gray-100'>Môi giới</button>
-            <button className='px-3 py-1 rounded text-xs font-semibold hover:bg-gray-100'>Sinh viên</button>
+      <main>
+        <section className='relative overflow-hidden bg-gradient-to-br from-[#000814] via-[#001D3D] to-[#0D63C2] px-8 pb-28 pt-16 text-white'>
+          <div className='absolute right-24 top-12 h-72 w-72 rounded-full bg-[#FFC300]/20 blur-3xl' />
+          <div className='absolute bottom-8 left-8 h-64 w-64 rounded-full bg-[#0D63C2]/30 blur-3xl' />
+          <div className='relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.2fr_0.8fr]'>
+            <div>
+              <p className='text-sm font-extrabold tracking-[0.28em] text-[#FFD60A]'>UNISTAY ĐÀ NẴNG</p>
+              <h1 className='mt-6 max-w-3xl text-5xl font-extrabold leading-tight'>
+                Tìm phòng trọ phù hợp cho sinh viên trong vài phút
+              </h1>
+              <p className='mt-6 max-w-2xl text-lg font-medium leading-8 text-blue-100'>
+                Khám phá phòng trọ, căn hộ và bạn cùng phòng quanh các trường đại học tại Đà Nẵng với bộ lọc theo khu
+                vực, ngân sách và tiện ích.
+              </p>
+              <div className='mt-8 flex flex-wrap gap-4'>
+                <button className='rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20'>
+                  Tìm phòng ngay
+                </button>
+                <Link to='/posts/create' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>
+                  Đăng tin mới
+                </Link>
+              </div>
+            </div>
+
+            <aside className='rounded-3xl border border-white/20 bg-white/10 p-8 backdrop-blur'>
+              <h2 className='text-2xl font-extrabold'>Tổng quan hôm nay</h2>
+              <div className='mt-8 grid grid-cols-3 gap-5'>
+                {[
+                  ['1,240+', 'phòng hiển thị'],
+                  ['18', 'khu vực'],
+                  ['4.8/5', 'đánh giá']
+                ].map(([value, label]) => (
+                  <div key={label}>
+                    <p className='text-3xl font-extrabold text-[#FFD60A]'>{value}</p>
+                    <p className='mt-2 text-sm font-medium text-blue-100'>{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className='mt-8 border-t border-white/20 pt-6 text-sm leading-6 text-blue-100'>
+                Gợi ý được ưu tiên theo trường học, mức giá và tiện ích bạn thường tìm.
+              </div>
+            </aside>
           </div>
-          <input className='flex-1 px-4 py-2 outline-none text-sm' placeholder='Nhập vào từ khoá tìm kiếm' />
-          <button className='flex items-center gap-1 px-3 py-2 bg-gray-100 rounded text-xs font-semibold mr-2'>
-            <FaSearch className='text-gray-500' />
-            Nâng cao
-          </button>
-          <button className='bg-yellow-400 p-2 rounded text-white'>
-            <FaSearch />
-          </button>
-        </div>
-      </section>
+        </section>
 
-      {/* Info Section */}
-      <section id='info-section' className='scroll-mt-20 py-16 bg-white'>
-        <div className='max-w-3xl mx-auto text-center'>
-          <h2 className='text-2xl font-bold mb-4 text-[#0a183d]'>TÌM KIẾM PHÒNG TRỌ PHÙ HỢP NHẤT</h2>
-          <p className='text-gray-600 mb-6'>
-            Unistay giúp sinh viên dễ dàng tìm kiếm, so sánh và lựa chọn phòng trọ phù hợp tại Đà Nẵng.
-            <br />
-            Chúng tôi kết nối bạn với chủ trọ uy tín, cập nhật thông tin và hỗ trợ tận tình trong quá trình tìm kiếm.
-          </p>
-          <ul className='mb-6 space-y-2 text-left inline-block'>
-            <li className='flex items-center gap-2'>
-              <span className='text-yellow-400 text-lg'>•</span> Nhiều lựa chọn phòng trọ đa dạng, giá cả công khai
-            </li>
-            <li className='flex items-center gap-2'>
-              <span className='text-yellow-400 text-lg'>•</span> Kết nối bạn cùng phòng, hỗ trợ nhanh chóng
-            </li>
-            <li className='flex items-center gap-2'>
-              <span className='text-yellow-400 text-lg'>•</span> Đăng tin miễn phí, quản lý thông tin dễ dàng
-            </li>
-          </ul>
+        <section className='relative z-10 mx-auto -mt-16 max-w-7xl px-8'>
+          <div className='grid gap-4 rounded-3xl border border-[#E6EAF0] bg-white p-6 shadow-2xl shadow-[#001D3D]/10 md:grid-cols-[1.3fr_0.9fr_0.9fr_0.75fr_auto]'>
+            {[
+              ['Từ khóa', 'Gần Đại học Bách Khoa'],
+              ['Khu vực', 'Hải Châu'],
+              ['Giá thuê', '2 - 4 triệu'],
+              ['Loại phòng', 'Phòng trọ']
+            ].map(([label, value]) => (
+              <button
+                key={label}
+                className='flex min-h-[76px] items-center justify-between rounded-2xl border border-[#E6EAF0] px-5 text-left'
+              >
+                <span>
+                  <span className='block text-xs font-bold text-gray-500'>{label}</span>
+                  <span className='mt-1 block font-extrabold text-[#181A20]'>{value}</span>
+                </span>
+                <FaChevronDown className='text-[#FFC300]' />
+              </button>
+            ))}
+            <button className='min-h-[76px] rounded-2xl bg-[#FFC300] px-8 font-extrabold text-[#001D3D]'>Tìm kiếm</button>
+          </div>
+        </section>
+
+        <section className='mx-auto max-w-7xl px-8 py-20'>
+          <div className='flex items-end justify-between gap-6'>
+            <div>
+              <h2 className='text-4xl font-extrabold text-[#181A20]'>Bài đăng nổi bật</h2>
+              <p className='mt-3 text-gray-500'>Các phòng đã được duyệt, có ảnh rõ ràng và thông tin giá minh bạch.</p>
+            </div>
+            <button className='rounded-full bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white'>Xem tất cả</button>
+          </div>
+
+          <div className='mt-10 grid gap-7 lg:grid-cols-3'>
+            {listings.map((listing) => (
+              <ListingCard key={listing.title} listing={listing} />
+            ))}
+          </div>
+        </section>
+
+        <section className='mx-auto max-w-7xl px-8 pb-20'>
           <div>
-            <button className='border border-yellow-400 text-yellow-400 px-6 py-2 rounded text-sm font-semibold hover:bg-yellow-400 hover:text-white transition'>
-              Tìm hiểu thêm
-            </button>
+            <h2 className='text-4xl font-extrabold'>Khu vực được tìm kiếm nhiều</h2>
+            <p className='mt-3 text-gray-500'>Bắt đầu từ những quận có nhiều lựa chọn phù hợp với sinh viên.</p>
           </div>
-        </div>
-      </section>
+          <div className='mt-9 grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
+            {areas.map((area) => (
+              <article
+                key={area.name}
+                className='rounded-2xl border border-[#E6EAF0] bg-white p-6 shadow-lg shadow-[#001D3D]/5'
+              >
+                <div className='h-1.5 w-16 rounded-full' style={{ backgroundColor: area.color }} />
+                <h3 className='mt-8 text-2xl font-extrabold'>{area.name}</h3>
+                <p className='mt-2 text-sm font-medium text-gray-500'>{area.count}</p>
+              </article>
+            ))}
+          </div>
+        </section>
 
-      {/* Features Section */}
-      <section id='feature-section' className='scroll-mt-20 bg-white py-16'>
-        <div className='max-w-4xl mx-auto text-center mb-12'>
-          <h2 className='text-2xl font-bold mb-2'>UNISTAY CÓ THỂ GIÚP BẠN</h2>
-          <p className='text-gray-500 text-sm'>Lợi ích khi sử dụng Unistay</p>
-        </div>
-        <div className='flex flex-col md:flex-row justify-center gap-8 max-w-4xl mx-auto'>
-          {/* Feature 1 */}
-          <div className='flex-1 bg-gray-50 rounded-lg p-8 flex flex-col items-center shadow hover:shadow-lg transition'>
-            <FaHome className='text-4xl text-yellow-400 mb-4' />
-            <h3 className='font-semibold mb-2'>Giá cả công khai</h3>
-            <p className='text-gray-500 text-sm mb-4'>
-              Giá cả hoàn toàn được công khai, từ bảng giá đến chi phí phát sinh, giúp bạn dễ dàng so sánh và lựa chọn
-              phù hợp.
-            </p>
-          </div>
-          {/* Feature 2 */}
-          <div className='flex-1 bg-white border-2 border-yellow-400 rounded-lg p-8 flex flex-col items-center shadow-lg'>
-            <FaUserFriends className='text-4xl text-yellow-400 mb-4' />
-            <h3 className='font-semibold mb-2'>Tìm kiếm nhanh chóng</h3>
-            <p className='text-gray-500 text-sm mb-4'>
-              Tìm kiếm phòng trọ, bạn cùng phòng, hoặc đăng tin dễ dàng chỉ với vài thao tác.
-            </p>
-            <button className='bg-[#0a183d] text-white px-4 py-2 rounded text-sm hover:bg-yellow-400 hover:text-white transition font-semibold'>
-              Đi đến trang chủ
-            </button>
-          </div>
-          {/* Feature 3 */}
-          <div className='flex-1 bg-gray-50 rounded-lg p-8 flex flex-col items-center shadow hover:shadow-lg transition'>
-            <FaClock className='text-4xl text-yellow-400 mb-4' />
-            <h3 className='font-semibold mb-2'>Cập nhật thời gian thực</h3>
-            <p className='text-gray-500 text-sm mb-4'>
-              Cập nhật thời gian thực giúp bạn không bỏ lỡ thông tin mới nhất về phòng trọ và bạn cùng phòng.
-            </p>
-          </div>
-        </div>
-      </section>
-      <footer id='footer' className='scroll-mt-20 bg-gradient-to-b from-[#0D63C2] to-[#000814] text-white py-10'>
-        <div className='max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between items-start gap-8'>
-          {/* Logo & Contact */}
-          <div className='flex-1 mb-6 md:mb-0'>
-            <div className='flex items-center gap-3 mb-4'>
-              <img src={logo} alt='Unistay Logo' className='w-20 h-20' />
-              <span className='text-2xl font-bold font-serif'>UNISTAY</span>
+        <section className='mx-auto max-w-7xl px-8 pb-24'>
+          <div className='grid overflow-hidden rounded-3xl bg-[#001D3D] text-white lg:grid-cols-[1.1fr_0.9fr]'>
+            <div className='p-10'>
+              <h2 className='max-w-2xl text-4xl font-extrabold leading-tight'>
+                Tạo nhu cầu thuê trọ để nhận gợi ý phù hợp hơn
+              </h2>
+              <p className='mt-5 max-w-2xl text-blue-100'>
+                Lưu ngân sách, khu vực, trường học và tiêu chí bạn cùng phòng. UniStay sẽ ưu tiên những bài đăng khớp
+                nhất.
+              </p>
+              <button className='mt-8 rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D]'>Tạo nhu cầu</button>
             </div>
-            <div className='text-sm text-gray-300'>
-              <p>Website kết nối sinh viên và chủ trọ tại Đà Nẵng.</p>
-              <p className='mt-2'>
-                <span className='font-semibold'>Liên hệ:</span> unistay.danang@gmail.com
-              </p>
-              <p>
-                <span className='font-semibold'>Hotline:</span> 0123 456 789
-              </p>
+            <div className='grid gap-4 bg-[#003566] p-10 sm:grid-cols-2'>
+              {amenities.map(({ icon: Icon, label }) => (
+                <div key={label} className='rounded-2xl bg-white/10 p-5'>
+                  <Icon className='text-2xl text-[#FFD60A]' />
+                  <p className='mt-4 font-bold'>{label}</p>
+                </div>
+              ))}
             </div>
           </div>
-          {/* Members */}
-          <div className='flex-1'>
-            <h4 className='text-lg font-semibold mb-3 text-[#FFD60A]'>Thành viên phát triển</h4>
-            <ul className='space-y-2 text-sm'>
-              <li>
-                <span className='font-semibold text-white'>Ngô Quốc Hoàng Trung</span> - 102240172@sv1.udn.vn
-              </li>
-              <li>
-                <span className='font-semibold text-white'>Lê Minh Trí</span> - 102240170@sv1.udn.vn
-              </li>
-              <li>
-                <span className='font-semibold text-white'>Trần Thị Hạnh Nguyên</span> - 102240154@sv1.udn.vn
-              </li>
-            </ul>
-          </div>
-        </div>
-        <div className='mt-8 border-t border-[#001D3D] pt-4 text-center text-xs text-gray-400'>
-          © {new Date().getFullYear()} UNISTAY Đà Nẵng. All rights reserved.
-        </div>
-      </footer>
+        </section>
+      </main>
+
+      <SiteFooter />
     </div>
   )
 }

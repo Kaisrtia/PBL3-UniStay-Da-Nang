@@ -1,5 +1,3 @@
-import React from 'react'
-
 import AppRoutes from './hooks/routes/PageRoute' // Import file bạn vừa chụp ảnh
 
 function App() {

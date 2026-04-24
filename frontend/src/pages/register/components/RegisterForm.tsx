@@ -1,11 +1,11 @@
-import React from 'react'
+import { type FormEvent } from 'react'
 
 import { FaGoogle } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 export const RegisterForm = () => {
   // Logic xử lý khi nhấn Đăng ký
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     // Xử lý logic đăng ký tại đây
     console.log("Đang đăng ký...");
