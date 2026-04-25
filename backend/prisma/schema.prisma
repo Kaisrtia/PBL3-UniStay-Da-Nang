@@ -127,17 +127,11 @@ model user {
   moderatedPosts post[]   @relation("moderator")
 }
 
-model district {
-  id    Int    @id @default(autoincrement())
-  name  String @db.VarChar(100)
-  wards ward[]
-}
+
 
 model ward {
   id             Int              @id @default(autoincrement())
-  districtId     Int
   name           String           @db.VarChar(100)
-  district       district         @relation(fields: [districtId], references: [id])
   universities   university[]
   posts          post[]
   studentDemands student_demand[]

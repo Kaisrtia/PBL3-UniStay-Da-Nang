@@ -11,7 +11,7 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   const {
     purpose,
     wardId,
-    districtId,
+
     minArea,
     maxArea,
     minPrice,
@@ -40,7 +40,7 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   }
 
   if (wardId !== undefined) filters.wardId = Number(wardId);
-  if (districtId !== undefined) filters.districtId = Number(districtId);
+
   if (minArea !== undefined) filters.minArea = Number(minArea);
   if (maxArea !== undefined) filters.maxArea = Number(maxArea);
   if (minPrice !== undefined) filters.minPrice = Number(minPrice);
@@ -151,17 +151,17 @@ export const handleGetPostStatistics = async (req: Request, res: Response) => {
   );
 };
 
-export const handleGetPostsCountByDistrict = async (
+export const handleGetPostsCountByWard = async (
   req: Request,
   res: Response
 ) => {
-  const result = await postService.getPostsCountByDistrict();
+  const result = await postService.getPostsCountByWard();
 
   sendSuccess(
     res,
     HttpStatus.OK,
     result,
-    'Fetched post counts by district successfully'
+    'Fetched post counts by ward successfully'
   );
 };
 

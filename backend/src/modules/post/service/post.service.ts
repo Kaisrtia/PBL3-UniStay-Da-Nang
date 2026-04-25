@@ -20,7 +20,7 @@ export interface PostFilters {
   purpose?: post_purpose;
   status?: post_status; // Used for admin-level filtering
   wardId?: number;
-  districtId?: number;
+
   minArea?: number;
   maxArea?: number;
   minPrice?: number;
@@ -55,8 +55,6 @@ export const getPosts = async (filters: PostFilters) => {
   // Location — filter by specific ward or by district (all wards within it)
   if (filters.wardId !== undefined) {
     where.wardId = filters.wardId;
-  } else if (filters.districtId !== undefined) {
-    where.ward = { districtId: filters.districtId };
   }
 
   // Area range
@@ -116,9 +114,7 @@ export const getPosts = async (filters: PostFilters) => {
         postAmenities: {
           include: { amenity: true }
         },
-        ward: {
-          include: { district: true }
-        },
+        ward: true,
         user: {
           select: {
             id: true,
@@ -175,9 +171,7 @@ export const getPostsForAdmin = async (
             avatarUrl: true
           }
         },
-        ward: {
-          include: { district: true }
-        },
+        ward: true,
         _count: {
           select: { comments: true, reports: true }
         }
@@ -307,28 +301,20 @@ export const getPostStatistics = async (
   };
 };
 
-export const getPostsCountByDistrict = async () => {
-  const districts = await prismaClient.district.findMany({
+export const getPostsCountByWard = async () => {
+  const wards = await prismaClient.ward.findMany({
     include: {
-      wards: {
-        include: {
-          _count: {
-            select: { posts: true }
-          }
-        }
+      _count: {
+        select: { posts: true }
       }
     }
   });
 
-  const result = districts.map((district) => {
-    const numberOfPosts = district.wards.reduce(
-      (acc, ward) => acc + ward._count.posts,
-      0
-    );
+  const result = wards.map((ward) => {
     return {
-      id: district.id,
-      'name district': district.name,
-      'number of posts': numberOfPosts
+      id: ward.id,
+      'name ward': ward.name,
+      'number of posts': ward._count.posts
     };
   });
 
@@ -369,9 +355,7 @@ export const getMyPosts = async (
         postAmenities: {
           include: { amenity: true }
         },
-        ward: {
-          include: { district: true }
-        },
+        ward: true,
         _count: {
           select: { comments: true, accomodationRequests: true }
         }

@@ -42,10 +42,10 @@ postRouter.get(
   asyncHandler(postController.handleGetPostStatistics)
 );
 
-// Get post counts grouped by district
+// Get post counts grouped by ward
 postRouter.get(
-  '/count-by-district',
-  asyncHandler(postController.handleGetPostsCountByDistrict)
+  '/count-by-ward',
+  asyncHandler(postController.handleGetPostsCountByWard)
 );
 
 // -- Post Management --
