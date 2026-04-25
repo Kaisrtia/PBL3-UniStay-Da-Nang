@@ -335,7 +335,7 @@ model notification {
   id        Int            @id @default(autoincrement())
   userId    String
   title     String            @db.VarChar(255)
-  content   String            @db.Text
+  content   String?           @db.Text
   type      notification_type 
   isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB

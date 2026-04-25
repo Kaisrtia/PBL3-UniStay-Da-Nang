@@ -167,3 +167,139 @@ export const createRequestSharedAccommodationNotification = async (
     }
   });
 };
+
+export const createCommentNotification = async (
+  commentId: string
+) => {
+  // Fetch the comment along with its user, the associated post, and parent comment
+  const currentComment = await prismaClient.comment.findUnique({
+    where: { id: commentId },
+    include: {
+      user: { select: { fullName: true } },
+      post: { select: { title: true, userId: true, user: { select: { fullName: true } } } },
+      comment: { select: { userId: true, user: { select: { fullName: true } } } } // parent comment
+    }
+  });
+
+  if (!currentComment) return null;
+
+  const isReply = !!currentComment.parentId;
+  
+  // Determine target user
+  const targetUserId = isReply ? currentComment.comment!.userId : currentComment.post.userId;
+
+  // Don't notify the user about their own comment
+  if (currentComment.userId === targetUserId) {
+    return null;
+  }
+
+  // Fetch all users who have commented on this post (if root) or replied to this parent (if reply),
+  // excluding the target user
+  const siblingComments = await prismaClient.comment.findMany({
+    where: {
+      postId: currentComment.postId,
+      parentId: currentComment.parentId,
+      userId: { not: targetUserId },
+      status: 'DISPLAYED'
+    },
+    select: { user: { select: { fullName: true } } },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  // Group by distinct users
+  const distinctUsers = Array.from(new Set(siblingComments.map(c => c.user.fullName)));
+  
+  if (distinctUsers.length === 0) return null;
+
+  const count = distinctUsers.length;
+  let namesString: string;
+  if (count === 1) {
+    namesString = distinctUsers[0];
+  } else if (count === 2) {
+    namesString = `${distinctUsers[0]} and ${distinctUsers[1]}`;
+  } else {
+    namesString = `${distinctUsers[0]} and ${count - 1} others`;
+  }
+
+  let title: string;
+  let content: string | null = null;
+
+  if (isReply) {
+    // Title: Your comment on post {post title} by {poster name} just received a reply from A
+    // Note: {poster name} refers to the post owner's name
+    title = `Your comment on post ${currentComment.post.title} by ${currentComment.post.user.fullName} just received a reply from ${namesString}`;
+  } else {
+    // Title: Your post {post title} just received a notification
+    title = `Your post ${currentComment.post.title} just received a notification`;
+    
+    // Content: A just commented on your post / A and B have commented on your post
+    if (count === 1) {
+      content = `${namesString} just commented on your post`;
+    } else {
+      content = `${namesString} have commented on your post`;
+    }
+  }
+
+  // Check for existing notification
+  const existingNotifs = await prismaClient.notification.findMany({
+    where: {
+      type: notification_type.COMMENT,
+      userId: targetUserId,
+      metaData: {
+        path: isReply ? ['parentId'] : ['postId'],
+        equals: isReply ? currentComment.parentId! : currentComment.postId
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 10
+  });
+
+  // Filter exactly to make sure it's the right level
+  const existingNoti = existingNotifs.find(n => {
+     const meta = n.metaData as any;
+     if (isReply) {
+       return meta?.notificationLevel === 'REPLY' && meta?.parentId === currentComment.parentId;
+     } else {
+       return meta?.notificationLevel === 'ROOT' && meta?.postId === currentComment.postId;
+     }
+  });
+
+  if (existingNoti) {
+    return await prismaClient.notification.update({
+      where: { id: existingNoti.id },
+      data: {
+        title,
+        content,
+        isRead: false,
+        updatedAt: new Date(),
+        metaData: {
+          ...((existingNoti.metaData as any) || {}),
+          commentId,
+          postId: currentComment.postId,
+          ...(isReply ? { parentId: currentComment.parentId } : {}),
+          notificationLevel: isReply ? 'REPLY' : 'ROOT'
+        }
+      }
+    });
+  }
+
+  return await prismaClient.notification.create({
+    data: {
+      title,
+      content,
+      type: notification_type.COMMENT,
+      isRead: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metaData: {
+        commentId,
+        postId: currentComment.postId,
+        ...(isReply ? { parentId: currentComment.parentId } : {}),
+        notificationLevel: isReply ? 'REPLY' : 'ROOT'
+      },
+      user: {
+        connect: { id: targetUserId }
+      }
+    }
+  });
+};

@@ -3,6 +3,7 @@ import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 import { user, comment_status } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
+import { addCommentNotificationJob } from '../../notification/queues/notification.queue';
 
 export const createComment = async (
   currentUser: user,
@@ -33,7 +34,7 @@ export const createComment = async (
     }
   }
 
-  return prismaClient.comment.create({
+  const newComment = await prismaClient.comment.create({
     data: {
       id: generateHybridId('cmt_'),
       userId: currentUser.id,
@@ -42,6 +43,12 @@ export const createComment = async (
       parentId: data.parentId || null
     }
   });
+
+  addCommentNotificationJob(newComment.id).catch(err => {
+    console.error('Error enqueueing comment notification job:', err);
+  });
+
+  return newComment;
 };
 
 export const updateComment = async (

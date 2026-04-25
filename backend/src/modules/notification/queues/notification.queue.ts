@@ -64,3 +64,27 @@ export const addRequestSharedAccommodationNotificationJob = async (
     }
   );
 };
+
+// Comment notification queue
+const commentNotificationQueue = new Queue(
+  'comment-notification-queue',
+  {
+    connection
+  }
+);
+
+export const addCommentNotificationJob = async (
+  commentId: string
+) => {
+  return await commentNotificationQueue.add(
+    'comment-notification',
+    { commentId },
+    {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 3000
+      }
+    }
+  );
+};
