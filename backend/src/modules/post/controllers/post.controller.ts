@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
-import * as postService from '../service/post.service';
+import * as postQueryService from '../service/queries/post.query.service';
+import * as postCommandService from '../service/commands/post.command.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 import { room_type, post_purpose, post_status } from '@prisma/client';
@@ -26,7 +27,7 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     sortOrder
   } = req.query;
 
-  const filters: postService.PostFilters = {};
+  const filters: postQueryService.PostFilters = {};
 
   if (purpose !== undefined) {
     const validPurposes: post_purpose[] = ['RENT', 'FIND_ROOMMATE'];
@@ -79,7 +80,7 @@ export const handleGetPosts = async (req: Request, res: Response) => {
 
   const validSortFields = ['createdAt', 'price', 'area', 'viewCount'];
   if (sortBy !== undefined && validSortFields.includes(sortBy as string)) {
-    filters.sortBy = sortBy as postService.PostFilters['sortBy'];
+    filters.sortBy = sortBy as postQueryService.PostFilters['sortBy'];
   }
 
   if (
@@ -89,7 +90,7 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     filters.sortOrder = sortOrder as 'asc' | 'desc';
   }
 
-  const result = await postService.getPosts(filters);
+  const result = await postQueryService.getPosts(filters);
 
   sendSuccess(res, HttpStatus.OK, result, 'Posts fetched successfully');
 };
@@ -98,7 +99,7 @@ export const handleGetMyPosts = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 
-  const result = await postService.getMyPosts(req.user!, page, limit);
+  const result = await postQueryService.getMyPosts(req.user!, page, limit);
 
   sendSuccess(res, HttpStatus.OK, result, 'My posts fetched successfully');
 };
@@ -123,7 +124,11 @@ export const handleGetPostsByStatusForAdmin = async (
     postStatus = status as post_status;
   }
 
-  const result = await postService.getPostsForAdmin(postStatus, page, limit);
+  const result = await postQueryService.getPostsForAdmin(
+    postStatus,
+    page,
+    limit
+  );
 
   sendSuccess(
     res,
@@ -141,7 +146,7 @@ export const handleGetPostStatistics = async (req: Request, res: Response) => {
     ? (period as 'day' | 'week' | 'month')
     : 'day';
 
-  const stats = await postService.getPostStatistics(selectedPeriod);
+  const stats = await postQueryService.getPostStatistics(selectedPeriod);
 
   sendSuccess(
     res,
@@ -155,7 +160,7 @@ export const handleGetPostsCountByWard = async (
   req: Request,
   res: Response
 ) => {
-  const result = await postService.getPostsCountByWard();
+  const result = await postQueryService.getPostsCountByWard();
 
   sendSuccess(
     res,
@@ -185,28 +190,9 @@ export const handleCreatePost = async (req: Request, res: Response) => {
     postAmenities
   } = req.body;
 
-  // Basic required fields validation
-  if (
-    !title ||
-    wardId === undefined ||
-    !purpose ||
-    !detailAddress ||
-    area === undefined ||
-    price === undefined ||
-    deposit === undefined ||
-    !roomType ||
-    !postPurpose ||
-    !description ||
-    latitude === undefined ||
-    longitude === undefined
-  ) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'Missing required fields to create a post'
-    );
-  }
+  // Removed manual basic requirement validations since Joi handles it via middleware
 
-  const post = await postService.createPost(req.user!, {
+  const post = await postCommandService.createPost(req.user!, {
     title,
     wardId: Number(wardId),
     purpose,
@@ -238,7 +224,7 @@ export const handleGetPostDetail = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const post = await postService.getPostDetail(postId);
+  const post = await postQueryService.getPostDetail(postId);
 
   sendSuccess(res, HttpStatus.OK, post, 'Post detail fetched successfully');
 };
@@ -252,7 +238,7 @@ export const handleCensorPostManually = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const post = await postService.censorPost(
+  const post = await postCommandService.censorPost(
     admin!,
     postId,
     status,
@@ -260,60 +246,6 @@ export const handleCensorPostManually = async (req: Request, res: Response) => {
   );
 
   sendSuccess(res, HttpStatus.OK, post, 'Post censored successfully');
-};
-
-// -- Favourite Posts --
-
-export const handleAddFavouritePost = async (req: Request, res: Response) => {
-  const { postId } = req.body;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  const favourite = await postService.addFavouritePost(req.user!, postId);
-
-  sendSuccess(res, HttpStatus.CREATED, favourite, 'Post added to favourites');
-};
-
-export const handleRemoveFavouritePost = async (
-  req: Request,
-  res: Response
-) => {
-  const { postId } = req.params;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  await postService.removeFavouritePost(req.user!, postId);
-
-  sendSuccess(res, HttpStatus.OK, null, 'Post removed from favourites');
-};
-
-// -- Accommodation Requests --
-
-export const handleCreateAccommodationRequest = async (
-  req: Request,
-  res: Response
-) => {
-  const { postId } = req.body;
-
-  if (!postId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
-  }
-
-  const request = await postService.createAccommodationRequest(
-    req.user!,
-    postId
-  );
-
-  sendSuccess(
-    res,
-    HttpStatus.CREATED,
-    request,
-    'Accommodation request submitted successfully'
-  );
 };
 
 export const handleUpdatePost = async (req: Request, res: Response) => {
@@ -339,7 +271,7 @@ export const handleUpdatePost = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const updatedPost = await postService.updatePost(req.user!, postId, {
+  const updatedPost = await postCommandService.updatePost(req.user!, postId, {
     title,
     wardId: wardId ? Number(wardId) : undefined,
     purpose,
