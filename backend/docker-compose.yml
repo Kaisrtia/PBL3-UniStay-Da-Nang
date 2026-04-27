@@ -1,22 +1,17 @@
-
 services:
   app:
-    build:
-      context: .
-      target: development
+    build: .
+    container_name: be-app
     ports:
-      - "3000:3000"
+      - "6969:6969"
     volumes:
-      - ./src:/usr/src/app/src
+      - ./:/app
+      - /app/node_modules
     env_file:
       - .env
     environment:
-      - NODE_ENV=development
-      - DB_HOST=db
-    depends_on:
-      db:
-        condition: service_healthy
-
+      - REDIS_HOST=redis
+      - DATABASE_URL=postgresql://postgres:1@db:5432/uni-stay-dn-db
   db:
     image: postgres:latest
     restart: always
