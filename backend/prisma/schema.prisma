@@ -155,7 +155,6 @@ model student {
   universityId         String?
   university           university?             @relation(fields: [universityId], references: [id])
   user                 user                    @relation(fields: [studentId], references: [id])
-  studentEvaluateHosts student_evaluate_host[]
   studentDemands       student_demand[]
   demandAmenities      demand_amenity[]
   studentFavoritePosts student_favorite_post[]
@@ -167,18 +166,6 @@ model host {
   isVerified           Boolean                 @default(false)
   avgStar              Decimal                 @default(-1) @db.Decimal(3, 2)
   user                 user                    @relation(fields: [hostId], references: [id])
-  studentEvaluateHosts student_evaluate_host[]
-}
-
-model student_evaluate_host {
-  id          Int      @id @default(autoincrement())
-  studentId   String
-  hostId      String
-  numberStar  Int
-  description String
-  createdAt   DateTime @default(now())
-  student     student  @relation(fields: [studentId], references: [studentId])
-  host        host     @relation(fields: [hostId], references: [hostId])
 }
 
 model system_feedback {

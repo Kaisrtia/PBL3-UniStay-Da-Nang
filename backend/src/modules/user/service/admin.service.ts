@@ -57,17 +57,6 @@ export const verifyHost = async (hostId: string) => {
     );
   }
 
-  const evaluationCount = await prismaClient.student_evaluate_host.count({
-    where: { hostId }
-  });
-
-  if (evaluationCount <= 20) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      `Host has not received enough evaluations (> 20). Currently has ${evaluationCount}.`
-    );
-  }
-
   return prismaClient.host.update({
     where: { hostId },
     data: { isVerified: true }

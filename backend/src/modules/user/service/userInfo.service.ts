@@ -15,12 +15,21 @@ export const setupProfile = async (
     universityId?: string;
   }
 ) => {
-  if (!data.role || (data.role !== account_role.STUDENT && data.role !== account_role.HOST)) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or missing role. Must be either STUDENT or HOST');
+  if (
+    !data.role ||
+    (data.role !== account_role.STUDENT && data.role !== account_role.HOST)
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Invalid or missing role. Must be either STUDENT or HOST'
+    );
   }
 
   if (user.status !== account_status.SET_UP) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'User profile is already set up or locked');
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'User profile is already set up or locked'
+    );
   }
 
   if (data.phone) {
@@ -85,8 +94,17 @@ export const updateProfile = async (
     universityId?: string;
   }
 ) => {
-  if (!data.fullName && !data.dob && !data.gender && !data.avatarUrl && !data.universityId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'At least one field is required to update');
+  if (
+    !data.fullName &&
+    !data.dob &&
+    !data.gender &&
+    !data.avatarUrl &&
+    !data.universityId
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'At least one field is required to update'
+    );
   }
 
   if (data.universityId && user.roles.includes(account_role.STUDENT)) {
@@ -143,7 +161,10 @@ export const changePassword = async (
     );
   }
 
-  const isPasswordValid = await bcrypt.compare(currentPassword, user.hashedPassword!);
+  const isPasswordValid = await bcrypt.compare(
+    currentPassword,
+    user.hashedPassword!
+  );
   if (!isPasswordValid) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid current password');
   }
@@ -173,26 +194,15 @@ export const getUserProfile = async (targetUserId: string) => {
 
   // Remove highly sensitive properties directly
   const { hashedPassword, ...safeUser } = targetUser;
-  
+
   return safeUser;
 };
 
-export const getVerificationCandidates = async (page: number = 1, limit: number = 10) => {
+export const getVerificationCandidates = async (
+  page: number = 1,
+  limit: number = 10
+) => {
   const skip = (page - 1) * limit;
-
-  // Find hostIds with > 20 evaluations
-  const evaluationGroups = await prismaClient.student_evaluate_host.groupBy({
-    by: ['hostId'],
-    having: {
-      hostId: {
-        _count: {
-          gt: 20
-        }
-      }
-    }
-  });
-
-  const validHostIds = evaluationGroups.map(g => g.hostId);
 
   const [paginatedData, totalCount] = await Promise.all([
     prismaClient.host.findMany({
@@ -202,8 +212,7 @@ export const getVerificationCandidates = async (page: number = 1, limit: number 
         isVerified: false,
         avgStar: {
           gte: 4.5
-        },
-        hostId: { in: validHostIds }
+        }
       },
       include: {
         user: {
@@ -214,9 +223,6 @@ export const getVerificationCandidates = async (page: number = 1, limit: number 
             avatarUrl: true,
             phone: true
           }
-        },
-        _count: {
-          select: { studentEvaluateHosts: true }
         }
       }
     }),
@@ -225,8 +231,7 @@ export const getVerificationCandidates = async (page: number = 1, limit: number 
         isVerified: false,
         avgStar: {
           gte: 4.5
-        },
-        hostId: { in: validHostIds }
+        }
       }
     })
   ]);
