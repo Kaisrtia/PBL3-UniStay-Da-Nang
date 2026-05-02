@@ -70,7 +70,7 @@ const amenities = [
 
 const ListingCard = ({ listing }: { listing: Listing }) => (
   <Link
-    to='/posts/demo-post'
+    to='/posts/MAPTEST_DUT_ROOM_001'
     className='block overflow-hidden rounded-2xl border border-[#E6EAF0] bg-white shadow-lg shadow-[#001D3D]/5 transition hover:-translate-y-1 hover:shadow-xl hover:shadow-[#001D3D]/10'
   >
     <div className={`relative h-48 bg-gradient-to-br ${listing.accent}`}>

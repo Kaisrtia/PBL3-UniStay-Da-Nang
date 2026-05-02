@@ -27,56 +27,55 @@ const LoginForm = () => {
       return
     }
 
-    if (!response) {
-      alert('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
-    }
+    alert('Dang nhap that bai. Vui long kiem tra lai thong tin.')
   }
 
   return (
-    <form onSubmit={handleSubmit} className='flex flex-col gap-4 w-full'>
+    <form onSubmit={handleSubmit} className='flex w-full flex-col gap-4'>
       <div>
-        <label className='block text-sm font-semibold mb-1 text-gray-700'>Email</label>
+        <label className='mb-1 block text-sm font-semibold text-gray-700'>Email</label>
         <input
           name='email'
           type='email'
           placeholder='Enter your email'
-          className='w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
       <div>
-        <label className='block text-sm font-semibold mb-1 text-gray-700'>Mật khẩu</label>
+        <label className='mb-1 block text-sm font-semibold text-gray-700'>Mat khau</label>
         <input
           name='password'
           type='password'
           placeholder='********'
-          className='w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
-      <div className='flex items-center justify-between text-xs mb-2'>
-        <label className='flex items-center gap-1 cursor-pointer'>
+      <div className='mb-2 flex items-center justify-between text-xs'>
+        <label className='flex cursor-pointer items-center gap-1'>
           <input type='checkbox' className='accent-yellow-400' />
-          <span className='text-gray-600'>Ghi nhớ đăng nhập</span>
+          <span className='text-gray-600'>Ghi nho dang nhap</span>
         </label>
         <Link to='/forgot-password' replace className='text-gray-500 hover:underline'>
-          Quên mật khẩu
+          Quen mat khau
         </Link>
       </div>
       <button
         type='submit'
-        className='bg-yellow-400 text-white font-bold rounded-lg px-3 py-2.5 mt-1 hover:bg-yellow-500 transition shadow-md'
+        disabled={loading}
+        className='mt-1 rounded-lg bg-yellow-400 px-3 py-2.5 font-bold text-white shadow-md transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
       >
-        Đăng nhập
+        {loading ? 'Dang dang nhap...' : 'Dang nhap'}
       </button>
       <button
         type='button'
-        className='flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-3 py-2.5 font-semibold hover:bg-gray-50 transition'
+        className='flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5 font-semibold transition hover:bg-gray-50'
       >
-        <FaGoogle className='text-red-500' /> Đăng nhập với Google
+        <FaGoogle className='text-red-500' /> Dang nhap voi Google
       </button>
-      <div className='text-xs text-center mt-4 text-gray-500'>
-        Chưa có tài khoản?{' '}
-        <Link to='/register' className='text-orange-500 hover:underline font-bold'>
-          Đăng ký ngay!
+      <div className='mt-4 text-center text-xs text-gray-500'>
+        Chua co tai khoan?{' '}
+        <Link to='/register' className='font-bold text-orange-500 hover:underline'>
+          Dang ky ngay!
         </Link>
       </div>
     </form>

@@ -29,7 +29,7 @@ const tabs: { label: string; value: ResultTab }[] = [
 
 const results: SearchResult[] = [
   {
-    id: 'luxury-family-home',
+    id: 'MAPTEST_DUT_ROOM_001',
     title: 'Căn hộ mini gần DUT',
     address: '12 Green Ave, Liên Chiểu',
     price: '3.800.000đ',
@@ -40,7 +40,7 @@ const results: SearchResult[] = [
     size: '32m²'
   },
   {
-    id: 'gorgeous-villa-bay',
+    id: 'MAPTEST_DRAGON_APT_002',
     title: 'Nhà nguyên căn Hòa Xuân',
     address: '18 Gratton St, Cẩm Lệ',
     price: '6.500.000đ',
@@ -51,7 +51,7 @@ const results: SearchResult[] = [
     size: '80m²'
   },
   {
-    id: 'skyper-pool-apartment',
+    id: 'MAPTEST_ASIA_HOUSE_003',
     title: 'Phòng studio đầy đủ nội thất',
     address: '151 Tonkins Ave, Hải Châu',
     price: '2.850.000đ',
