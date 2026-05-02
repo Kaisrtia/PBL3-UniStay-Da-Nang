@@ -104,14 +104,14 @@ model user {
   email                String                 @unique @db.VarChar(255)
   hashedPassword       String?                @db.VarChar(255)
   fullName             String                 @db.VarChar(100)
-  phone                String?                @unique @db.VarChar(15)
+  phone                String?                @db.VarChar(15)
   dob                  DateTime?
   gender               String?                @db.VarChar(10)
   avatarUrl            String?                @db.Text
   emailVerified        Boolean?               @default(false)
   phoneVerified        Boolean?               @default(false)
-  provider             provider?
-  status               account_status?        @default(LOCKED)
+  provider             provider               @default(SYSTEM)
+  status               account_status         @default(LOCKED)
   roles                account_role[]         @default([USER])
   createdAt            DateTime               @default(now())
   student              student?
@@ -123,6 +123,7 @@ model user {
   notifications        notification[]
 
   userReports    report[] @relation("report")
+  wasReported    report[] @relation("was reported")
   reportHandlers report[] @relation("handle")
   moderatedPosts post[]   @relation("moderator")
 }
@@ -197,7 +198,7 @@ model comment {
   content   String         @db.Text
   status    comment_status @default(DISPLAYED)
   createdAt DateTime       @default(now())
-  updatedAt DateTime       @default(now())
+  updatedAt DateTime?    
   user      user           @relation(fields: [userId], references: [id])
   post      post           @relation(fields: [postId], references: [id])
   comment   comment?       @relation("ReplyRelation", fields: [parentId], references: [id])
@@ -225,7 +226,7 @@ model post {
   status               post_status             @default(PENDING)
   rejectionReason      String?                 @db.Text
   createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @default(now())
+  updatedAt            DateTime?               
   user                 user                    @relation(fields: [userId], references: [id])
   moderator            user?                   @relation("moderator", fields: [moderatorId], references: [id])
   ward                 ward                    @relation(fields: [wardId], references: [id])
@@ -301,7 +302,7 @@ model accomodation_request {
   userId    String
   status    accomodation_request_status @default(PENDING)
   createdAt DateTime                    @default(now())
-  updatedAt DateTime                    @default(now())
+  updatedAt DateTime?
   post      post                        @relation(fields: [postId], references: [id])
   user      user                        @relation(fields: [userId], references: [id])
 
@@ -314,12 +315,14 @@ model report {
   adminId   String?
   postId    String?
   commentId String?
+  reportedUserId String
   reason    String
   status    report_status @default(PENDING)
   adminNote String?
   createdAt DateTime      @default(now())
   tackledAt DateTime?
   user      user          @relation("report", fields: [userId], references: [id])
+  reportedUser user       @relation("was reported", fields: [reportedUserId], references: [id])
   admin     user?         @relation("handle", fields: [adminId], references: [id])
   post      post?         @relation(fields: [postId], references: [id])
   comment   comment?      @relation(fields: [commentId], references: [id])
@@ -334,6 +337,6 @@ model notification {
   isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB
   createdAt DateTime          @default(now())
-  updatedAt DateTime          @default(now())
+  updatedAt DateTime?       
   user      user              @relation(fields: [userId], references: [id])
 }
