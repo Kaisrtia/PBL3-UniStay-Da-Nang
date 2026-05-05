@@ -6,9 +6,11 @@ import './modules/post/workers/image.moderation.worker';
 import './modules/post/workers/text.moderation.worker';
 import './modules/post/workers/finalStatus.moderation.worker';
 import './modules/post/workers/cache.worker';
+import './modules/demand/workers/cache.worker';
 import './modules/notification/workers/censorPost.notification';
 
 import { initCacheJob } from './modules/post/queues/cache.queue';
+import { initDemandCacheJob } from './modules/demand/queues/cache.queue';
 
 import config from './core/config/config';
 
@@ -21,6 +23,7 @@ const startServer = () => {
       console.log(`Server is listening on port ${PORT}`);
       // Initialize recurring jobs
       await initCacheJob();
+      await initDemandCacheJob();
     });
 
     // Graceful Shutdown strategy for Linux environments (e.g., when running in Docker)
