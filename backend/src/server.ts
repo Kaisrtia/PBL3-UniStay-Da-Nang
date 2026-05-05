@@ -5,7 +5,10 @@ import { connectDB, disconnectDB } from './core/config/database';
 import './modules/post/workers/image.moderation.worker';
 import './modules/post/workers/text.moderation.worker';
 import './modules/post/workers/finalStatus.moderation.worker';
+import './modules/post/workers/cache.worker';
 import './modules/notification/workers/censorPost.notification';
+
+import { initCacheJob } from './modules/post/queues/cache.queue';
 
 import config from './core/config/config';
 
@@ -14,8 +17,10 @@ import { connection } from './core/config/redis.connection';
 
 const startServer = () => {
   try {
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, async () => {
       console.log(`Server is listening on port ${PORT}`);
+      // Initialize recurring jobs
+      await initCacheJob();
     });
 
     // Graceful Shutdown strategy for Linux environments (e.g., when running in Docker)
