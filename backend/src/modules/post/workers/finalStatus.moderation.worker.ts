@@ -4,6 +4,7 @@ import prismaClient from '../../../core/config/prisma';
 import { notification_type } from '@prisma/client';
 import { addCensorPostNotificationJob } from '../../notification/queues/notification.queue';
 import { createPostCensorNotification } from '../../notification/services/notification.service';
+import { addMatchDemandJob } from '../queues/matchDemand.queue';
 
 export const finalModerationWorker = new Worker(
   'final-status-queue',
@@ -79,6 +80,9 @@ export const finalModerationWorker = new Worker(
       );
       await addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
+      });
+      await addMatchDemandJob('match_approved_post_ai', {
+        postId: job.data.postId
       });
     }
   },

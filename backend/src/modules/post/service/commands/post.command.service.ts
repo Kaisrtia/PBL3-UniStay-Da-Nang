@@ -12,6 +12,7 @@ import {
 import { generateHybridId } from '../../../../core/utils/generateId';
 import { addModerationFlow } from '../../queues/moderation.queue';
 import { addCensorPostNotificationJob } from '../../../notification/queues/notification.queue';
+import { addMatchDemandJob } from '../../queues/matchDemand.queue';
 
 export const censorPost = async (
   admin: user,
@@ -55,6 +56,9 @@ export const censorPost = async (
     status,
     rejectionReason
   });
+  if (status === post_status.APPROVED) {
+    await addMatchDemandJob('match_approved_post_admin', { postId: post.id });
+  }
   return updatedPost;
 };
 

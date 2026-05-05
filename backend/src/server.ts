@@ -6,6 +6,7 @@ import './modules/post/workers/image.moderation.worker';
 import './modules/post/workers/text.moderation.worker';
 import './modules/post/workers/finalStatus.moderation.worker';
 import './modules/post/workers/cache.worker';
+import './modules/post/workers/matchDemand.worker';
 import './modules/demand/workers/cache.worker';
 import './modules/notification/workers/censorPost.notification';
 
