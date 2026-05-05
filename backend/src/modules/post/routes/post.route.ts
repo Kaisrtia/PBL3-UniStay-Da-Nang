@@ -17,10 +17,15 @@ const postRouter = Router();
 // -- Post Listing --
 
 // List posts with optional filters (public — only APPROVED posts are returned)
-// Query params: wardId, districtId, minArea, maxArea, minPrice, maxPrice,
-//               roomType, verifiedHost, amenities (comma-separated IDs),
-//               hasMedia, page, limit, sortBy, sortOrder
 postRouter.get('/', asyncHandler(postController.handleGetPosts));
+
+// Recommend posts for a student based on their demand and preferences (Student only)
+postRouter.get(
+  '/recommendations',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(postController.handleGetRecommendedPosts)
+);
 
 // Get my posts (Student, Host)
 postRouter.get(

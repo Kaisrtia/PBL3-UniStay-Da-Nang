@@ -1,6 +1,8 @@
 import prismaClient from '../../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../../core/exceptions/AppError';
+import { calculateScore } from '../../../demand/utils/matching.handler';
+import { connection } from '../../../../core/config/redis.connection';
 import {
   user,
   room_type,
@@ -133,6 +135,51 @@ export const getPosts = async (filters: PostFilters) => {
       page,
       limit,
       totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
+
+export const getRecommendedPosts = async (
+  currentUser: user,
+  page: number = 1,
+  limit: number = 10
+) => {
+  const demand = await prismaClient.student_demand.findUnique({
+    where: { studentId: currentUser.id }
+  });
+  if (!demand) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Student demand not found');
+  }
+
+  const cachedPostsJson = await connection.get('cache:posts:approved');
+  if (!cachedPostsJson) {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
+
+  let cachedPosts = JSON.parse(cachedPostsJson);
+
+  // Filter and score posts
+  const scoredPosts = cachedPosts
+    .map((post: any) => ({
+      ...post,
+      score: calculateScore(post, demand)
+    }))
+    .filter((post: any) => post.score > 0);
+
+  // Sort by score descending
+  scoredPosts.sort((a: any, b: any) => b.score - a.score);
+
+  // Paginate
+  const skip = (page - 1) * limit;
+  const paginatedPosts = scoredPosts.slice(skip, skip + limit);
+
+  return {
+    data: paginatedPosts,
+    meta: {
+      total: scoredPosts.length,
+      page,
+      limit,
+      totalPages: Math.ceil(scoredPosts.length / limit)
     }
   };
 };

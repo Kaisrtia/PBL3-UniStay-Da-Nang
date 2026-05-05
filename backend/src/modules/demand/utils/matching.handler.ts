@@ -1,0 +1,44 @@
+export const calculateScore = (post: any, demand: any) => {
+  let score = 0;
+
+  // 1. Price (0.35 weight)
+  const postPrice = Number(post.price);
+  const minPrice = Number(demand.minPrice);
+  const maxPrice = Number(demand.maxPrice);
+  
+  if (postPrice >= minPrice && postPrice <= maxPrice) {
+    score += 0.35;
+  } else if (postPrice > maxPrice && postPrice <= maxPrice * 1.2) {
+    score += 0.35 * (1 - (postPrice - maxPrice) / (maxPrice * 0.2));
+  } else if (postPrice < minPrice && postPrice >= minPrice * 0.8) {
+    score += 0.35 * (1 - (minPrice - postPrice) / (minPrice * 0.2));
+  }
+
+  // 2. Near University (0.25 weight)
+  if (post.wardId === demand.wardId) {
+    score += 0.25;
+  }
+
+  // 3. Area (0.2 weight)
+  // Since demand has no area preference, assume larger is better up to a point, or flat score.
+  if (Number(post.area) > 15) {
+    score += 0.2;
+  } else if (Number(post.area) > 10) {
+    score += 0.1;
+  }
+
+  // 4. Roommate Gender (0.15 weight)
+  // Assuming post.postPurpose identifies roommate search
+  if (demand.isLookingForRoommate && post.postPurpose === 'FIND_ROOMMATE') {
+    score += 0.15;
+  } else if (!demand.isLookingForRoommate && post.postPurpose !== 'FIND_ROOMMATE') {
+    score += 0.15;
+  }
+
+  // 5. Room Type (0.05 weight)
+  if (post.roomType === demand.roomType) {
+    score += 0.05;
+  }
+
+  return score;
+};

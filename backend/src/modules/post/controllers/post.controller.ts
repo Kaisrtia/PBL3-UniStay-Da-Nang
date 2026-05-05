@@ -95,6 +95,15 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, result, 'Posts fetched successfully');
 };
 
+export const handleGetRecommendedPosts = async (req: Request, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const result = await postQueryService.getRecommendedPosts(req.user!, page, limit);
+
+  sendSuccess(res, HttpStatus.OK, result, 'Recommended posts fetched successfully');
+}
+
 export const handleGetMyPosts = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
