@@ -1,162 +1,82 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { FaBath, FaBed, FaBolt, FaMapMarkerAlt, FaRulerCombined } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import postService, { type Post, type PostPurpose } from '@/services/postService'
 
-type PosterType = 'broker' | 'personal'
-type ResultTab = 'all' | PosterType
-
-type SearchResult = {
-  address: string
-  baths: number
-  beds: number
-  featured?: boolean
-  id: string
-  image: string
-  posterType: PosterType
-  price: string
-  size: string
-  title: string
-}
+type ResultTab = 'all' | PostPurpose | 'recommended'
 
 const tabs: { label: string; value: ResultTab }[] = [
-  { label: 'Tất cả', value: 'all' },
-  { label: 'Môi giới', value: 'broker' },
-  { label: 'Cá nhân', value: 'personal' }
+  { label: 'Tat ca', value: 'all' },
+  { label: 'Cho thue', value: 'RENT' },
+  { label: 'O ghep', value: 'FIND_ROOMMATE' },
+  { label: 'Goi y cho toi', value: 'recommended' }
 ]
 
-const results: SearchResult[] = [
-  {
-    id: 'MAPTEST_DUT_ROOM_001',
-    title: 'Căn hộ mini gần DUT',
-    address: '12 Green Ave, Liên Chiểu',
-    price: '3.800.000đ',
-    image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=640&q=80',
-    posterType: 'broker',
-    beds: 2,
-    baths: 1,
-    size: '32m²'
-  },
-  {
-    id: 'MAPTEST_DRAGON_APT_002',
-    title: 'Nhà nguyên căn Hòa Xuân',
-    address: '18 Gratton St, Cẩm Lệ',
-    price: '6.500.000đ',
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=640&q=80',
-    posterType: 'broker',
-    beds: 3,
-    baths: 2,
-    size: '80m²'
-  },
-  {
-    id: 'MAPTEST_ASIA_HOUSE_003',
-    title: 'Phòng studio đầy đủ nội thất',
-    address: '151 Tonkins Ave, Hải Châu',
-    price: '2.850.000đ',
-    image: 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=640&q=80',
-    posterType: 'personal',
-    beds: 1,
-    baths: 1,
-    size: '24m²'
-  },
-  {
-    id: 'diamond-manor-apartment',
-    title: 'Căn hộ ban công sáng',
-    address: '343 Franklin Ave, Sơn Trà',
-    price: '3.500.000đ',
-    image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=640&q=80',
-    posterType: 'personal',
-    beds: 2,
-    baths: 1,
-    size: '36m²'
-  },
-  {
-    id: 'house-on-hollywood',
-    title: 'Nhà trọ có sân để xe',
-    address: '374 Johnson Ave, Ngũ Hành Sơn',
-    price: '2.400.000đ',
-    image: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=640&q=80',
-    posterType: 'broker',
-    beds: 2,
-    baths: 1,
-    size: '28m²',
-    featured: true
-  },
-  {
-    id: 'comfortable-villa-green',
-    title: 'Phòng gần Đại học Kinh tế',
-    address: '178 Broadway, Ngũ Hành Sơn',
-    price: '1.900.000đ',
-    image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=640&q=80',
-    posterType: 'personal',
-    beds: 1,
-    baths: 1,
-    size: '22m²',
-    featured: true
-  },
-  {
-    id: 'quality-house-for-sale',
-    title: 'Căn hộ mới gần biển',
-    address: '873 Bedford Ave, Sơn Trà',
-    price: '4.200.000đ',
-    image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=640&q=80',
-    posterType: 'broker',
-    beds: 2,
-    baths: 2,
-    size: '48m²',
-    featured: true
-  },
-  {
-    id: 'villa-with-pool',
-    title: 'Phòng ở ghép giá tốt',
-    address: '9750 Distribution Ave, Hải Châu',
-    price: '1.200.000đ',
-    image: 'https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=640&q=80',
-    posterType: 'personal',
-    beds: 1,
-    baths: 1,
-    size: '18m²'
-  }
-]
+const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=640&q=80'
 
-const SearchResultCard = ({ result }: { result: SearchResult }) => (
-  <Link to={`/posts/${result.id}`} className='group block'>
+const currencyFormatter = new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: 'VND',
+  maximumFractionDigits: 0
+})
+
+const roomTypeLabel: Record<string, string> = {
+  ROOM: 'Phong tro',
+  APARTMENT: 'Can ho',
+  HOUSE: 'Nha nguyen can'
+}
+
+const formatCurrency = (value: string | number) => {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? currencyFormatter.format(numberValue) : `${value}`
+}
+
+const getPostImage = (post: Post) => post.postImages?.[0]?.imageUrl || fallbackImage
+
+const getPostAddress = (post: Post) => {
+  const wardName = post.ward?.name
+  return wardName ? `${post.detailAddress}, ${wardName}` : post.detailAddress
+}
+
+const SearchResultCard = ({ post }: { post: Post }) => (
+  <Link to={`/posts/${post.id}`} className='group block'>
     <article>
       <div className='relative h-44 overflow-hidden rounded-md bg-gray-100'>
         <img
-          src={result.image}
-          alt={result.title}
+          src={getPostImage(post)}
+          alt={post.title}
           className='h-full w-full object-cover transition duration-300 group-hover:scale-105'
         />
-        {result.featured && (
+        {post.user?.hosts?.some((host) => host.isVerified) && (
           <span className='absolute left-4 top-4 flex items-center gap-1 rounded bg-[#F2765B] px-3 py-1.5 text-xs font-extrabold text-white'>
             <FaBolt className='text-[10px]' />
-            FEATURED
+            VERIFIED
           </span>
         )}
       </div>
 
       <div className='mt-4'>
-        <p className='text-sm font-extrabold text-[#181A20]'>{result.price}</p>
-        <h3 className='mt-2 line-clamp-1 text-base font-extrabold text-[#181A20]'>{result.title}</h3>
+        <p className='text-sm font-extrabold text-[#181A20]'>{formatCurrency(post.price)}</p>
+        <h3 className='mt-2 line-clamp-1 text-base font-extrabold text-[#181A20]'>{post.title}</h3>
         <p className='mt-1 flex items-center gap-1 text-xs font-medium text-gray-500'>
           <FaMapMarkerAlt className='text-[#FFC300]' />
-          {result.address}
+          {getPostAddress(post)}
         </p>
         <div className='mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-gray-600'>
           <span className='flex items-center gap-1'>
             <FaBed />
-            {result.beds} Beds
+            {roomTypeLabel[String(post.roomType)] || post.roomType || 'Phong'}
           </span>
           <span className='flex items-center gap-1'>
             <FaBath />
-            {result.baths} Baths
+            {post._count?.comments ?? 0} binh luan
           </span>
           <span className='flex items-center gap-1'>
             <FaRulerCombined />
-            {result.size}
+            {post.area}m2
           </span>
         </div>
       </div>
@@ -166,11 +86,63 @@ const SearchResultCard = ({ result }: { result: SearchResult }) => (
 
 const SearchResultsPage = () => {
   const [activeTab, setActiveTab] = useState<ResultTab>('all')
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const filteredResults = useMemo(
-    () => (activeTab === 'all' ? results : results.filter((result) => result.posterType === activeTab)),
-    [activeTab]
-  )
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        setLoading(true)
+        setErrorMessage('')
+
+        const result =
+          activeTab === 'recommended'
+            ? await postService.getRecommendedPosts({ limit: 24 })
+            : await postService.getPosts({
+                purpose: activeTab === 'all' ? undefined : activeTab,
+                hasMedia: false,
+                limit: 24,
+                sortBy: 'createdAt',
+                sortOrder: 'desc'
+              })
+
+        setPosts(result.data)
+      } catch {
+        setErrorMessage(
+          activeTab === 'recommended'
+            ? 'Khong tai duoc goi y. Hay dang nhap bang tai khoan sinh vien va tao nhu cau thue phong.'
+            : 'Khong tai duoc danh sach bai dang.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadPosts()
+  }, [activeTab])
+
+  const content = useMemo(() => {
+    if (loading) {
+      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Dang tai danh sach bai dang...</p>
+    }
+
+    if (errorMessage) {
+      return <p className='py-12 text-center text-sm font-semibold text-red-500'>{errorMessage}</p>
+    }
+
+    if (posts.length === 0) {
+      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Chua co bai dang phu hop.</p>
+    }
+
+    return (
+      <div className='grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4'>
+        {posts.map((post) => (
+          <SearchResultCard key={post.id} post={post} />
+        ))}
+      </div>
+    )
+  }, [errorMessage, loading, posts])
 
   return (
     <div className='min-h-screen bg-[#E7E5E1] text-[#181A20]'>
@@ -194,13 +166,7 @@ const SearchResultsPage = () => {
             ))}
           </div>
 
-          <div className='px-12 py-12'>
-            <div className='grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4'>
-              {filteredResults.map((result) => (
-                <SearchResultCard key={result.id} result={result} />
-              ))}
-            </div>
-          </div>
+          <div className='px-12 py-12'>{content}</div>
         </section>
       </main>
 

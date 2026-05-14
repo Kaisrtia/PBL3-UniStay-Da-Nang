@@ -5,7 +5,7 @@ import { FaChevronDown, FaImage } from 'react-icons/fa'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
-import locationService, { type District } from '@/services/locationService'
+import locationService, { type Ward } from '@/services/locationService'
 import postService, { type PostPurpose, type RoomType } from '@/services/postService'
 
 const stayTypes: { label: string; value: RoomType }[] = [
@@ -143,13 +143,13 @@ const CreatePostPage = () => {
   const [roomType, setRoomType] = useState<RoomType>('ROOM')
   const [postPurpose, setPostPurpose] = useState<PostPurpose>('RENT')
   const [wardId, setWardId] = useState('')
-  const [wardOptions, setWardOptions] = useState<District[]>([])
+  const [wardOptions, setWardOptions] = useState<Ward[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const loadWardOptions = async () => {
       try {
-        const data = await locationService.getDistricts()
+        const data = await locationService.getWards()
         setWardOptions(data)
       } catch {
         alert('Không tải được danh sách xã/phường.')

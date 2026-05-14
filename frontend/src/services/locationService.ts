@@ -1,8 +1,14 @@
 import api from './api'
 
-export type District = {
+export type Ward = {
   id: number
   name: string
+}
+
+type University = {
+  id: string
+  name: string
+  ward?: Ward | null
 }
 
 type ApiResponse<T> = {
@@ -11,9 +17,18 @@ type ApiResponse<T> = {
 }
 
 export const locationService = {
-  getDistricts: async () => {
-    const response = await api.get<ApiResponse<District[]>>('/api/v1/locations/districts')
-    return response.data.data || []
+  getWards: async () => {
+    const response = await api.get<ApiResponse<University[]>>('/locations/universities')
+    const universities = response.data.data || []
+    const wards = new Map<number, Ward>()
+
+    universities.forEach((university) => {
+      if (university.ward) {
+        wards.set(university.ward.id, university.ward)
+      }
+    })
+
+    return Array.from(wards.values())
   }
 }
 

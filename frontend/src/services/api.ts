@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:6969/api/v1').replace(/\/$/, '')
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:6969',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   },

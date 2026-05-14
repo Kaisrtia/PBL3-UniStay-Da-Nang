@@ -45,22 +45,22 @@ export type AuthResponse = {
 
 export const authService = {
   login: async (payload: LoginPayload) => {
-    const response = await api.post<AuthResponse>('/api/v1/auth/login', payload)
+    const response = await api.post<AuthResponse>('/auth/login', payload)
     return response.data
   },
 
   register: async (payload: RegisterPayload) => {
-    const response = await api.post<AuthResponse>('/api/v1/auth/register', payload)
+    const response = await api.post<AuthResponse>('/auth/register', payload)
     return response.data
   },
 
   verifyEmail: async (payload: VerifyEmailPayload) => {
-    const response = await api.patch<AuthResponse>('/api/v1/auth/email-verification', payload)
+    const response = await api.patch<AuthResponse>('/auth/email-verification', payload)
     return response.data
   },
 
   sendEmailVerification: async (payload: SendEmailVerificationPayload) => {
-    const response = await api.post<AuthResponse>('/api/v1/auth/email-verification', payload)
+    const response = await api.post<AuthResponse>('/auth/email-verification', payload)
     return response.data
   }
 }
