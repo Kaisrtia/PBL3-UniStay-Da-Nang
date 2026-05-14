@@ -4,32 +4,7 @@ import * as locationService from '../service/location.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 
-export const handleGetAllDistricts = async (req: Request, res: Response) => {
-  const districts = await locationService.getAllDistricts();
-  sendSuccess(res, HttpStatus.OK, districts);
-};
 
-export const handleGetDistrict = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  
-  if (!id || isNaN(Number(id))) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Valid District ID is required');
-  }
-
-  const district = await locationService.getDistrictById(Number(id));
-  sendSuccess(res, HttpStatus.OK, district);
-};
-
-export const handleGetWardsByDistrict = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  if (!id || isNaN(Number(id))) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Valid District ID is required');
-  }
-
-  const wards = await locationService.getWardsByDistrict(Number(id));
-  sendSuccess(res, HttpStatus.OK, wards);
-};
 
 export const handleGetWard = async (req: Request, res: Response) => {
   const { id } = req.params;

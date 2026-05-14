@@ -1,0 +1,91 @@
+import { Worker } from 'bullmq';
+import { connection } from '../../../core/config/redis.connection';
+import prismaClient from '../../../core/config/prisma';
+import { calculateScore } from '../../demand/utils/matching.handler';
+import { notification_type } from '@prisma/client';
+
+export const matchDemandWorker = new Worker(
+  'matchDemandQueue',
+  async (job) => {
+    try {
+      const { postId } = job.data;
+      console.log(`Running matchDemandWorker for post: ${postId}`);
+
+      // 1. Get post data
+      const post = await prismaClient.post.findUnique({
+        where: { id: postId },
+        include: {
+          ward: true,
+          postAmenities: true
+        }
+      });
+
+      if (!post) {
+        console.log(`Post ${postId} not found.`);
+        return;
+      }
+
+      // 2. Access student demands from Cache
+      const CACHE_KEY = 'cache:demands:student';
+      const cachedDemandsJson = await connection.get(CACHE_KEY);
+
+      if (!cachedDemandsJson) {
+        console.log('No student demands cached.');
+        return;
+      }
+
+      const demands = JSON.parse(cachedDemandsJson);
+
+      // 3. Match score for each demand (e.g. threshold > 0.5)
+      for (const demand of demands) {
+        const score = calculateScore(post, demand);
+        const MIN_SCORE_THRESHOLD = 0.4;
+
+        if (score >= MIN_SCORE_THRESHOLD) {
+          console.log(
+            `Matched student ${demand.studentId} for post ${post.id} with score: ${score}`
+          );
+
+          const notificationTitle = 'Có phòng mới phù hợp với nhu cầu của bạn!';
+          const notificationContent = `Gợi ý: ${post.title} (Độ phù hợp: ${(score * 100).toFixed(0)}%)`;
+
+          // 4. Save notification to DB
+          const newNotif = await prismaClient.notification.create({
+            data: {
+              userId: demand.studentId, // Ensure it points to the user.id representing the student
+              title: notificationTitle,
+              content: notificationContent,
+              type: notification_type.SYSTEM,
+              metaData: { postId: post.id, score }
+            }
+          });
+
+          // 5. Send SSE message if user is online
+          const isOnline = await connection.sismember(
+            'online_users',
+            demand.studentId
+          );
+          if (isOnline) {
+            await connection.publish(
+              `user_notif:${demand.studentId}`,
+              JSON.stringify(newNotif)
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in matchDemandWorker:', error);
+      throw error;
+    }
+  },
+  {
+    connection,
+    concurrency: 5
+  }
+);
+
+matchDemandWorker.on('failed', (job, err) => {
+  console.error(
+    `matchDemandWorker: Job ${job?.id} failed with error ${err.message}`
+  );
+});

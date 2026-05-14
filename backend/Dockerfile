@@ -1,25 +1,22 @@
-# Stage 1: Base
-FROM node:18-alpine AS base
-WORKDIR /usr/src/app
-COPY package*.json ./
-
-# Stage 2: Development
-FROM base AS development
-RUN npm install
-COPY . .
+# Pipeline: parent image -> source code -> install dependencies -> run the application
+# Use an official Node.js runtime as a parent image
+FROM node:20-alpine
+# Set the working directory in the container to /app
+WORKDIR /app
+# Because node:20-alpine image is based on alpine,
+# it does not have openssl package, which is required by Prisma.
+# So we need to install it before installing dependencies
+RUN apk add --no-cache openssl
+COPY package*.json .
+# Install any needed packages specified in package.json
+# Doing this so that if there are changes in source code, 
+# the dependencies will not be reinstalled and the build process will be faster
+RUN npm install 
+# Copy all files have same level with Dockerfile to /app in container
+# First dot means current directory
+# Second dot means destination directory in container
+COPY . . 
 RUN npx prisma generate
+# Make port 6969 available to the world outside this container
+EXPOSE 6969
 CMD ["npm", "run", "dev"]
-
-# Stage 3: Builder
-FROM base AS builder
-RUN npm install
-COPY . .
-RUN npx prisma generate
-RUN npm run build
-
-# Stage 4: Production
-FROM base AS production
-ENV NODE_ENV=production
-RUN npm install --only=production
-COPY --from=builder /usr/src/app/dist ./dist
-CMD ["npm", "start"]

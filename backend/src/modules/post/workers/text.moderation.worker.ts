@@ -1,8 +1,8 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../core/config/redis.connection';
-import { prisma } from '../core/config/database';
+import { connection } from '../../../core/config/redis.connection';
+import prismaClient from '../../../core/config/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import config from '../core/config/config';
+import config from '../../../core/config/config';
 import { finalStatusQueue } from '../queues/moderation.queue';
 
 const genAI = new GoogleGenerativeAI(config.ai_key.gemini);
@@ -15,7 +15,7 @@ export const textModerationWorker = new Worker(
     const { postId } = job.data.postId;
     let post;
     try {
-      post = await prisma.post.findUnique({
+      post = await prismaClient.post.findUnique({
         where: { id: postId },
         include: {
           postImages: true,

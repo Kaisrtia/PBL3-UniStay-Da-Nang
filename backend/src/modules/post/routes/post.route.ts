@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import * as postController from '../controllers/post.controller';
+import * as favouriteController from '../controllers/favourite.controller';
+import * as accommodationReqController from '../controllers/accommodationReq.controller';
 import { asyncHandler } from '../../../core/middlewares/async.handler';
 import { verifyToken } from '../../../core/middlewares/auth.middleware';
 import { authorize } from '../../../core/middlewares/role.middleware';
+import { validate } from '../../../core/middlewares/validate.middleware';
+import {
+  createPostSchema,
+  updatePostSchema
+} from '../validation/post.validation';
 import { account_role } from '@prisma/client';
 
 const postRouter = Router();
@@ -10,12 +17,14 @@ const postRouter = Router();
 // -- Post Listing --
 
 // List posts with optional filters (public — only APPROVED posts are returned)
-// Query params: wardId, districtId, minArea, maxArea, minPrice, maxPrice,
-//               roomType, verifiedHost, amenities (comma-separated IDs),
-//               hasMedia, page, limit, sortBy, sortOrder
+postRouter.get('/', asyncHandler(postController.handleGetPosts));
+
+// Recommend posts for a student based on their demand and preferences (Student only)
 postRouter.get(
-  '/',
-  asyncHandler(postController.handleGetPosts)
+  '/recommendations',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(postController.handleGetRecommendedPosts)
 );
 
 // Get my posts (Student, Host)
@@ -42,10 +51,10 @@ postRouter.get(
   asyncHandler(postController.handleGetPostStatistics)
 );
 
-// Get post counts grouped by district
+// Get post counts grouped by ward
 postRouter.get(
-  '/count-by-district',
-  asyncHandler(postController.handleGetPostsCountByDistrict)
+  '/count-by-ward',
+  asyncHandler(postController.handleGetPostsCountByWard)
 );
 
 // -- Post Management --
@@ -55,6 +64,7 @@ postRouter.post(
   '/',
   verifyToken,
   authorize([account_role.USER]),
+  validate(createPostSchema),
   asyncHandler(postController.handleCreatePost)
 );
 
@@ -71,6 +81,7 @@ postRouter.patch(
   '/:postId',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
+  validate(updatePostSchema),
   asyncHandler(postController.handleUpdatePost)
 );
 
@@ -89,7 +100,7 @@ postRouter.post(
   '/favourites',
   verifyToken,
   authorize([account_role.STUDENT]),
-  asyncHandler(postController.handleAddFavouritePost)
+  asyncHandler(favouriteController.handleAddFavouritePost)
 );
 
 // Remove a post from favourites (Student only)
@@ -97,7 +108,7 @@ postRouter.delete(
   '/favourites/:postId',
   verifyToken,
   authorize([account_role.STUDENT]),
-  asyncHandler(postController.handleRemoveFavouritePost)
+  asyncHandler(favouriteController.handleRemoveFavouritePost)
 );
 
 // -- Accommodation Requests --
@@ -107,7 +118,7 @@ postRouter.post(
   '/accommodation-requests',
   verifyToken,
   authorize([account_role.STUDENT]),
-  asyncHandler(postController.handleCreateAccommodationRequest)
+  asyncHandler(accommodationReqController.handleCreateAccommodationRequest)
 );
 
 export default postRouter;

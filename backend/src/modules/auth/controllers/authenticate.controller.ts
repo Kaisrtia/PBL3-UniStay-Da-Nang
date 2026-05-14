@@ -15,6 +15,15 @@ import { toUserResponseDto } from '../../user/dto/user-response.dto';
 
 // Auth Handlers
 
+const setRefreshTokenCookie = (res: Response, token: string) => {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: Number(config.jwt.refresh_token_ttl)
+  });
+};
+
 export const handleRegister = async (req: Request, res: Response) => {
   const { email, password, fullName } = req.body;
   await authService.signUp(email, password, fullName);
@@ -30,12 +39,7 @@ export const handleLogin = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const result = await authService.login(email, password);
 
-  res.cookie('refreshToken', result.refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'strict',
-    maxAge: Number(config.jwt.refresh_token_ttl)
-  });
+  setRefreshTokenCookie(res, result.refreshToken);
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
@@ -61,12 +65,7 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
     payload.picture
   );
 
-  res.cookie('refreshToken', result.refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'strict',
-    maxAge: Number(config.jwt.refresh_token_ttl)
-  });
+  setRefreshTokenCookie(res, result.refreshToken);
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,

@@ -1,14 +1,8 @@
-import { PrismaClient } from '@prisma/client';
-import config from './config';
-
-const prisma = new PrismaClient({
-  log:
-    config.node_env === 'development' ? ['error', 'warn'] : ['error']
-});
+import prismaClient from './prisma';
 
 const connectDB = async () => {
   try {
-    await prisma.$connect();
+    await prismaClient.$connect();
     console.log('Connected to database');
   } catch (error: any) {
     console.error('Error connecting to database: ', error.message);
@@ -17,7 +11,7 @@ const connectDB = async () => {
 
 const disconnectDB = async () => {
   try {
-    await prisma.$disconnect();
+    await prismaClient.$disconnect();
     console.log('Disconnected from database');
   } catch (error: any) {
     console.error('Error disconnecting from database: ', error.message);
@@ -25,4 +19,4 @@ const disconnectDB = async () => {
   }
 };
 
-export { prisma, connectDB, disconnectDB };
+export { connectDB, disconnectDB };

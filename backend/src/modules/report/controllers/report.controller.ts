@@ -16,7 +16,7 @@ export const handleTackleReport = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'status is required');
   }
 
-  const tackledReport = await reportService.tackleReport(req.user!, id, {
+  const tackledReport = await reportService.tackleReport(req.user!.id, id, {
     status,
     adminNote
   });
@@ -31,7 +31,7 @@ export const handleCreateReport = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'reason is required');
   }
 
-  const report = await reportService.createReport(req.user!, {
+  const report = await reportService.createReport(req.user!.id, {
     reason,
     postId,
     commentId

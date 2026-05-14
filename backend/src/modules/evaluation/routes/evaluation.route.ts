@@ -7,14 +7,6 @@ import { account_role } from '@prisma/client';
 
 const evaluationRouter = Router();
 
-// Evaluate a host (Student only)
-evaluationRouter.post(
-  '/host',
-  verifyToken,
-  authorize([account_role.STUDENT]),
-  asyncHandler(evaluationController.handleCreateEvaluation)
-);
-
 // Evaluate system (Any authenticated user)
 evaluationRouter.post(
   '/system-feedback',
