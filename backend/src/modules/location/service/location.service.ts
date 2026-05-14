@@ -4,6 +4,13 @@ import { AppError } from '../../../core/exceptions/AppError';
 
 
 
+export const getAllWards = async () => {
+  return prismaClient.ward.findMany({
+    orderBy: { name: 'asc' },
+    include: { universities: true }
+  });
+};
+
 export const getWardById = async (id: number) => {
   const ward = await prismaClient.ward.findUnique({
     where: { id: id },

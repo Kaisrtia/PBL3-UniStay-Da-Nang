@@ -7,6 +7,11 @@ const locationRouter = Router();
 // -- Wards --
 
 locationRouter.get(
+  '/wards',
+  asyncHandler(locationController.handleGetAllWards)
+);
+
+locationRouter.get(
   '/wards/:id',
   asyncHandler(locationController.handleGetWard)
 );

@@ -6,6 +6,11 @@ import { AppError } from '../../../core/exceptions/AppError';
 
 
 
+export const handleGetAllWards = async (_req: Request, res: Response) => {
+  const wards = await locationService.getAllWards();
+  sendSuccess(res, HttpStatus.OK, wards);
+};
+
 export const handleGetWard = async (req: Request, res: Response) => {
   const { id } = req.params;
 

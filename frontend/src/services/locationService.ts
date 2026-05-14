@@ -18,17 +18,13 @@ type ApiResponse<T> = {
 
 export const locationService = {
   getWards: async () => {
+    const response = await api.get<ApiResponse<Ward[]>>('/locations/wards')
+    return response.data.data || []
+  },
+
+  getUniversities: async () => {
     const response = await api.get<ApiResponse<University[]>>('/locations/universities')
-    const universities = response.data.data || []
-    const wards = new Map<number, Ward>()
-
-    universities.forEach((university) => {
-      if (university.ward) {
-        wards.set(university.ward.id, university.ward)
-      }
-    })
-
-    return Array.from(wards.values())
+    return response.data.data || []
   }
 }
 

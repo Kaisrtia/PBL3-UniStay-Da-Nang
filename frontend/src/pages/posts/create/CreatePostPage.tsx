@@ -5,6 +5,7 @@ import { FaChevronDown, FaImage } from 'react-icons/fa'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import amenityService, { type Amenity } from '@/services/amenityService'
 import locationService, { type Ward } from '@/services/locationService'
 import postService, { type PostPurpose, type RoomType } from '@/services/postService'
 
@@ -32,6 +33,11 @@ const amenities = [
   'Máy giặt',
   'Gác xép'
 ]
+
+const fallbackAmenities: Amenity[] = amenities.slice(0, 5).map((name, index) => ({
+  id: index + 1,
+  name
+}))
 
 const benefits = [
   'Nuôi thú cưng',
@@ -138,26 +144,62 @@ const CheckboxGrid = ({ items }: { items: string[] }) => (
   </div>
 )
 
+const AmenityCheckboxGrid = ({
+  items,
+  selectedIds,
+  onToggle
+}: {
+  items: Amenity[]
+  selectedIds: number[]
+  onToggle: (amenityId: number) => void
+}) => (
+  <div className='grid gap-x-20 gap-y-2 px-8 text-base text-[#111111] md:grid-cols-2'>
+    {items.map((item) => (
+      <label key={item.id} className='flex items-center gap-2'>
+        <input
+          type='checkbox'
+          checked={selectedIds.includes(item.id)}
+          onChange={() => onToggle(item.id)}
+          className='h-4 w-4 accent-[#001D3D]'
+        />
+        <span>{item.name}</span>
+      </label>
+    ))}
+  </div>
+)
+
 const CreatePostPage = () => {
   const navigate = useNavigate()
   const [roomType, setRoomType] = useState<RoomType>('ROOM')
   const [postPurpose, setPostPurpose] = useState<PostPurpose>('RENT')
   const [wardId, setWardId] = useState('')
   const [wardOptions, setWardOptions] = useState<Ward[]>([])
+  const [amenityOptions, setAmenityOptions] = useState<Amenity[]>(fallbackAmenities)
+  const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const loadWardOptions = async () => {
+    const loadFormOptions = async () => {
       try {
-        const data = await locationService.getWards()
-        setWardOptions(data)
+        const [wards, amenitiesData] = await Promise.all([
+          locationService.getWards(),
+          amenityService.getAmenities()
+        ])
+        setWardOptions(wards)
+        setAmenityOptions(amenitiesData.length > 0 ? amenitiesData : fallbackAmenities)
       } catch {
-        alert('Không tải được danh sách xã/phường.')
+        alert('Không tải được danh sách xã/phường hoặc tiện ích.')
       }
     }
 
-    loadWardOptions()
+    loadFormOptions()
   }, [])
+
+  const handleToggleAmenity = (amenityId: number) => {
+    setSelectedAmenityIds((current) =>
+      current.includes(amenityId) ? current.filter((id) => id !== amenityId) : [...current, amenityId]
+    )
+  }
 
   const getBackendErrorMessage = (error: unknown) => {
     if (axios.isAxiosError(error)) {
@@ -197,7 +239,11 @@ const CreatePostPage = () => {
         postPurpose,
         description: String(formData.get('description') || ''),
         latitude: Number(formData.get('latitude') || 0),
-        longitude: Number(formData.get('longitude') || 0)
+        longitude: Number(formData.get('longitude') || 0),
+        postAmenities: selectedAmenityIds.map((amenityId) => ({
+          amenityId,
+          currentCondition: 'GOOD'
+        }))
       })
 
       alert(response.message || 'Tạo bài đăng thành công.')
@@ -289,7 +335,11 @@ const CreatePostPage = () => {
           </FormSection>
 
           <FormSection title='Tiện ích'>
-            <CheckboxGrid items={amenities} />
+            <AmenityCheckboxGrid
+              items={amenityOptions}
+              selectedIds={selectedAmenityIds}
+              onToggle={handleToggleAmenity}
+            />
           </FormSection>
 
           <FormSection title='Lợi ích'>

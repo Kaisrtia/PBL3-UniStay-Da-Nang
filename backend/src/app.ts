@@ -13,6 +13,7 @@ import reportRouter from './modules/report/routes/report.route';
 import commentRouter from './modules/comment/routes/comment.route';
 import locationRouter from './modules/location/routes/location.route';
 import notificationRouter from './modules/notification/routes/notification.route';
+import amenityRouter from './modules/amenity/routes/amenity.route';
 
 const app: Application = express();
 
@@ -38,6 +39,7 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
 // public routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/locations', locationRouter);
+app.use('/api/v1/amenities', amenityRouter);
 
 // private routes
 app.use('/api/v1/users', userRouter);
