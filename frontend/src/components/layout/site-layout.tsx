@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import {
   FaBars,
@@ -6,13 +6,18 @@ import {
   FaChevronDown,
   FaHeart,
   FaHome,
+  FaListAlt,
+  FaPlusCircle,
   FaSearch,
   FaSlidersH,
-  FaTimes
+  FaSignOutAlt,
+  FaTimes,
+  FaUsers
 } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { logo } from '@/assets/images'
+import { type AuthUser } from '@/services/authService'
 
 type SiteHeaderProps = {
   accountLabel?: string
@@ -26,6 +31,12 @@ type FilterSelectProps = {
 type FilterChipProps = {
   children: ReactNode
   selected?: boolean
+}
+
+type HeaderUser = AuthUser & {
+  fullName?: string
+  email?: string
+  roles?: string[]
 }
 
 const filterOptions = {
@@ -42,6 +53,32 @@ const filterOptions = {
 const amenities = ['Ban công', 'Cửa sổ', 'Máy giặt', 'Gác xép', 'Wifi', 'Chỗ để xe']
 const benefits = ['Nuôi thú cưng', 'Giờ giấc tự do', 'An ninh tốt', 'An toàn PCCC']
 const universities = ['DUT', 'DUE', 'VKU', 'UED', 'DNU']
+
+const parseStoredUser = (): HeaderUser | null => {
+  const rawUser = localStorage.getItem('authUser')
+
+  if (!rawUser) {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawUser) as HeaderUser
+  } catch {
+    localStorage.removeItem('authUser')
+    return null
+  }
+}
+
+const getInitials = (name?: string, email?: string) => {
+  const source = name || email || 'U'
+  const parts = source.trim().split(/\s+/).filter(Boolean)
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+  }
+
+  return source.slice(0, 2).toUpperCase()
+}
 
 const FilterSelect = ({ label, options = ['Tất cả'] }: FilterSelectProps) => (
   <label className='block'>
@@ -202,11 +239,53 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
 
 export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isAccountOpen, setIsAccountOpen] = useState(false)
+  const [isFavoriteOpen, setIsFavoriteOpen] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [user, setUser] = useState<HeaderUser | null>(() => parseStoredUser())
+  const [hasToken, setHasToken] = useState(() => Boolean(localStorage.getItem('accessToken')))
+  const navigate = useNavigate()
+
+  const isAuthenticated = hasToken || Boolean(user)
+  const displayName = user?.fullName || user?.email || 'Tài khoản'
+  const primaryRole = user?.roles?.find((role) => role !== 'USER') || user?.roles?.[0] || 'USER'
+  const initials = useMemo(() => getInitials(user?.fullName, user?.email), [user?.email, user?.fullName])
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      setUser(parseStoredUser())
+      setHasToken(Boolean(localStorage.getItem('accessToken')))
+    }
+
+    window.addEventListener('storage', syncAuthState)
+    window.addEventListener('focus', syncAuthState)
+
+    return () => {
+      window.removeEventListener('storage', syncAuthState)
+      window.removeEventListener('focus', syncAuthState)
+    }
+  }, [])
+
+  const closeHeaderMenus = () => {
+    setIsAccountOpen(false)
+    setIsFavoriteOpen(false)
+    setIsNotificationOpen(false)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('token')
+    localStorage.removeItem('authUser')
+    setUser(null)
+    setHasToken(false)
+    closeHeaderMenus()
+    navigate('/login')
+  }
 
   return (
     <header className='sticky top-0 z-30 bg-gradient-to-r from-[#000814] via-[#001D3D] to-[#003566] shadow-lg shadow-[#001D3D]/20'>
       <div className='mx-auto flex h-24 max-w-[1440px] items-center px-8'>
-        <Link to='/landing' className='mr-8 flex w-56 items-center'>
+        <Link to='/home' className='mr-8 flex w-56 items-center'>
           <img src={logo} alt='UniStay' className='h-20 w-32 object-contain' />
         </Link>
 
@@ -236,15 +315,167 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
         </div>
 
         <div className='ml-5 flex items-center gap-4'>
-          <button className='grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-white shadow-md'>
-            <FaHeart />
-          </button>
-          <button className='grid h-11 w-11 place-items-center rounded-full text-[#FFC300]'>
-            <FaBell className='text-3xl' />
-          </button>
-          <Link to='/login' className='rounded-full border border-white/20 px-5 py-3 text-sm font-bold text-white'>
-            {accountLabel}
-          </Link>
+          <div className='relative'>
+            <button
+              type='button'
+              onClick={() => {
+                setIsFavoriteOpen((current) => !current)
+                setIsNotificationOpen(false)
+                setIsAccountOpen(false)
+              }}
+              className='grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-white shadow-md'
+              aria-label='Mở danh sách yêu thích'
+            >
+              <FaHeart />
+            </button>
+
+            {isFavoriteOpen && (
+              <div className='absolute right-0 top-14 z-50 w-72 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+                <div className='border-b border-gray-100 px-5 py-4'>
+                  <p className='text-sm font-extrabold'>Bài đăng yêu thích</p>
+                  <p className='mt-1 text-xs font-medium text-gray-500'>
+                    {isAuthenticated
+                      ? 'Các phòng đã lưu sẽ được đồng bộ với tài khoản của bạn.'
+                      : 'Đăng nhập để lưu và quản lý phòng yêu thích.'}
+                  </p>
+                </div>
+                <div className='p-3'>
+                  <Link
+                    to={isAuthenticated ? '/posts/search' : '/login'}
+                    onClick={() => setIsFavoriteOpen(false)}
+                    className='block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    {isAuthenticated ? 'Xem phòng phù hợp' : 'Đăng nhập để xem'}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className='relative'>
+            <button
+              type='button'
+              onClick={() => {
+                setIsNotificationOpen((current) => !current)
+                setIsFavoriteOpen(false)
+                setIsAccountOpen(false)
+              }}
+              className='grid h-11 w-11 place-items-center rounded-full text-[#FFC300]'
+              aria-label='Mở thông báo'
+            >
+              <FaBell className='text-3xl' />
+            </button>
+
+            {isNotificationOpen && (
+              <div className='absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+                <div className='border-b border-gray-100 px-5 py-4'>
+                  <p className='text-sm font-extrabold'>Thông báo</p>
+                  <p className='mt-1 text-xs font-medium text-gray-500'>
+                    {isAuthenticated
+                      ? 'Thông báo từ bài đăng, bình luận và yêu cầu thuê phòng sẽ hiện tại đây.'
+                      : 'Đăng nhập để nhận thông báo theo tài khoản.'}
+                  </p>
+                </div>
+                <div className='p-3 text-sm text-gray-500'>Chưa có thông báo mới.</div>
+              </div>
+            )}
+          </div>
+
+          <div className='relative'>
+            {isAuthenticated ? (
+              <button
+                type='button'
+                onClick={() => {
+                  setIsAccountOpen((current) => !current)
+                  setIsFavoriteOpen(false)
+                  setIsNotificationOpen(false)
+                }}
+                className='flex h-12 items-center gap-3 rounded-full border border-white/20 bg-white/5 pl-1.5 pr-4 text-sm font-bold text-white transition hover:bg-white/10'
+                aria-expanded={isAccountOpen}
+              >
+                <span className='grid h-9 w-9 place-items-center rounded-full bg-[#FFC300] text-xs font-extrabold text-[#001D3D]'>
+                  {initials}
+                </span>
+                <span className='max-w-28 truncate'>{displayName}</span>
+                <FaChevronDown className={`text-xs transition ${isAccountOpen ? 'rotate-180' : ''}`} />
+              </button>
+            ) : (
+              <Link to='/login' className='rounded-full border border-white/20 px-5 py-3 text-sm font-bold text-white'>
+                {accountLabel}
+              </Link>
+            )}
+
+            {isAuthenticated && isAccountOpen && (
+              <div className='absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+                <div className='bg-gradient-to-br from-[#001D3D] to-[#003566] px-5 py-5 text-white'>
+                  <div className='flex items-center gap-3'>
+                    <span className='grid h-12 w-12 place-items-center rounded-full bg-[#FFC300] text-sm font-extrabold text-[#001D3D]'>
+                      {initials}
+                    </span>
+                    <span className='min-w-0'>
+                      <span className='block truncate text-sm font-extrabold'>{displayName}</span>
+                      <span className='mt-1 block text-xs font-semibold uppercase tracking-wide text-[#FFD60A]'>
+                        {primaryRole}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className='grid p-3'>
+                  <Link
+                    to='/posts/create'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaPlusCircle className='text-[#FFC300]' />
+                    Đăng tin mới
+                  </Link>
+                  <Link
+                    to='/posts/me'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaListAlt className='text-[#003566]' />
+                    Bài đăng của tôi
+                  </Link>
+                  <Link
+                    to='/demands'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaSlidersH className='text-[#003566]' />
+                    Nhu cầu và gợi ý
+                  </Link>
+                  {user?.roles?.includes('ADMIN') ? (
+                    <Link
+                      to='/admin/overview'
+                      onClick={() => setIsAccountOpen(false)}
+                      className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    >
+                      <FaUsers className='text-[#FFC300]' />
+                      Trang quản trị
+                    </Link>
+                  ) : null}
+                  <Link
+                    to='/posts/search'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaHeart className='text-[#FFC300]' />
+                    Yêu thích
+                  </Link>
+                  <button
+                    type='button'
+                    onClick={handleLogout}
+                    className='mt-2 flex items-center gap-3 rounded-xl border-t border-gray-100 px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50'
+                  >
+                    <FaSignOutAlt />
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

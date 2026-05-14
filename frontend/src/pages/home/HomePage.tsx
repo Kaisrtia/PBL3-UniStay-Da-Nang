@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { FaBolt, FaChevronDown, FaMapMarkerAlt, FaParking, FaRegHeart, FaShieldAlt, FaStar, FaWifi } from 'react-icons/fa'
+import { FaBolt, FaMapMarkerAlt, FaParking, FaRegHeart, FaShieldAlt, FaStar, FaWifi } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -167,7 +167,7 @@ const HomePage = () => {
       <SiteHeader />
 
       <main>
-        <section className='relative overflow-hidden bg-gradient-to-br from-[#000814] via-[#001D3D] to-[#0D63C2] px-8 pb-28 pt-16 text-white'>
+        <section className='relative overflow-hidden bg-gradient-to-br from-[#000814] via-[#001D3D] to-[#0D63C2] px-8 py-16 text-white'>
           <div className='absolute right-24 top-12 h-72 w-72 rounded-full bg-[#FFC300]/20 blur-3xl' />
           <div className='absolute bottom-8 left-8 h-64 w-64 rounded-full bg-[#0D63C2]/30 blur-3xl' />
           <div className='relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.2fr_0.8fr]'>
@@ -208,32 +208,6 @@ const HomePage = () => {
                 Cac bai dang noi bat lay truc tiep tu API bai dang da duyet.
               </div>
             </aside>
-          </div>
-        </section>
-
-        <section className='relative z-10 mx-auto -mt-16 max-w-7xl px-8'>
-          <div className='grid gap-4 rounded-3xl border border-[#E6EAF0] bg-white p-6 shadow-2xl shadow-[#001D3D]/10 md:grid-cols-[1.3fr_0.9fr_0.9fr_0.75fr_auto]'>
-            {[
-              ['Tu khoa', 'Gan Dai hoc Bach Khoa'],
-              ['Khu vuc', 'Theo ward'],
-              ['Gia thue', 'Loc trong trang search'],
-              ['Loai phong', 'Phong tro']
-            ].map(([label, value]) => (
-              <Link
-                to='/posts/search'
-                key={label}
-                className='flex min-h-[76px] items-center justify-between rounded-2xl border border-[#E6EAF0] px-5 text-left'
-              >
-                <span>
-                  <span className='block text-xs font-bold text-gray-500'>{label}</span>
-                  <span className='mt-1 block font-extrabold text-[#181A20]'>{value}</span>
-                </span>
-                <FaChevronDown className='text-[#FFC300]' />
-              </Link>
-            ))}
-            <Link to='/posts/search' className='grid min-h-[76px] place-items-center rounded-2xl bg-[#FFC300] px-8 font-extrabold text-[#001D3D]'>
-              Tim kiem
-            </Link>
           </div>
         </section>
 

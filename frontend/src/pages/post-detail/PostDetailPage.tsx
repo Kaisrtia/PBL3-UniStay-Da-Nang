@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import { Link, useParams } from 'react-router-dom'
 
+import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
 import { API_BASE_URL } from '@/services/api'
 import engagementService from '@/services/engagementService'
@@ -156,35 +157,45 @@ const PostDetailPage = () => {
 
   if (isLoading) {
     return (
-      <main className='min-h-screen bg-gray-50 px-4 py-10'>
-        <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
-          <p className='text-sm text-gray-500'>Dang tai chi tiet bai dang...</p>
-        </div>
-      </main>
+      <div className='min-h-screen bg-gray-50 text-[#181A20]'>
+        <SiteHeader />
+        <main className='px-4 py-10'>
+          <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
+            <p className='text-sm text-gray-500'>Dang tai chi tiet bai dang...</p>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
     )
   }
 
   if (errorMessage || !post) {
     return (
-      <main className='min-h-screen bg-gray-50 px-4 py-10'>
-        <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
-          <Link to='/home' className='text-sm font-semibold text-blue-600 hover:underline'>
-            Quay lai trang chu
-          </Link>
-          <h1 className='mt-4 text-2xl font-bold text-gray-900'>Khong the hien thi bai dang</h1>
-          <p className='mt-2 text-gray-600'>{errorMessage || 'Bai dang khong ton tai.'}</p>
-          <p className='mt-4 text-sm text-gray-500'>
-            Neu API yeu cau dang nhap, hay luu access token vao localStorage voi key accessToken roi tai lai trang.
-          </p>
-        </div>
-      </main>
+      <div className='min-h-screen bg-gray-50 text-[#181A20]'>
+        <SiteHeader />
+        <main className='px-4 py-10'>
+          <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
+            <Link to='/home' className='text-sm font-semibold text-blue-600 hover:underline'>
+              Quay lai trang chu
+            </Link>
+            <h1 className='mt-4 text-2xl font-bold text-gray-900'>Khong the hien thi bai dang</h1>
+            <p className='mt-2 text-gray-600'>{errorMessage || 'Bai dang khong ton tai.'}</p>
+            <p className='mt-4 text-sm text-gray-500'>
+              Neu API yeu cau dang nhap, hay luu access token vao localStorage voi key accessToken roi tai lai trang.
+            </p>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
     )
   }
 
   return (
-    <main className='min-h-screen bg-gray-50 px-4 py-10'>
-      <article className='mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_420px]'>
-        <section className='rounded-lg bg-white p-6 shadow-sm'>
+    <div className='min-h-screen bg-gray-50 text-[#181A20]'>
+      <SiteHeader />
+      <main className='px-4 py-10'>
+        <article className='mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_420px]'>
+          <section className='rounded-lg bg-white p-6 shadow-sm'>
           <Link to='/home' className='text-sm font-semibold text-blue-600 hover:underline'>
             Quay lai trang chu
           </Link>
@@ -222,9 +233,9 @@ const PostDetailPage = () => {
             <h2 className='text-xl font-bold text-gray-950'>Mo ta</h2>
             <p className='mt-3 whitespace-pre-line leading-7 text-gray-700'>{post.description}</p>
           </section>
-        </section>
+          </section>
 
-        <aside className='space-y-4'>
+          <aside className='space-y-4'>
           <section className='rounded-lg bg-white p-5 shadow-sm'>
             <h2 className='text-lg font-bold text-gray-950'>Thao tac</h2>
             <div className='mt-4 grid gap-3'>
@@ -288,9 +299,11 @@ const PostDetailPage = () => {
               </button>
             </form>
           </section>
-        </aside>
-      </article>
-    </main>
+          </aside>
+        </article>
+      </main>
+      <SiteFooter />
+    </div>
   )
 }
 

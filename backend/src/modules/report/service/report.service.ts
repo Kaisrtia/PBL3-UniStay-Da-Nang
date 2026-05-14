@@ -77,11 +77,14 @@ export const createReport = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report both a post and a comment at the same time');
   }
 
+  let reportedUserId: string | undefined;
+
   if (data.postId) {
     const post = await prismaClient.post.findUnique({ where: { id: data.postId } });
     if (!post) {
       throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
     }
+    reportedUserId = post.userId;
   }
 
   if (data.commentId) {
@@ -89,11 +92,17 @@ export const createReport = async (
     if (!comment) {
       throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
     }
+    reportedUserId = comment.userId;
+  }
+
+  if (!reportedUserId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Reported user could not be determined');
   }
 
   return prismaClient.report.create({
     data: {
       userId,
+      reportedUserId,
       reason: data.reason,
       postId: data.postId,
       commentId: data.commentId

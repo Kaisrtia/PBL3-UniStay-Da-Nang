@@ -9,6 +9,8 @@ type AuthAction = 'login' | 'register'
 export const getTokenFromAuthResponse = (response: AuthResponse) =>
   response.data?.accessToken || response.data?.token || response.accessToken || response.token
 
+export const getUserFromAuthResponse = (response: AuthResponse) => response.data?.user || response.user
+
 const getSuccessMessage = (action: AuthAction, response: AuthResponse) => {
   if (response.message) {
     return response.message
@@ -47,6 +49,11 @@ export const useAuth = () => {
 
       if (token) {
         localStorage.setItem('accessToken', token)
+      }
+
+      const user = getUserFromAuthResponse(response)
+      if (user) {
+        localStorage.setItem('authUser', JSON.stringify(user))
       }
 
       setSuccess(getSuccessMessage(action, response))

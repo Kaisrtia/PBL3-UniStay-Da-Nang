@@ -1,10 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import {
+  AdminOverviewPage,
+  AdminPostsPage,
+  AdminUsersPage,
   CreatePostPage,
+  DemandPage,
   HomePage,
   LandingPage,
   LoginPage,
+  MyPostsPage,
   PostDetailPage,
   RegisterPage,
   SearchResultsPage,
@@ -21,8 +26,14 @@ const AppRoutes = () => {
       <Route path='/post' element={<Navigate to='/posts/search' replace />} />
       <Route path='/posts' element={<Navigate to='/posts/search' replace />} />
       <Route path='/posts/create' element={<CreatePostPage />}></Route>
+      <Route path='/posts/me' element={<MyPostsPage />}></Route>
       <Route path='/posts/search' element={<SearchResultsPage />}></Route>
       <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
+      <Route path='/demands' element={<DemandPage />}></Route>
+      <Route path='/admin' element={<Navigate to='/admin/overview' replace />} />
+      <Route path='/admin/overview' element={<AdminOverviewPage />}></Route>
+      <Route path='/admin/posts' element={<AdminPostsPage />}></Route>
+      <Route path='/admin/users' element={<AdminUsersPage />}></Route>
       <Route path='/register' element={<RegisterPage />} />
       <Route path='/verify-email' element={<VerifyEmailPage />} />
       <Route path='*' element={<Navigate to='/home' replace />} />

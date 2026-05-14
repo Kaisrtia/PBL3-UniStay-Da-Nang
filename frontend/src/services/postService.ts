@@ -146,6 +146,11 @@ export const postService = {
     return response.data.data || { data: [] }
   },
 
+  getMyPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'>) => {
+    const response = await api.get<PostResponse<PaginatedPosts>>(`/posts/me${buildPostQuery(filters)}`)
+    return response.data.data || { data: [] }
+  },
+
   createPost: async (payload: CreatePostPayload) => {
     const response = await api.post<PostResponse>('/posts', payload)
     return response.data

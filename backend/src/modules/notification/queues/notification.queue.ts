@@ -48,7 +48,7 @@ export const addRequestSharedAccommodationNotificationJob = async (
   postId: string,
   postOwnerId: string
 ) => {
-  const jobId = `accom-notif:${postId}`;
+  const jobId = `accom-notif-${postId}`;
 
   return await requestSharedAccommodationNotificationQueue.add(
     'request-shared-accommodation',
