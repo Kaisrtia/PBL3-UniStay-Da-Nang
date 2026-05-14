@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
+import adminService from '@/services/adminService'
 import { API_BASE_URL } from '@/services/api'
 import engagementService from '@/services/engagementService'
 
@@ -15,6 +16,7 @@ type PostImage = {
 
 type PostDetail = {
   id: string
+  userId?: string
   title: string
   detailAddress: string
   area: string | number
@@ -48,6 +50,20 @@ const getAccessToken = () => {
   return localStorage.getItem('accessToken') ?? localStorage.getItem('token') ?? ''
 }
 
+const getStoredUser = () => {
+  const rawUser = localStorage.getItem('authUser')
+
+  if (!rawUser) {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawUser) as StoredUser
+  } catch {
+    return null
+  }
+}
+
 const toNumber = (value: string | number) => Number(value)
 
 const PostDetailPage = () => {
@@ -59,6 +75,8 @@ const PostDetailPage = () => {
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [isAdmin] = useState(() => Boolean(getStoredUser()?.roles?.includes('ADMIN')))
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -102,7 +120,12 @@ const PostDetailPage = () => {
     return () => abortController.abort()
   }, [postId])
 
-  const heroImage = useMemo(() => post?.postImages?.[0]?.imageUrl, [post])
+  const postImages = useMemo(() => post?.postImages?.filter((image) => Boolean(image.imageUrl)) ?? [], [post])
+  const heroImage = postImages[selectedImageIndex]?.imageUrl
+
+  useEffect(() => {
+    setSelectedImageIndex(0)
+  }, [post?.id])
 
   const runPostAction = async (action: () => Promise<{ message?: string }>, fallbackMessage: string) => {
     if (isSubmittingAction) {
@@ -139,6 +162,58 @@ const PostDetailPage = () => {
     if (!reason?.trim()) return
 
     void runPostAction(() => engagementService.createReport(post.id, reason.trim()), 'Da gui bao cao bai dang.')
+  }
+
+  const handleBanPostOwner = () => {
+    if (!post?.userId) {
+      setActionError('Không tìm thấy chủ bài đăng để chặn.')
+      return
+    }
+
+    if (!window.confirm('Chặn người dùng đã đăng bài này?')) {
+      return
+    }
+
+    const ownerId = post.userId
+    void runPostAction(() => adminService.banUser(ownerId), 'Đã chặn người dùng.')
+  }
+
+  const handleRemovePost = () => {
+    if (!post) return
+
+    if (!window.confirm('Xóa bài viết khỏi danh sách công khai?')) {
+      return
+    }
+
+    void runPostAction(
+      () =>
+        adminService.censorPost(post.id, {
+          status: 'REJECTED',
+          rejectionReason: 'Bài viết bị quản trị viên xóa khỏi danh sách công khai.'
+        }),
+      'Đã xóa bài viết khỏi danh sách công khai.'
+    )
+  }
+
+  const handleBanOwnerAndRemovePost = () => {
+    if (!post?.userId) {
+      setActionError('Không tìm thấy chủ bài đăng để chặn.')
+      return
+    }
+
+    if (!window.confirm('Chặn người dùng và xóa bài viết này?')) {
+      return
+    }
+
+    const ownerId = post.userId
+    void runPostAction(async () => {
+      await adminService.banUser(ownerId)
+      await adminService.censorPost(post.id, {
+        status: 'REJECTED',
+        rejectionReason: 'Người dùng bị chặn và bài viết bị quản trị viên xóa khỏi danh sách công khai.'
+      })
+      return { message: 'Đã chặn người dùng và xóa bài viết.' }
+    }, 'Đã chặn người dùng và xóa bài viết.')
   }
 
   const handleCreateComment = (event: FormEvent<HTMLFormElement>) => {
@@ -201,7 +276,35 @@ const PostDetailPage = () => {
           </Link>
 
           {heroImage ? (
-            <img src={heroImage} alt={post.title} className='mt-5 h-80 w-full rounded-lg object-cover' />
+            <div className='mt-5'>
+              <div className='relative overflow-hidden rounded-lg bg-gray-100'>
+                <img src={heroImage} alt={post.title} className='h-80 w-full object-cover' />
+                {postImages.length > 1 ? (
+                  <span className='absolute bottom-4 right-4 rounded-full bg-black/65 px-3 py-1 text-xs font-bold text-white'>
+                    {selectedImageIndex + 1}/{postImages.length}
+                  </span>
+                ) : null}
+              </div>
+
+              {postImages.length > 1 ? (
+                <div className='mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5'>
+                  {postImages.map((image, index) => (
+                    <button
+                      key={image.id || `${image.imageUrl}-${index}`}
+                      type='button'
+                      onClick={() => setSelectedImageIndex(index)}
+                      className={`h-20 overflow-hidden rounded-lg border-2 bg-gray-100 transition ${
+                        selectedImageIndex === index
+                          ? 'border-[#FFC300] shadow-md shadow-[#001D3D]/15'
+                          : 'border-transparent hover:border-[#F6D983]'
+                      }`}
+                    >
+                      <img src={image.imageUrl} alt={`${post.title} ${index + 1}`} className='h-full w-full object-cover' />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : (
             <div className='mt-5 flex h-80 w-full items-center justify-center rounded-lg bg-gray-100 text-gray-500'>
               Chua co hinh anh
@@ -239,30 +342,61 @@ const PostDetailPage = () => {
           <section className='rounded-lg bg-white p-5 shadow-sm'>
             <h2 className='text-lg font-bold text-gray-950'>Thao tac</h2>
             <div className='mt-4 grid gap-3'>
-              <button
-                type='button'
-                disabled={isSubmittingAction}
-                onClick={handleAddFavourite}
-                className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
-              >
-                Luu bai dang
-              </button>
-              <button
-                type='button'
-                disabled={isSubmittingAction}
-                onClick={handleAccommodationRequest}
-                className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
-              >
-                Gui yeu cau thue/o ghep
-              </button>
-              <button
-                type='button'
-                disabled={isSubmittingAction}
-                onClick={handleReport}
-                className='rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
-              >
-                Bao cao bai dang
-              </button>
+              {isAdmin ? (
+                <>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleBanPostOwner}
+                    className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Chặn người dùng
+                  </button>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleRemovePost}
+                    className='rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Xóa bài viết
+                  </button>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleBanOwnerAndRemovePost}
+                    className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Chặn và xóa bài
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleAddFavourite}
+                    className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Luu bai dang
+                  </button>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleAccommodationRequest}
+                    className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Gui yeu cau thue/o ghep
+                  </button>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleReport}
+                    className='rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Bao cao bai dang
+                  </button>
+                </>
+              )}
             </div>
             {actionMessage ? <p className='mt-3 text-sm font-semibold text-green-600'>{actionMessage}</p> : null}
             {actionError ? <p className='mt-3 text-sm font-semibold text-red-600'>{actionError}</p> : null}
@@ -281,6 +415,7 @@ const PostDetailPage = () => {
             />
           </section>
 
+          {!isAdmin ? (
           <section className='rounded-lg bg-white p-5 shadow-sm'>
             <h2 className='text-lg font-bold text-gray-950'>Binh luan</h2>
             <form onSubmit={handleCreateComment} className='mt-4 grid gap-3'>
@@ -299,12 +434,17 @@ const PostDetailPage = () => {
               </button>
             </form>
           </section>
+          ) : null}
           </aside>
         </article>
       </main>
       <SiteFooter />
     </div>
   )
+}
+
+type StoredUser = {
+  roles?: string[]
 }
 
 export default PostDetailPage

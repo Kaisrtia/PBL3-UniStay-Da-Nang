@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { FaBath, FaBed, FaBolt, FaMapMarkerAlt, FaRulerCombined } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
-import postService, { type Post, type PostPurpose } from '@/services/postService'
+import postService, { type Post, type PostFilters, type PostPurpose, type RoomType } from '@/services/postService'
 
 type ResultTab = 'all' | PostPurpose | 'recommended'
 
@@ -39,6 +39,31 @@ const getPostImage = (post: Post) => post.postImages?.[0]?.imageUrl || fallbackI
 const getPostAddress = (post: Post) => {
   const wardName = post.ward?.name
   return wardName ? `${post.detailAddress}, ${wardName}` : post.detailAddress
+}
+
+const parseNumberParam = (value: string | null) => {
+  if (!value) {
+    return undefined
+  }
+
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : undefined
+}
+
+const isPostPurpose = (value: string | null): value is PostPurpose => {
+  return value === 'RENT' || value === 'FIND_ROOMMATE'
+}
+
+const isRoomType = (value: string | null): value is RoomType => {
+  return value === 'ROOM' || value === 'APARTMENT' || value === 'HOUSE'
+}
+
+const isSortBy = (value: string | null): value is NonNullable<PostFilters['sortBy']> => {
+  return value === 'createdAt' || value === 'price' || value === 'area' || value === 'viewCount'
+}
+
+const isSortOrder = (value: string | null): value is NonNullable<PostFilters['sortOrder']> => {
+  return value === 'asc' || value === 'desc'
 }
 
 const SearchResultCard = ({ post }: { post: Post }) => (
@@ -85,10 +110,43 @@ const SearchResultCard = ({ post }: { post: Post }) => (
 )
 
 const SearchResultsPage = () => {
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<ResultTab>('all')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const queryFilters = useMemo<PostFilters>(() => {
+    const purposeParam = searchParams.get('purpose')
+    const roomTypeParam = searchParams.get('roomType')
+    const sortByParam = searchParams.get('sortBy')
+    const sortOrderParam = searchParams.get('sortOrder')
+    const amenities = searchParams
+      .get('amenities')
+      ?.split(',')
+      .map(Number)
+      .filter((value) => Number.isFinite(value))
+
+    return {
+      wardId: parseNumberParam(searchParams.get('wardId')),
+      purpose: isPostPurpose(purposeParam) ? purposeParam : undefined,
+      roomType: isRoomType(roomTypeParam) ? roomTypeParam : undefined,
+      minArea: parseNumberParam(searchParams.get('minArea')),
+      maxArea: parseNumberParam(searchParams.get('maxArea')),
+      minPrice: parseNumberParam(searchParams.get('minPrice')),
+      maxPrice: parseNumberParam(searchParams.get('maxPrice')),
+      amenities: amenities && amenities.length > 0 ? amenities : undefined,
+      sortBy: isSortBy(sortByParam) ? sortByParam : 'createdAt',
+      sortOrder: isSortOrder(sortOrderParam) ? sortOrderParam : 'desc'
+    }
+  }, [searchParams])
+
+  const keyword = searchParams.get('keyword')?.trim().toLowerCase() || ''
+
+  useEffect(() => {
+    const purpose = searchParams.get('purpose')
+    setActiveTab(isPostPurpose(purpose) ? purpose : 'all')
+  }, [searchParams])
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -100,14 +158,25 @@ const SearchResultsPage = () => {
           activeTab === 'recommended'
             ? await postService.getRecommendedPosts({ limit: 24 })
             : await postService.getPosts({
+                ...queryFilters,
                 purpose: activeTab === 'all' ? undefined : activeTab,
-                hasMedia: false,
                 limit: 24,
-                sortBy: 'createdAt',
-                sortOrder: 'desc'
+                sortBy: queryFilters.sortBy || 'createdAt',
+                sortOrder: queryFilters.sortOrder || 'desc'
               })
 
-        setPosts(result.data)
+        const nextPosts = keyword
+          ? result.data.filter((post) => {
+              const searchText = [post.title, post.description, post.detailAddress, post.ward?.name]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+
+              return searchText.includes(keyword)
+            })
+          : result.data
+
+        setPosts(nextPosts)
       } catch {
         setErrorMessage(
           activeTab === 'recommended'
@@ -120,7 +189,7 @@ const SearchResultsPage = () => {
     }
 
     void loadPosts()
-  }, [activeTab])
+  }, [activeTab, keyword, queryFilters])
 
   const content = useMemo(() => {
     if (loading) {

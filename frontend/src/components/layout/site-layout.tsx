@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 
 import {
   FaBars,
@@ -17,7 +17,10 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 
 import { logo } from '@/assets/images'
+import amenityService, { type Amenity } from '@/services/amenityService'
 import { type AuthUser } from '@/services/authService'
+import locationService, { type Ward } from '@/services/locationService'
+import { type PostPurpose, type RoomType } from '@/services/postService'
 
 type SiteHeaderProps = {
   accountLabel?: string
@@ -25,12 +28,34 @@ type SiteHeaderProps = {
 
 type FilterSelectProps = {
   label: string
-  options?: string[]
+  options?: Array<SelectOption | string>
+  value?: string
+  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void
+  disabled?: boolean
 }
 
 type FilterChipProps = {
   children: ReactNode
   selected?: boolean
+  onClick?: () => void
+}
+
+type SelectOption = {
+  label: string
+  value: string
+}
+
+type AdvancedFilterState = {
+  wardId: string
+  purpose: '' | PostPurpose
+  roomType: '' | RoomType
+  minPrice: string
+  maxPrice: string
+  minArea: string
+  amenityIds: number[]
+  benefits: string[]
+  keyword: string
+  sort: string
 }
 
 type HeaderUser = AuthUser & {
@@ -39,20 +64,49 @@ type HeaderUser = AuthUser & {
   roles?: string[]
 }
 
-const filterOptions = {
-  districts: ['Tất cả', 'Hải Châu', 'Liên Chiểu', 'Cẩm Lệ', 'Sơn Trà', 'Ngũ Hành Sơn'],
-  wards: ['Tất cả', 'Hòa Khánh Bắc', 'Hòa Xuân', 'An Hải Bắc', 'Mỹ An'],
-  roomTypes: ['Tất cả', 'Trọ', 'Nhà nguyên căn', 'Chung cư'],
-  listingTypes: ['Tất cả', 'Cho thuê', 'Cho ở ghép'],
-  posters: ['Tất cả', 'Chủ trọ', 'Môi giới', 'Sinh viên'],
-  furnishing: ['Không giới hạn', 'Mới', 'Đầy đủ nội thất', 'Cơ bản', 'Trống'],
-  sources: ['Tất cả', 'Tin đã duyệt', 'Tin mới', 'Tin gần trường'],
-  sorts: ['Tin mới nhất', 'Giá thấp đến cao', 'Giá cao đến thấp', 'Đánh giá cao']
+const benefits = ['Nuôi thú cưng', 'Giờ giấc tự do', 'An ninh tốt', 'An toàn PCCC']
+
+const defaultAdvancedFilters: AdvancedFilterState = {
+  wardId: '',
+  purpose: '',
+  roomType: '',
+  minPrice: '',
+  maxPrice: '',
+  minArea: '',
+  amenityIds: [],
+  benefits: [],
+  keyword: '',
+  sort: 'createdAt-desc'
 }
 
-const amenities = ['Ban công', 'Cửa sổ', 'Máy giặt', 'Gác xép', 'Wifi', 'Chỗ để xe']
-const benefits = ['Nuôi thú cưng', 'Giờ giấc tự do', 'An ninh tốt', 'An toàn PCCC']
-const universities = ['DUT', 'DUE', 'VKU', 'UED', 'DNU']
+const roomTypeOptions: SelectOption[] = [
+  { label: 'Tất cả', value: '' },
+  { label: 'Trọ', value: 'ROOM' },
+  { label: 'Nhà nguyên căn', value: 'HOUSE' },
+  { label: 'Chung cư', value: 'APARTMENT' }
+]
+
+const listingTypeOptions: SelectOption[] = [
+  { label: 'Tất cả', value: '' },
+  { label: 'Cho thuê', value: 'RENT' },
+  { label: 'Cho ở ghép', value: 'FIND_ROOMMATE' }
+]
+
+const sortOptions: SelectOption[] = [
+  { label: 'Tin mới nhất', value: 'createdAt-desc' },
+  { label: 'Giá thấp đến cao', value: 'price-asc' },
+  { label: 'Giá cao đến thấp', value: 'price-desc' },
+  { label: 'Diện tích lớn nhất', value: 'area-desc' }
+]
+
+const fallbackAmenities: Amenity[] = [
+  { id: 1, name: 'Ban công' },
+  { id: 2, name: 'Cửa sổ' },
+  { id: 3, name: 'Máy giặt' },
+  { id: 4, name: 'Gác xép' },
+  { id: 5, name: 'Wifi' },
+  { id: 6, name: 'Chỗ để xe' }
+]
 
 const parseStoredUser = (): HeaderUser | null => {
   const rawUser = localStorage.getItem('authUser')
@@ -80,23 +134,37 @@ const getInitials = (name?: string, email?: string) => {
   return source.slice(0, 2).toUpperCase()
 }
 
-const FilterSelect = ({ label, options = ['Tất cả'] }: FilterSelectProps) => (
-  <label className='block'>
-    <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>{label}</span>
-    <span className='relative mt-2 block'>
-      <select className='h-12 w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 pr-10 text-sm font-semibold text-[#181A20] outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'>
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-      <FaChevronDown className='pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400' />
-    </span>
-  </label>
-)
+const FilterSelect = ({ label, options = [{ label: 'Tất cả', value: '' }], value, onChange, disabled }: FilterSelectProps) => {
+  const normalizedOptions = options.map((option) =>
+    typeof option === 'string' ? { label: option, value: option === 'Tất cả' ? '' : option } : option
+  )
 
-const FilterChip = ({ children, selected = false }: FilterChipProps) => (
+  return (
+    <label className='block'>
+      <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>{label}</span>
+      <span className='relative mt-2 block'>
+        <select
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className='h-12 w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 pr-10 text-sm font-semibold text-[#181A20] outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30 disabled:bg-gray-50 disabled:text-gray-500'
+        >
+          {normalizedOptions.map((option) => (
+            <option key={option.value || option.label} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <FaChevronDown className='pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400' />
+      </span>
+    </label>
+  )
+}
+
+const FilterChip = ({ children, selected = false, onClick }: FilterChipProps) => (
   <button
     type='button'
+    onClick={onClick}
     className={`rounded-full border px-4 py-2 text-sm font-bold transition ${
       selected
         ? 'border-[#FFC300] bg-[#FFF1B8] text-[#6F5616]'
@@ -107,7 +175,108 @@ const FilterChip = ({ children, selected = false }: FilterChipProps) => (
   </button>
 )
 
-const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
+const formatPriceChip = (minPrice: string, maxPrice: string) => {
+  if (minPrice && maxPrice) {
+    return `${Number(minPrice).toLocaleString('vi-VN')} - ${Number(maxPrice).toLocaleString('vi-VN')}đ`
+  }
+
+  if (minPrice) {
+    return `Từ ${Number(minPrice).toLocaleString('vi-VN')}đ`
+  }
+
+  if (maxPrice) {
+    return `Đến ${Number(maxPrice).toLocaleString('vi-VN')}đ`
+  }
+
+  return ''
+}
+
+const getSelectedLabel = (options: SelectOption[], value: string) => {
+  return options.find((option) => option.value === value)?.label
+}
+
+const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => {
+  const navigate = useNavigate()
+  const [filters, setFilters] = useState<AdvancedFilterState>(defaultAdvancedFilters)
+  const [wards, setWards] = useState<Ward[]>([])
+  const [amenityOptions, setAmenityOptions] = useState<Amenity[]>(fallbackAmenities)
+
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        const [wardData, amenityData] = await Promise.all([locationService.getWards(), amenityService.getAmenities()])
+        setWards(wardData)
+        setAmenityOptions(amenityData.length > 0 ? amenityData : fallbackAmenities)
+      } catch {
+        setAmenityOptions(fallbackAmenities)
+      }
+    }
+
+    void loadFilterOptions()
+  }, [])
+
+  const updateFilter = <K extends keyof AdvancedFilterState>(key: K, value: AdvancedFilterState[K]) => {
+    setFilters((current) => ({ ...current, [key]: value }))
+  }
+
+  const toggleAmenity = (amenityId: number) => {
+    setFilters((current) => ({
+      ...current,
+      amenityIds: current.amenityIds.includes(amenityId)
+        ? current.amenityIds.filter((id) => id !== amenityId)
+        : [...current.amenityIds, amenityId]
+    }))
+  }
+
+  const toggleBenefit = (benefit: string) => {
+    setFilters((current) => ({
+      ...current,
+      benefits: current.benefits.includes(benefit)
+        ? current.benefits.filter((item) => item !== benefit)
+        : [...current.benefits, benefit]
+    }))
+  }
+
+  const wardOptions: SelectOption[] = [
+    { label: 'Tất cả', value: '' },
+    ...wards.map((ward) => ({ label: ward.name, value: String(ward.id) }))
+  ]
+
+  const selectedWardLabel = getSelectedLabel(wardOptions, filters.wardId)
+  const selectedPriceLabel = formatPriceChip(filters.minPrice, filters.maxPrice)
+  const selectedChips = [
+    selectedWardLabel && selectedWardLabel !== 'Tất cả' ? selectedWardLabel : '',
+    getSelectedLabel(roomTypeOptions, filters.roomType),
+    getSelectedLabel(listingTypeOptions, filters.purpose),
+    selectedPriceLabel,
+    filters.minArea ? `Từ ${filters.minArea}m²` : '',
+    ...amenityOptions
+      .filter((amenity) => filters.amenityIds.includes(amenity.id))
+      .map((amenity) => amenity.name),
+    ...filters.benefits,
+    filters.keyword.trim() ? `"${filters.keyword.trim()}"` : ''
+  ].filter(Boolean)
+
+  const handleSearch = () => {
+    const params = new URLSearchParams()
+    const [sortBy, sortOrder] = filters.sort.split('-')
+
+    if (filters.wardId) params.set('wardId', filters.wardId)
+    if (filters.purpose) params.set('purpose', filters.purpose)
+    if (filters.roomType) params.set('roomType', filters.roomType)
+    if (filters.minPrice) params.set('minPrice', filters.minPrice)
+    if (filters.maxPrice) params.set('maxPrice', filters.maxPrice)
+    if (filters.minArea) params.set('minArea', filters.minArea)
+    if (filters.amenityIds.length > 0) params.set('amenities', filters.amenityIds.join(','))
+    if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
+    if (sortBy) params.set('sortBy', sortBy)
+    if (sortOrder) params.set('sortOrder', sortOrder)
+
+    onClose()
+    navigate(`/posts/search?${params.toString()}`)
+  }
+
+  return (
   <div className='absolute left-1/2 top-16 z-50 w-[min(92vw,760px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
     <div className='flex h-14 items-center justify-between border-b border-gray-100 px-5'>
       <button type='button' onClick={onClose} className='grid h-9 w-9 place-items-center rounded-full hover:bg-gray-100'>
@@ -121,40 +290,46 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
       <section>
         <p className='text-sm font-extrabold'>Đã chọn</p>
         <div className='mt-3 flex flex-wrap gap-2'>
-          <FilterChip selected>Đà Nẵng</FilterChip>
-          <FilterChip selected>2 - 4 triệu</FilterChip>
-          <FilterChip selected>Gần trường</FilterChip>
+          {selectedChips.length > 0 ? (
+            selectedChips.map((chip) => (
+              <FilterChip key={chip} selected>
+                {chip}
+              </FilterChip>
+            ))
+          ) : (
+            <span className='text-sm font-semibold text-gray-500'>Chưa chọn bộ lọc nào.</span>
+          )}
         </div>
       </section>
 
       <section className='mt-6 border-t border-gray-100 pt-6'>
         <h3 className='text-base font-extrabold'>Khu vực</h3>
-        <div className='mt-4 grid gap-4 md:grid-cols-3'>
-          <FilterSelect label='Tỉnh / Thành' options={['Đà Nẵng']} />
-          <FilterSelect label='Quận / Huyện' options={filterOptions.districts} />
-          <FilterSelect label='Phường / Xã' options={filterOptions.wards} />
-        </div>
         <div className='mt-4 grid gap-4 md:grid-cols-2'>
-          <FilterSelect label='Trường học' options={['Tất cả', ...universities]} />
-          <label className='block'>
-            <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Bán kính</span>
-            <input
-              type='range'
-              min='1'
-              max='10'
-              defaultValue='5'
-              className='mt-4 h-1 w-full accent-[#FFC300]'
-            />
-          </label>
+          <FilterSelect label='Tỉnh / Thành' options={[{ label: 'Đà Nẵng', value: 'da-nang' }]} value='da-nang' disabled />
+          <FilterSelect
+            label='Phường / Xã'
+            options={wardOptions}
+            value={filters.wardId}
+            onChange={(event) => updateFilter('wardId', event.target.value)}
+          />
         </div>
       </section>
 
       <section className='mt-6 border-t border-gray-100 pt-6'>
         <h3 className='text-base font-extrabold'>Loại tin</h3>
         <div className='mt-4 grid gap-4 md:grid-cols-3'>
-          <FilterSelect label='Loại phòng' options={filterOptions.roomTypes} />
-          <FilterSelect label='Loại tin' options={filterOptions.listingTypes} />
-          <FilterSelect label='Người đăng' options={filterOptions.posters} />
+          <FilterSelect
+            label='Loại phòng'
+            options={roomTypeOptions}
+            value={filters.roomType}
+            onChange={(event) => updateFilter('roomType', event.target.value as AdvancedFilterState['roomType'])}
+          />
+          <FilterSelect
+            label='Loại tin'
+            options={listingTypeOptions}
+            value={filters.purpose}
+            onChange={(event) => updateFilter('purpose', event.target.value as AdvancedFilterState['purpose'])}
+          />
         </div>
       </section>
 
@@ -164,6 +339,10 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
           <label className='block'>
             <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối thiểu</span>
             <input
+              type='number'
+              min='0'
+              value={filters.minPrice}
+              onChange={(event) => updateFilter('minPrice', event.target.value)}
               className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
               placeholder='0đ'
             />
@@ -171,6 +350,10 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
           <label className='block'>
             <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối đa</span>
             <input
+              type='number'
+              min='0'
+              value={filters.maxPrice}
+              onChange={(event) => updateFilter('maxPrice', event.target.value)}
               className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
               placeholder='Không giới hạn'
             />
@@ -178,27 +361,34 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
           <label className='block'>
             <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Diện tích từ</span>
             <input
+              type='number'
+              min='0'
+              value={filters.minArea}
+              onChange={(event) => updateFilter('minArea', event.target.value)}
               className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
               placeholder='m²'
             />
           </label>
-          <FilterSelect label='Tình trạng nội thất' options={filterOptions.furnishing} />
         </div>
       </section>
 
       <section className='mt-6 border-t border-gray-100 pt-6'>
         <h3 className='text-base font-extrabold'>Tiện ích</h3>
         <div className='mt-3 flex flex-wrap gap-2'>
-          {amenities.map((item, index) => (
-            <FilterChip key={item} selected={index < 2}>
-              {item}
+          {amenityOptions.map((item) => (
+            <FilterChip
+              key={item.id}
+              selected={filters.amenityIds.includes(item.id)}
+              onClick={() => toggleAmenity(item.id)}
+            >
+              {item.name}
             </FilterChip>
           ))}
         </div>
         <h3 className='mt-5 text-base font-extrabold'>Lợi ích</h3>
         <div className='mt-3 flex flex-wrap gap-2'>
-          {benefits.map((item, index) => (
-            <FilterChip key={item} selected={index === 1}>
+          {benefits.map((item) => (
+            <FilterChip key={item} selected={filters.benefits.includes(item)} onClick={() => toggleBenefit(item)}>
               {item}
             </FilterChip>
           ))}
@@ -210,32 +400,43 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => (
         <div className='relative mt-3'>
           <FaSearch className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400' />
           <input
+            value={filters.keyword}
+            onChange={(event) => updateFilter('keyword', event.target.value)}
             className='h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
             placeholder='Nhập từ khóa tìm kiếm...'
           />
         </div>
         <div className='mt-4 grid gap-4 md:grid-cols-2'>
-          <FilterSelect label='Nguồn tin' options={filterOptions.sources} />
-          <FilterSelect label='Sắp xếp' options={filterOptions.sorts} />
+          <FilterSelect
+            label='Sắp xếp'
+            options={sortOptions}
+            value={filters.sort}
+            onChange={(event) => updateFilter('sort', event.target.value)}
+          />
         </div>
       </section>
     </div>
 
     <div className='sticky bottom-0 mt-6 flex items-center justify-between border-t border-gray-100 bg-white px-6 py-4'>
-      <button type='button' className='text-sm font-extrabold text-[#181A20] underline underline-offset-4'>
+      <button
+        type='button'
+        onClick={() => setFilters(defaultAdvancedFilters)}
+        className='text-sm font-extrabold text-[#181A20] underline underline-offset-4'
+      >
         Xóa tất cả
       </button>
-      <Link
-        to='/posts/search'
-        onClick={onClose}
+      <button
+        type='button'
+        onClick={handleSearch}
         className='flex items-center gap-2 rounded-xl bg-[#181A20] px-7 py-3 text-sm font-extrabold text-white shadow-lg shadow-[#181A20]/20'
       >
         <FaSearch />
         Tìm kiếm
-      </Link>
+      </button>
     </div>
   </div>
-)
+  )
+}
 
 export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -244,9 +445,11 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [user, setUser] = useState<HeaderUser | null>(() => parseStoredUser())
   const [hasToken, setHasToken] = useState(() => Boolean(localStorage.getItem('accessToken')))
+  const [searchKeyword, setSearchKeyword] = useState('')
   const navigate = useNavigate()
 
   const isAuthenticated = hasToken || Boolean(user)
+  const isAdmin = Boolean(user?.roles?.includes('ADMIN'))
   const displayName = user?.fullName || user?.email || 'Tài khoản'
   const primaryRole = user?.roles?.find((role) => role !== 'USER') || user?.roles?.[0] || 'USER'
   const initials = useMemo(() => getInitials(user?.fullName, user?.email), [user?.email, user?.fullName])
@@ -282,6 +485,10 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
     navigate('/login')
   }
 
+  const searchUrl = searchKeyword.trim()
+    ? `/posts/search?keyword=${encodeURIComponent(searchKeyword.trim())}`
+    : '/posts/search'
+
   return (
     <header className='sticky top-0 z-30 bg-gradient-to-r from-[#000814] via-[#001D3D] to-[#003566] shadow-lg shadow-[#001D3D]/20'>
       <div className='mx-auto flex h-24 max-w-[1440px] items-center px-8'>
@@ -296,6 +503,13 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
         <div className='relative flex h-12 flex-1 max-w-[560px] items-center rounded-full border border-[#FFD60A]/20 bg-white px-5 shadow-sm'>
           <FaHome className='mr-3 text-[#001D3D]' />
           <input
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                navigate(searchUrl)
+              }
+            }}
             className='min-w-0 flex-1 border-none bg-transparent text-sm text-[#181A20] outline-none placeholder:text-gray-400'
             placeholder='Nhập vào từ khóa tìm kiếm'
           />
@@ -307,7 +521,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
             <FaSlidersH className='text-[#001D3D]' />
             Nâng cao
           </button>
-          <Link to='/posts/search' className='ml-4 grid h-9 w-9 place-items-center rounded-full bg-[#FFC300] text-white'>
+          <Link to={searchUrl} className='ml-4 grid h-9 w-9 place-items-center rounded-full bg-[#FFC300] text-white'>
             <FaSearch />
           </Link>
 
@@ -315,6 +529,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
         </div>
 
         <div className='ml-5 flex items-center gap-4'>
+          {!isAdmin ? (
           <div className='relative'>
             <button
               type='button'
@@ -351,6 +566,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
               </div>
             )}
           </div>
+          ) : null}
 
           <div className='relative'>
             <button
@@ -423,9 +639,17 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
 
                 <div className='grid p-3'>
                   <Link
-                    to='/posts/create'
+                    to='/posts/search'
                     onClick={() => setIsAccountOpen(false)}
                     className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaSearch className='text-[#003566]' />
+                    Xem bài đăng
+                  </Link>
+                  <Link
+                    to='/posts/create'
+                    onClick={() => setIsAccountOpen(false)}
+                    className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaPlusCircle className='text-[#FFC300]' />
                     Đăng tin mới
@@ -433,7 +657,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   <Link
                     to='/posts/me'
                     onClick={() => setIsAccountOpen(false)}
-                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaListAlt className='text-[#003566]' />
                     Bài đăng của tôi
@@ -441,7 +665,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   <Link
                     to='/demands'
                     onClick={() => setIsAccountOpen(false)}
-                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaSlidersH className='text-[#003566]' />
                     Nhu cầu và gợi ý
@@ -459,7 +683,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   <Link
                     to='/posts/search'
                     onClick={() => setIsAccountOpen(false)}
-                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaHeart className='text-[#FFC300]' />
                     Yêu thích

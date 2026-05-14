@@ -1,13 +1,17 @@
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import axios from 'axios'
-import { FaChevronDown, FaImage } from 'react-icons/fa'
+import L from 'leaflet'
+import { FaChevronDown, FaImage, FaTimes } from 'react-icons/fa'
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { Link, useNavigate } from 'react-router-dom'
+import 'leaflet/dist/leaflet.css'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import amenityService, { type Amenity } from '@/services/amenityService'
+import { uploadPostImages } from '@/services/cloudinaryService'
 import locationService, { type Ward } from '@/services/locationService'
-import postService, { type PostPurpose, type RoomType } from '@/services/postService'
+import postService, { type AmenityCondition, type PostPurpose, type RoomType } from '@/services/postService'
 
 const stayTypes: { label: string; value: RoomType }[] = [
   { label: 'Trọ', value: 'ROOM' },
@@ -18,6 +22,28 @@ const listingPurposes: { label: string; value: PostPurpose }[] = [
   { label: 'Cho thuê', value: 'RENT' },
   { label: 'Cho ở ghép', value: 'FIND_ROOMMATE' }
 ]
+
+const amenityConditionOptions: { label: string; value: AmenityCondition }[] = [
+  { label: 'Mới', value: 'NEW' },
+  { label: 'Tốt', value: 'GOOD' },
+  { label: 'Cũ', value: 'OLD' }
+]
+
+const defaultMapCenter: [number, number] = [16.0544, 108.2022]
+
+const mapTileAttribution =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+
+const isValidCoordinate = (latitude: number, longitude: number) => {
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  )
+}
 
 const amenities = [
   'Ban công rộng',
@@ -66,11 +92,22 @@ const FormSection = ({ children, title }: FormSectionProps) => (
   </section>
 )
 
-const PillButton = ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
+type PillButtonProps = {
+  children: ReactNode
+  onClick?: () => void
+  selected?: boolean
+}
+
+const PillButton = ({ children, onClick, selected = false }: PillButtonProps) => (
   <button
     type='button'
     onClick={onClick}
-    className='min-w-36 rounded-full bg-[#E2E1DD] px-8 py-3 text-sm font-extrabold text-[#111111] transition hover:bg-[#F7DE8B]'
+    aria-pressed={selected}
+    className={`min-w-36 rounded-full px-8 py-3 text-sm font-extrabold text-[#111111] transition ${
+      selected
+        ? 'bg-[#FFC300] shadow-md shadow-[#001D3D]/15 ring-2 ring-[#001D3D]'
+        : 'bg-[#E2E1DD] hover:bg-[#F7DE8B]'
+    }`}
   >
     {children}
   </button>
@@ -79,6 +116,14 @@ const PillButton = ({ children, onClick }: { children: ReactNode; onClick?: () =
 type SelectOption = {
   label: string
   value: string | number
+}
+
+type MediaPreview = {
+  id: string
+  file: File
+  name: string
+  type: string
+  url: string
 }
 
 type SelectFieldProps = {
@@ -133,6 +178,33 @@ const TextField = ({
   </label>
 )
 
+const CoordinateField = ({
+  label,
+  value,
+  min,
+  max,
+  onChange
+}: {
+  label: string
+  value: string
+  min: number
+  max: number
+  onChange: (value: string) => void
+}) => (
+  <label className='flex items-center gap-3'>
+    <span className='w-36 shrink-0 whitespace-nowrap text-base font-extrabold text-[#111111]'>{label}</span>
+    <input
+      type='number'
+      value={value}
+      min={min}
+      max={max}
+      step='0.000001'
+      onChange={(event) => onChange(event.target.value)}
+      className='h-11 w-full rounded-full border border-[#001D3D] bg-white px-6 text-sm font-semibold text-[#111111] outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+    />
+  </label>
+)
+
 const CheckboxGrid = ({ items }: { items: string[] }) => (
   <div className='grid gap-x-20 gap-y-2 px-8 text-base text-[#111111] md:grid-cols-2'>
     {items.map((item, index) => (
@@ -168,6 +240,110 @@ const AmenityCheckboxGrid = ({
   </div>
 )
 
+const RecenterPickerMap = ({ center }: { center: [number, number] }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    map.setView(center, map.getZoom())
+  }, [center, map])
+
+  return null
+}
+
+const LocationClickHandler = ({ onPick }: { onPick: (latitude: number, longitude: number) => void }) => {
+  useMapEvents({
+    click(event) {
+      onPick(event.latlng.lat, event.latlng.lng)
+    }
+  })
+
+  return null
+}
+
+const LocationPicker = ({
+  latitude,
+  longitude,
+  onPick
+}: {
+  latitude: string
+  longitude: string
+  onPick: (latitude: number, longitude: number) => void
+}) => {
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  const hasCoordinate = latitude.trim() !== '' && longitude.trim() !== ''
+  const center = useMemo<[number, number]>(
+    () => (hasCoordinate && isValidCoordinate(lat, lng) ? [lat, lng] : defaultMapCenter),
+    [hasCoordinate, lat, lng]
+  )
+
+  const markerIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: 'post-location-marker',
+        html: '<span class="post-location-marker-dot"></span>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -28]
+      }),
+    []
+  )
+
+  return (
+    <div className='relative z-0 isolate overflow-hidden rounded-2xl border border-[#001D3D] bg-white shadow-sm'>
+      <MapContainer center={center} zoom={15} scrollWheelZoom={false} style={{ height: 320, width: '100%' }}>
+        <RecenterPickerMap center={center} />
+        <TileLayer attribution={mapTileAttribution} url='https://tile.openstreetmap.org/{z}/{x}/{y}.png' />
+        <LocationClickHandler onPick={onPick} />
+        <Marker position={center} icon={markerIcon} />
+      </MapContainer>
+      <div className='border-t border-gray-100 px-4 py-3 text-sm font-semibold text-gray-600'>
+        Bấm vào bản đồ để chọn đúng vị trí kinh độ/vĩ độ cho bài đăng.
+      </div>
+    </div>
+  )
+}
+
+const MediaPreviewGrid = ({
+  items,
+  onRemove
+}: {
+  items: MediaPreview[]
+  onRemove: (previewId: string) => void
+}) => {
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className='group relative overflow-hidden rounded-2xl border border-[#F6D983] bg-white shadow-sm shadow-[#001D3D]/10'
+        >
+          {item.type.startsWith('video/') ? (
+            <video src={item.url} controls className='h-40 w-full bg-[#001D3D] object-cover' />
+          ) : (
+            <img src={item.url} alt={item.name} className='h-40 w-full object-cover' />
+          )}
+          <div className='flex items-center justify-between gap-3 px-3 py-2'>
+            <span className='truncate text-xs font-bold text-[#111111]'>{item.name}</span>
+            <button
+              type='button'
+              onClick={() => onRemove(item.id)}
+              className='grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#001D3D] text-xs text-white transition hover:bg-red-600'
+              aria-label={`Xóa ${item.name}`}
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const CreatePostPage = () => {
   const navigate = useNavigate()
   const [roomType, setRoomType] = useState<RoomType>('ROOM')
@@ -176,6 +352,11 @@ const CreatePostPage = () => {
   const [wardOptions, setWardOptions] = useState<Ward[]>([])
   const [amenityOptions, setAmenityOptions] = useState<Amenity[]>(fallbackAmenities)
   const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
+  const [amenityCondition, setAmenityCondition] = useState<AmenityCondition>('GOOD')
+  const [latitude, setLatitude] = useState('16.054400')
+  const [longitude, setLongitude] = useState('108.202200')
+  const [mediaPreviews, setMediaPreviews] = useState<MediaPreview[]>([])
+  const mediaPreviewsRef = useRef<MediaPreview[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -195,16 +376,68 @@ const CreatePostPage = () => {
     loadFormOptions()
   }, [])
 
+  useEffect(() => {
+    mediaPreviewsRef.current = mediaPreviews
+  }, [mediaPreviews])
+
+  useEffect(() => {
+    return () => {
+      mediaPreviewsRef.current.forEach((preview) => URL.revokeObjectURL(preview.url))
+    }
+  }, [])
+
   const handleToggleAmenity = (amenityId: number) => {
     setSelectedAmenityIds((current) =>
       current.includes(amenityId) ? current.filter((id) => id !== amenityId) : [...current, amenityId]
     )
   }
 
+  const handlePickLocation = (pickedLatitude: number, pickedLongitude: number) => {
+    setLatitude(pickedLatitude.toFixed(6))
+    setLongitude(pickedLongitude.toFixed(6))
+  }
+
+  const handleMediaChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+
+    if (files.length === 0) {
+      return
+    }
+
+    setMediaPreviews((current) => {
+      current.forEach((preview) => URL.revokeObjectURL(preview.url))
+
+      return files.map((file, index) => ({
+        id: `${file.name}-${file.lastModified}-${index}`,
+        file,
+        name: file.name,
+        type: file.type,
+        url: URL.createObjectURL(file)
+      }))
+    })
+
+    event.target.value = ''
+  }
+
+  const handleRemoveMediaPreview = (previewId: string) => {
+    setMediaPreviews((current) => {
+      const previewToRemove = current.find((preview) => preview.id === previewId)
+      if (previewToRemove) {
+        URL.revokeObjectURL(previewToRemove.url)
+      }
+
+      return current.filter((preview) => preview.id !== previewId)
+    })
+  }
+
   const getBackendErrorMessage = (error: unknown) => {
     if (axios.isAxiosError(error)) {
       const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
       return data?.error?.message || data?.message || 'Tạo bài đăng thất bại.'
+    }
+
+    if (error instanceof Error) {
+      return error.message
     }
 
     return 'Tạo bài đăng thất bại.'
@@ -224,9 +457,20 @@ const CreatePostPage = () => {
       return
     }
 
+    const latitudeValue = Number(latitude)
+    const longitudeValue = Number(longitude)
+
+    if (!isValidCoordinate(latitudeValue, longitudeValue)) {
+      alert('Vui lòng chọn tọa độ hợp lệ trên bản đồ.')
+      return
+    }
+
     setLoading(true)
 
     try {
+      const uploadedImageUrls =
+        mediaPreviews.length > 0 ? await uploadPostImages(mediaPreviews.map((preview) => preview.file)) : []
+
       const response = await postService.createPost({
         title: String(formData.get('title') || ''),
         wardId: Number(wardId),
@@ -238,11 +482,12 @@ const CreatePostPage = () => {
         roomType,
         postPurpose,
         description: String(formData.get('description') || ''),
-        latitude: Number(formData.get('latitude') || 0),
-        longitude: Number(formData.get('longitude') || 0),
+        latitude: latitudeValue,
+        longitude: longitudeValue,
+        postImages: uploadedImageUrls,
         postAmenities: selectedAmenityIds.map((amenityId) => ({
           amenityId,
-          currentCondition: 'GOOD'
+          currentCondition: amenityCondition
         }))
       })
 
@@ -267,7 +512,11 @@ const CreatePostPage = () => {
             <div className='grid gap-4'>
               <div className='flex flex-wrap gap-5 pl-8'>
                 {stayTypes.map((type) => (
-                  <PillButton key={type.value} onClick={() => setRoomType(type.value)}>
+                  <PillButton
+                    key={type.value}
+                    selected={roomType === type.value}
+                    onClick={() => setRoomType(type.value)}
+                  >
                     {type.label}
                   </PillButton>
                 ))}
@@ -277,7 +526,11 @@ const CreatePostPage = () => {
                 <h3 className='text-2xl font-extrabold text-[#111111]'>Tôi muốn</h3>
                 <div className='mt-4 flex flex-wrap gap-5 pl-8'>
                   {listingPurposes.map((purpose) => (
-                    <PillButton key={purpose.value} onClick={() => setPostPurpose(purpose.value)}>
+                    <PillButton
+                      key={purpose.value}
+                      selected={postPurpose === purpose.value}
+                      onClick={() => setPostPurpose(purpose.value)}
+                    >
                       {purpose.label}
                     </PillButton>
                   ))}
@@ -304,10 +557,19 @@ const CreatePostPage = () => {
           <FormSection title='Đặc điểm'>
             <div className='grid gap-6 px-8 md:grid-cols-2'>
               <TextField label='Diện tích' name='area' type='number' />
-              <SelectField label='Tình trạng nội thất' />
+              <SelectField
+                label='Tình trạng nội thất'
+                name='amenityCondition'
+                value={amenityCondition}
+                onChange={(event) => setAmenityCondition((event.target.value || 'GOOD') as AmenityCondition)}
+                options={amenityConditionOptions}
+              />
               <TextField label='Tiền cọc' name='deposit' type='number' />
-              <TextField label='Vĩ độ' name='latitude' type='number' />
-              <TextField label='Kinh độ' name='longitude' type='number' />
+              <CoordinateField label='Vĩ độ' value={latitude} min={-90} max={90} onChange={setLatitude} />
+              <CoordinateField label='Kinh độ' value={longitude} min={-180} max={180} onChange={setLongitude} />
+              <div className='md:col-span-2'>
+                <LocationPicker latitude={latitude} longitude={longitude} onPick={handlePickLocation} />
+              </div>
             </div>
           </FormSection>
 
@@ -320,9 +582,21 @@ const CreatePostPage = () => {
                 <span className='grid h-12 w-12 place-items-center rounded-xl bg-white text-2xl text-[#FFC300]'>
                   <FaImage />
                 </span>
-                <span className='mt-2 text-sm font-bold'>Thêm ảnh/video</span>
-                <input id='post-media-upload' type='file' multiple accept='image/*,video/*' className='sr-only' />
+                <span className='mt-2 text-sm font-bold'>Thêm ảnh</span>
+                <span className='mt-1 text-xs font-semibold text-[#6F5616]/70'>
+                  {mediaPreviews.length > 0 ? `${mediaPreviews.length} file đã chọn` : 'Chọn ảnh để xem trước'}
+                </span>
+                <input
+                  id='post-media-upload'
+                  type='file'
+                  multiple
+                  accept='image/*'
+                  onChange={handleMediaChange}
+                  className='sr-only'
+                />
               </label>
+
+              <MediaPreviewGrid items={mediaPreviews} onRemove={handleRemoveMediaPreview} />
 
               <TextField name='title' placeholder='Tiêu đề' />
               <TextField name='price' type='number' placeholder='Giá thuê' />
@@ -358,7 +632,7 @@ const CreatePostPage = () => {
               disabled={loading}
               className='rounded-2xl bg-[#FFE9A6] px-8 py-5 text-2xl font-extrabold text-[#111111] shadow-md shadow-[#001D3D]/15 transition hover:-translate-y-0.5 hover:bg-[#F7DE8B]'
             >
-              ĐĂNG BÀI
+              {loading ? 'ĐANG XỬ LÝ' : 'ĐĂNG BÀI'}
             </button>
           </div>
         </form>
