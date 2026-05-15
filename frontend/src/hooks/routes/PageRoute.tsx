@@ -4,13 +4,16 @@ import {
   AdminOverviewPage,
   AdminPostsPage,
   AdminUsersPage,
+  ContactRequestsPage,
   CreatePostPage,
   DemandPage,
+  FavouritePostsPage,
   HomePage,
   LandingPage,
   LoginPage,
   MyPostsPage,
   PostDetailPage,
+  ProfilePage,
   RegisterPage,
   SearchResultsPage,
   VerifyEmailPage
@@ -26,9 +29,12 @@ const AppRoutes = () => {
       <Route path='/post' element={<Navigate to='/posts/search' replace />} />
       <Route path='/posts' element={<Navigate to='/posts/search' replace />} />
       <Route path='/posts/create' element={<CreatePostPage />}></Route>
+      <Route path='/posts/favourites' element={<FavouritePostsPage />}></Route>
       <Route path='/posts/me' element={<MyPostsPage />}></Route>
+      <Route path='/contacts' element={<ContactRequestsPage />}></Route>
       <Route path='/posts/search' element={<SearchResultsPage />}></Route>
       <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
+      <Route path='/account/profile' element={<ProfilePage />}></Route>
       <Route path='/demands' element={<DemandPage />}></Route>
       <Route path='/admin' element={<Navigate to='/admin/overview' replace />} />
       <Route path='/admin/overview' element={<AdminOverviewPage />}></Route>

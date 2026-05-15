@@ -4,6 +4,7 @@ import { FaBolt, FaMapMarkerAlt, FaParking, FaRegHeart, FaShieldAlt, FaStar, FaW
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import locationService from '@/services/locationService'
 import postService, { type Post } from '@/services/postService'
 
 type Listing = {
@@ -25,46 +26,46 @@ type Area = {
 
 const fallbackListings: Listing[] = [
   {
-    id: 'MAPTEST_DUT_ROOM_001',
-    title: 'Can ho mini gan DUT, day du noi that',
-    location: 'Lien Chieu, Da Nang',
-    price: '3.000.000d/thang',
-    meta: ['28m2', 'May giat', 'Ban cong'],
-    purpose: 'Cho thue',
+    id: 'pst_seed_001',
+    title: 'Căn hộ mini gần Đại học Bách khoa, đầy đủ nội thất',
+    location: 'Liên Chiểu, Đà Nẵng',
+    price: '3.000.000đ/tháng',
+    meta: ['28m²', 'Máy giặt', 'Ban công'],
+    purpose: 'Cho thuê',
     accent: 'from-[#0D63C2] to-[#003566]'
   },
   {
-    id: 'MAPTEST_DRAGON_APT_002',
-    title: 'Phong tro yen tinh cho sinh vien',
-    location: 'Hai Chau, Da Nang',
-    price: '2.200.000d/thang',
-    meta: ['22m2', 'Wifi', 'An ninh'],
-    purpose: 'Moi dang',
+    id: 'pst_seed_003',
+    title: 'Phòng trọ yên tĩnh cho sinh viên',
+    location: 'Hải Châu, Đà Nẵng',
+    price: '2.200.000đ/tháng',
+    meta: ['22m²', 'WiFi', 'An ninh'],
+    purpose: 'Mới đăng',
     accent: 'from-[#003566] to-[#001D3D]'
   },
   {
-    id: 'MAPTEST_ASIA_HOUSE_003',
-    title: 'Tim nu o ghep gan truong Kinh te',
-    location: 'Ngu Hanh Son, Da Nang',
-    price: '1.500.000d/thang',
-    meta: ['O ghep', 'Tu do', 'Gan truong'],
-    purpose: 'O ghep',
+    id: 'pst_seed_004',
+    title: 'Tìm nữ ở ghép gần Trường Đại học Kinh tế',
+    location: 'Ngũ Hành Sơn, Đà Nẵng',
+    price: '1.500.000đ/tháng',
+    meta: ['Ở ghép', 'Tự do', 'Gần trường'],
+    purpose: 'Ở ghép',
     accent: 'from-[#FFD60A] to-[#FFC300]'
   }
 ]
 
 const areas: Area[] = [
-  { name: 'Hai Chau', count: 'Nhieu bai dang phu hop', color: '#0D63C2' },
-  { name: 'Lien Chieu', count: 'Gan cac truong dai hoc', color: '#FFC300' },
-  { name: 'Cam Le', count: 'Gia thue de tiep can', color: '#003566' },
-  { name: 'Son Tra', count: 'Gan trung tam va bien', color: '#22C55E' }
+  { name: 'Hải Châu', count: 'Nhiều bài đăng phù hợp', color: '#0D63C2' },
+  { name: 'Liên Chiểu', count: 'Gần các trường đại học', color: '#FFC300' },
+  { name: 'Cẩm Lệ', count: 'Giá thuê dễ tiếp cận', color: '#003566' },
+  { name: 'Sơn Trà', count: 'Gần trung tâm và biển', color: '#22C55E' }
 ]
 
 const amenities = [
-  { icon: FaWifi, label: 'Wifi manh' },
-  { icon: FaParking, label: 'Cho de xe' },
-  { icon: FaShieldAlt, label: 'An ninh tot' },
-  { icon: FaBolt, label: 'Gio giac tu do' }
+  { icon: FaWifi, label: 'WiFi mạnh' },
+  { icon: FaParking, label: 'Chỗ để xe' },
+  { icon: FaShieldAlt, label: 'An ninh tốt' },
+  { icon: FaBolt, label: 'Giờ giấc tự do' }
 ]
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -74,14 +75,14 @@ const currencyFormatter = new Intl.NumberFormat('vi-VN', {
 })
 
 const roomTypeLabel: Record<string, string> = {
-  ROOM: 'Phong tro',
-  APARTMENT: 'Can ho',
-  HOUSE: 'Nha'
+  ROOM: 'Phòng trọ',
+  APARTMENT: 'Căn hộ',
+  HOUSE: 'Nhà nguyên căn'
 }
 
 const getPriceLabel = (price: string | number) => {
   const value = Number(price)
-  return Number.isFinite(value) ? `${currencyFormatter.format(value)}/thang` : `${price}`
+  return Number.isFinite(value) ? `${currencyFormatter.format(value)}/tháng` : `${price}`
 }
 
 const mapPostToListing = (post: Post, index: number): Listing => ({
@@ -90,8 +91,8 @@ const mapPostToListing = (post: Post, index: number): Listing => ({
   title: post.title,
   location: post.ward?.name || post.detailAddress,
   price: getPriceLabel(post.price),
-  meta: [`${post.area}m2`, roomTypeLabel[String(post.roomType)] || String(post.roomType || 'Phong'), post.postPurpose || 'RENT'],
-  purpose: post.purpose === 'FIND_ROOMMATE' ? 'O ghep' : 'Cho thue',
+  meta: [`${post.area}m²`, roomTypeLabel[String(post.roomType)] || String(post.roomType || 'Phòng'), post.postPurpose === 'FIND_ROOMMATE' ? 'Ở ghép' : 'Cho thuê'],
+  purpose: post.purpose === 'FIND_ROOMMATE' ? 'Ở ghép' : 'Cho thuê',
   accent: ['from-[#0D63C2] to-[#003566]', 'from-[#003566] to-[#001D3D]', 'from-[#FFD60A] to-[#FFC300]'][
     index % 3
   ]
@@ -141,19 +142,33 @@ const ListingCard = ({ listing }: { listing: Listing }) => (
 
 const HomePage = () => {
   const [featuredListings, setFeaturedListings] = useState<Listing[]>(fallbackListings)
+  const [overviewStats, setOverviewStats] = useState({
+    approvedPosts: 0,
+    wards: 0,
+    mappedPosts: 0
+  })
 
   useEffect(() => {
     const loadFeaturedPosts = async () => {
       try {
-        const result = await postService.getPosts({
-          limit: 3,
-          sortBy: 'createdAt',
-          sortOrder: 'desc'
-        })
+        const [postResult, wardResult] = await Promise.all([
+          postService.getPosts({
+            limit: 12,
+            sortBy: 'createdAt',
+            sortOrder: 'desc'
+          }),
+          locationService.getWards()
+        ])
 
-        if (result.data.length > 0) {
-          setFeaturedListings(result.data.map(mapPostToListing))
+        if (postResult.data.length > 0) {
+          setFeaturedListings(postResult.data.slice(0, 3).map(mapPostToListing))
         }
+
+        setOverviewStats({
+          approvedPosts: postResult.meta?.total || postResult.data.length,
+          wards: wardResult.length,
+          mappedPosts: postResult.data.filter((post) => Number(post.latitude) && Number(post.longitude)).length
+        })
       } catch {
         setFeaturedListings(fallbackListings)
       }
@@ -172,31 +187,31 @@ const HomePage = () => {
           <div className='absolute bottom-8 left-8 h-64 w-64 rounded-full bg-[#0D63C2]/30 blur-3xl' />
           <div className='relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.2fr_0.8fr]'>
             <div>
-              <p className='text-sm font-extrabold tracking-[0.28em] text-[#FFD60A]'>UNISTAY DA NANG</p>
+              <p className='text-sm font-extrabold tracking-[0.28em] text-[#FFD60A]'>UNISTAY ĐÀ NẴNG</p>
               <h1 className='mt-6 max-w-3xl text-5xl font-extrabold leading-tight'>
-                Tim phong tro phu hop cho sinh vien trong vai phut
+                Tìm phòng trọ phù hợp cho sinh viên trong vài phút
               </h1>
               <p className='mt-6 max-w-2xl text-lg font-medium leading-8 text-blue-100'>
-                Kham pha phong tro, can ho va ban cung phong quanh cac truong dai hoc tai Da Nang voi bo loc theo khu
-                vuc, ngan sach va tien ich.
+                Khám phá phòng trọ, căn hộ và bạn cùng phòng quanh các trường đại học tại Đà Nẵng với bộ lọc theo khu
+                vực, ngân sách và tiện ích.
               </p>
               <div className='mt-8 flex flex-wrap gap-4'>
                 <Link to='/posts/search' className='rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20'>
-                  Tim phong ngay
+                  Tìm phòng ngay
                 </Link>
                 <Link to='/posts/create' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>
-                  Dang tin moi
+                  Đăng tin mới
                 </Link>
               </div>
             </div>
 
             <aside className='rounded-3xl border border-white/20 bg-white/10 p-8 backdrop-blur'>
-              <h2 className='text-2xl font-extrabold'>Tong quan hom nay</h2>
+              <h2 className='text-2xl font-extrabold'>Dữ liệu đang có</h2>
               <div className='mt-8 grid grid-cols-3 gap-5'>
                 {[
-                  ['Moi', 'du lieu tu API'],
-                  ['Ward', 'vi tri hien tai'],
-                  ['Map', 'toa do dong']
+                  [overviewStats.approvedPosts, 'bài đã duyệt'],
+                  [overviewStats.wards, 'phường/xã'],
+                  [overviewStats.mappedPosts, 'bài có tọa độ']
                 ].map(([value, label]) => (
                   <div key={label}>
                     <p className='text-3xl font-extrabold text-[#FFD60A]'>{value}</p>
@@ -205,7 +220,7 @@ const HomePage = () => {
                 ))}
               </div>
               <div className='mt-8 border-t border-white/20 pt-6 text-sm leading-6 text-blue-100'>
-                Cac bai dang noi bat lay truc tiep tu API bai dang da duyet.
+                Số liệu được cập nhật từ hệ thống bài đăng, khu vực và tọa độ bản đồ.
               </div>
             </aside>
           </div>
@@ -214,11 +229,11 @@ const HomePage = () => {
         <section className='mx-auto max-w-7xl px-8 py-20'>
           <div className='flex items-end justify-between gap-6'>
             <div>
-              <h2 className='text-4xl font-extrabold text-[#181A20]'>Bai dang noi bat</h2>
-              <p className='mt-3 text-gray-500'>Cac phong da duoc duyet, co anh ro rang va thong tin gia minh bach.</p>
+              <h2 className='text-4xl font-extrabold text-[#181A20]'>Bài đăng nổi bật</h2>
+              <p className='mt-3 text-gray-500'>Các phòng đã được duyệt, có hình ảnh rõ ràng và thông tin giá minh bạch.</p>
             </div>
             <Link to='/posts/search' className='rounded-full bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white'>
-              Xem tat ca
+              Xem tất cả
             </Link>
           </div>
 
@@ -231,8 +246,8 @@ const HomePage = () => {
 
         <section className='mx-auto max-w-7xl px-8 pb-20'>
           <div>
-            <h2 className='text-4xl font-extrabold'>Khu vuc duoc tim kiem nhieu</h2>
-            <p className='mt-3 text-gray-500'>Bat dau tu nhung khu vuc co nhieu lua chon phu hop voi sinh vien.</p>
+            <h2 className='text-4xl font-extrabold'>Khu vực được tìm kiếm nhiều</h2>
+            <p className='mt-3 text-gray-500'>Bắt đầu từ những khu vực có nhiều lựa chọn phù hợp với sinh viên.</p>
           </div>
           <div className='mt-9 grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
             {areas.map((area) => (
@@ -252,14 +267,14 @@ const HomePage = () => {
           <div className='grid overflow-hidden rounded-3xl bg-[#001D3D] text-white lg:grid-cols-[1.1fr_0.9fr]'>
             <div className='p-10'>
               <h2 className='max-w-2xl text-4xl font-extrabold leading-tight'>
-                Tao nhu cau thue tro de nhan goi y phu hop hon
+                Tạo nhu cầu thuê trọ để nhận gợi ý phù hợp hơn
               </h2>
               <p className='mt-5 max-w-2xl text-blue-100'>
-                Luu ngan sach, khu vuc, truong hoc va tieu chi ban cung phong. UniStay se uu tien nhung bai dang khop
-                nhat.
+                Lưu ngân sách, khu vực, trường học và tiêu chí bạn cùng phòng. UniStay sẽ ưu tiên những bài đăng phù
+                hợp nhất.
               </p>
               <Link to='/posts/search' className='mt-8 inline-block rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D]'>
-                Xem goi y
+                Xem gợi ý
               </Link>
             </div>
             <div className='grid gap-4 bg-[#003566] p-10 sm:grid-cols-2'>

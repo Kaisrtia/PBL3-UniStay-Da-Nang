@@ -7,6 +7,11 @@ export const postCacheQueue = new Queue('postCacheQueue', {
 
 // Initialize the repeatable job to trace and cache approved posts
 export const initCacheJob = async () => {
+  await postCacheQueue.add('cacheApprovedPosts:startup', {}, {
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+
   await postCacheQueue.add(
     'cacheApprovedPosts',
     {},

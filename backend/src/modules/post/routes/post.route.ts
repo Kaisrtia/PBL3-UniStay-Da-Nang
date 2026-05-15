@@ -57,6 +57,32 @@ postRouter.get(
   asyncHandler(postController.handleGetPostsCountByWard)
 );
 
+// -- Favourite Posts --
+
+// List favourite posts (Student only)
+postRouter.get(
+  '/favourites',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(favouriteController.handleGetFavouritePosts)
+);
+
+// List requests sent to posts owned by the current host/student
+postRouter.get(
+  '/accommodation-requests/received',
+  verifyToken,
+  authorize([account_role.USER]),
+  asyncHandler(accommodationReqController.handleGetReceivedAccommodationRequests)
+);
+
+// List requests submitted by the current student
+postRouter.get(
+  '/accommodation-requests/sent',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(accommodationReqController.handleGetSentAccommodationRequests)
+);
+
 // -- Post Management --
 
 // Create Post (Users, Students, Hosts)
@@ -92,8 +118,6 @@ postRouter.patch(
   authorize([account_role.ADMIN]),
   asyncHandler(postController.handleCensorPostManually)
 );
-
-// -- Favourite Posts --
 
 // Add a post to favourites (Student only)
 postRouter.post(

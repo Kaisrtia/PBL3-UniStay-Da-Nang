@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { FaCheck, FaUsers, FaTimes } from 'react-icons/fa'
+import { FaCheck, FaEye, FaUsers, FaTimes } from 'react-icons/fa'
 import { Link, useLocation } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -47,33 +47,102 @@ const getStatusClass = (status?: string) => {
 const getPostCountByStatus = (stats: AdminPostStatistic, status: string) =>
   stats.byStatus?.find((item) => item.status === status)?.count || 0
 
-const ChartPlaceholder = ({ title }: { title: string }) => (
+type ChartPoint = {
+  label: string
+  posts: number
+  approved: number
+}
+
+const getPostDate = (post: Post) => {
+  const date = post.createdAt ? new Date(post.createdAt) : null
+  return date && !Number.isNaN(date.getTime()) ? date : null
+}
+
+const buildDailyChartData = (posts: Post[]): ChartPoint[] => {
+  const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+  const data = labels.map((label) => ({ label, posts: 0, approved: 0 }))
+
+  posts.forEach((post) => {
+    const date = getPostDate(post)
+    if (!date) return
+
+    const index = date.getDay() === 0 ? 6 : date.getDay() - 1
+    data[index].posts += 1
+    if (post.status === 'APPROVED') data[index].approved += 1
+  })
+
+  return data
+}
+
+const buildHourlyChartData = (posts: Post[]): ChartPoint[] => {
+  const ranges = [
+    { label: '0-4h', start: 0, end: 4 },
+    { label: '4-8h', start: 4, end: 8 },
+    { label: '8-12h', start: 8, end: 12 },
+    { label: '12-16h', start: 12, end: 16 },
+    { label: '16-20h', start: 16, end: 20 },
+    { label: '20-24h', start: 20, end: 24 }
+  ]
+  const data = ranges.map((range) => ({ label: range.label, posts: 0, approved: 0 }))
+
+  posts.forEach((post) => {
+    const date = getPostDate(post)
+    if (!date) return
+
+    const hour = date.getHours()
+    const index = ranges.findIndex((range) => hour >= range.start && hour < range.end)
+    if (index < 0) return
+
+    data[index].posts += 1
+    if (post.status === 'APPROVED') data[index].approved += 1
+  })
+
+  return data
+}
+
+const ActivityChart = ({ title, data }: { title: string; data: ChartPoint[] }) => {
+  const maxValue = Math.max(...data.flatMap((item) => [item.posts, item.approved]), 1)
+
+  return (
   <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
     <div className='flex items-start justify-between gap-6'>
       <h2 className='text-3xl font-extrabold text-[#181A20]'>{title}</h2>
       <div className='flex items-center gap-5 text-xs font-bold text-gray-500'>
         <span className='flex items-center gap-2'>
           <span className='h-3 w-3 rounded-full bg-[#001D3D]' />
-          Visits
+          Bài đăng
         </span>
         <span className='flex items-center gap-2'>
           <span className='h-3 w-3 rounded-full bg-[#FFC300]' />
-          Users
+          Đã duyệt
         </span>
       </div>
     </div>
-    <div className='mt-7 grid h-64 grid-rows-3 border-y border-gray-100'>
-      <span className='border-b border-gray-100' />
-      <span className='border-b border-gray-100' />
-      <span />
-    </div>
-    <div className='mt-3 grid grid-cols-7 text-[10px] font-extrabold text-gray-400'>
-      {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
-        <span key={day}>{day}</span>
+    <div className='mt-7 flex h-64 items-end gap-4 border-y border-gray-100 px-2 py-4'>
+      {data.map((item) => (
+        <div key={item.label} className='flex h-full min-w-0 flex-1 flex-col justify-end'>
+          <div className='flex h-full items-end justify-center gap-1'>
+            <span
+              className='w-4 rounded-t-md bg-[#001D3D]'
+              title={`${item.posts} bài đăng`}
+              style={{ height: `${Math.max(8, (item.posts / maxValue) * 100)}%` }}
+            />
+            <span
+              className='w-4 rounded-t-md bg-[#FFC300]'
+              title={`${item.approved} bài đã duyệt`}
+              style={{ height: `${Math.max(8, (item.approved / maxValue) * 100)}%` }}
+            />
+          </div>
+          <span className='mt-3 truncate text-center text-[10px] font-extrabold text-gray-400'>{item.label}</span>
+        </div>
       ))}
     </div>
+    <p className='mt-3 text-xs font-semibold text-gray-500'>
+      Dựa trên thời điểm tạo của các bài đăng đang tải trong trang quản trị.
+    </p>
   </section>
-)
+  )
+}
 
 const AdminShell = ({ activeTab, children }: AdminDashboardPageProps & { children: ReactNode }) => {
   const location = useLocation()
@@ -176,7 +245,7 @@ const RegionalStatistics = ({ posts }: { posts: Post[] }) => {
 
   return (
     <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
-      <h2 className='text-xl font-extrabold text-gray-700'>Regional Statistics</h2>
+      <h2 className='text-xl font-extrabold text-gray-700'>Thống kê theo khu vực</h2>
       <div className='mt-6 grid gap-5'>
         {regionalData.map((item) => (
           <div key={item.name}>
@@ -210,7 +279,7 @@ const OverviewContent = () => {
         setErrorMessage('')
         const [statResult, postResult, userResult] = await Promise.all([
           adminService.getPostStatistics(period),
-          adminService.getAdminPosts({ limit: 12 }),
+          adminService.getAdminPosts({ limit: 100 }),
           adminService.getUsers({ limit: 5 })
         ])
         setStats(statResult)
@@ -225,6 +294,8 @@ const OverviewContent = () => {
   }, [period])
 
   const recentFlaggedPosts = posts.filter((post) => (post._count?.comments || 0) > 0 || post.status !== 'APPROVED').slice(0, 3)
+  const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
+  const hourlyChartData = useMemo(() => buildHourlyChartData(posts), [posts])
 
   return (
     <AdminShell activeTab='overview'>
@@ -238,8 +309,8 @@ const OverviewContent = () => {
 
       <section className='mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_360px]'>
         <div className='grid gap-10'>
-          <ChartPlaceholder title='Thống kê theo ngày' />
-          <ChartPlaceholder title='Thống kê theo giờ' />
+          <ActivityChart title='Thống kê theo ngày' data={dailyChartData} />
+          <ActivityChart title='Thống kê theo giờ' data={hourlyChartData} />
         </div>
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
@@ -300,7 +371,7 @@ const AdminPostsContent = () => {
   const loadPosts = useCallback(async () => {
     const [statResult, postResult] = await Promise.all([
       adminService.getPostStatistics(period),
-      adminService.getAdminPosts({ status: statusFilter === 'ALL' ? undefined : statusFilter, limit: 20 })
+      adminService.getAdminPosts({ status: statusFilter === 'ALL' ? undefined : statusFilter, limit: 100 })
     ])
     setStats(statResult)
     setPosts(postResult.data)
@@ -323,6 +394,8 @@ const AdminPostsContent = () => {
       setMessage('Không thể cập nhật trạng thái bài đăng.')
     }
   }
+  const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
+  const hourlyChartData = useMemo(() => buildHourlyChartData(posts), [posts])
 
   return (
     <AdminShell activeTab='posts'>
@@ -330,8 +403,8 @@ const AdminPostsContent = () => {
 
       <section className='mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_360px]'>
         <div className='grid gap-8'>
-          <ChartPlaceholder title='Thống kê theo ngày' />
-          <ChartPlaceholder title='Thống kê theo giờ' />
+          <ActivityChart title='Thống kê theo ngày' data={dailyChartData} />
+          <ActivityChart title='Thống kê theo giờ' data={hourlyChartData} />
         </div>
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
@@ -364,7 +437,7 @@ const AdminPostsContent = () => {
               Tổng: {formatNumber(stats.totalPosts || posts.length)} | Chờ duyệt: {getPostCountByStatus(stats, 'PENDING')}
             </p>
           </div>
-          <p className='text-sm text-gray-500'>// đánh dấu vi phạm là +1 gậy và gửi thông báo</p>
+          <p className='text-sm text-gray-500'>Các quyết định xử lý sẽ được ghi nhận và gửi thông báo cho người đăng.</p>
         </div>
         <div className='mt-6 overflow-x-auto'>
           <table className='w-full min-w-[980px] text-left text-sm'>
@@ -392,6 +465,14 @@ const AdminPostsContent = () => {
                   <td className='py-4'>{post._count?.comments || 0}</td>
                   <td className='py-4'>
                     <div className='flex justify-end gap-2'>
+                      <Link
+                        to={`/posts/${post.id}`}
+                        state={{ returnTo: '/admin/posts', returnLabel: 'Quay lại trang quản trị' }}
+                        className='inline-flex items-center gap-2 rounded-full bg-[#001D3D] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#003566]'
+                      >
+                        <FaEye />
+                        Chi tiết
+                      </Link>
                       <button
                         type='button'
                         onClick={() => void handleCensor(post.id, 'REJECTED')}

@@ -1,13 +1,39 @@
 import { Request, Response } from 'express';
 import { connection } from '../config/redis.connection';
+import jwt from 'jsonwebtoken';
+import config from '../config/config';
+import prismaClient from '../config/prisma';
+
+const resolveUserId = async (req: Request) => {
+  const bearerToken = req.headers.authorization?.split(' ')[1];
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = bearerToken || queryToken;
+
+  if (token) {
+    const decoded = jwt.verify(token, config.jwt.secret) as jwt.JwtPayload;
+    const user = await prismaClient.user.findUnique({
+      where: { id: decoded.id }
+    });
+
+    return user?.id;
+  }
+
+  return typeof req.query.userId === 'string' ? req.query.userId : undefined;
+};
 
 export const sseHandler = async (req: Request, res: Response) => {
-  const userId = req.query.userId as string;
+  let userId: string | undefined;
+
+  try {
+    userId = await resolveUserId(req);
+  } catch {
+    userId = undefined;
+  }
 
   if (!userId) {
     return res
-      .status(400)
-      .json({ error: 'Missing userId in query parameters' });
+      .status(401)
+      .json({ error: 'Không thể xác thực người dùng để mở kênh thông báo.' });
   }
 
   res.writeHead(200, {

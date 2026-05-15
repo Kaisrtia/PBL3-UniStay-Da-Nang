@@ -88,6 +88,7 @@ export const updateProfile = async (
   user: user,
   data: {
     fullName?: string;
+    phone?: string;
     dob?: string;
     gender?: string;
     avatarUrl?: string;
@@ -96,6 +97,7 @@ export const updateProfile = async (
 ) => {
   if (
     !data.fullName &&
+    !data.phone &&
     !data.dob &&
     !data.gender &&
     !data.avatarUrl &&
@@ -105,6 +107,15 @@ export const updateProfile = async (
       HttpStatus.BAD_REQUEST,
       'At least one field is required to update'
     );
+  }
+
+  if (data.phone) {
+    const existingPhone = await prismaClient.user.findFirst({
+      where: { phone: data.phone, id: { not: user.id } }
+    });
+    if (existingPhone) {
+      throw new AppError(HttpStatus.CONFLICT, 'Số điện thoại đã được sử dụng.');
+    }
   }
 
   if (data.universityId && user.roles.includes(account_role.STUDENT)) {
@@ -121,6 +132,7 @@ export const updateProfile = async (
       where: { id: user.id },
       data: {
         ...(data.fullName && { fullName: data.fullName }),
+        ...(data.phone && { phone: data.phone }),
         ...(data.gender && { gender: data.gender }),
         ...(data.dob && { dob: new Date(data.dob) }),
         ...(data.avatarUrl && { avatarUrl: data.avatarUrl })

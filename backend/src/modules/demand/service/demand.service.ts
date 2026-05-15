@@ -14,6 +14,7 @@ export const createStudentDemand = async (
     isLookingForRoommate?: boolean;
     roommateGender?: string;
     rommateCriteria?: string;
+    amenityIds?: number[];
   }
 ) => {
   // Validate the ward
@@ -44,30 +45,81 @@ export const createStudentDemand = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid room type');
   }
 
-  // Upsert the demand limit to 1 per student (since studentId is @id in student_demand)
-  const demand = await prismaClient.student_demand.upsert({
-    where: { studentId },
-    update: {
-      wardId: data.wardId,
-      ...(data.universityId ? { universityId: data.universityId } : { universityId: null }),
-      minPrice: data.minPrice,
-      maxPrice: data.maxPrice,
-      roomType: data.roomType,
-      isLookingForRoommate: data.isLookingForRoommate ?? false,
-      roommateGender: data.roommateGender ?? '',
-      rommateCriteria: data.rommateCriteria ?? ''
-    },
-    create: {
-      studentId,
-      wardId: data.wardId,
-      ...(data.universityId && { universityId: data.universityId }),
-      minPrice: data.minPrice,
-      maxPrice: data.maxPrice,
-      roomType: data.roomType,
-      isLookingForRoommate: data.isLookingForRoommate ?? false,
-      roommateGender: data.roommateGender ?? '',
-      rommateCriteria: data.rommateCriteria ?? ''
+  const amenityIds = Array.from(new Set(data.amenityIds ?? []));
+
+  if (amenityIds.length > 0) {
+    const existingAmenities = await prismaClient.amenity.findMany({
+      where: {
+        id: {
+          in: amenityIds
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (existingAmenities.length !== amenityIds.length) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid amenity IDs');
     }
+  }
+
+  // Upsert the demand limit to 1 per student (since studentId is @id in student_demand)
+  const demand = await prismaClient.$transaction(async (tx) => {
+    await tx.student_demand.upsert({
+      where: { studentId },
+      update: {
+        wardId: data.wardId,
+        ...(data.universityId ? { universityId: data.universityId } : { universityId: null }),
+        minPrice: data.minPrice,
+        maxPrice: data.maxPrice,
+        roomType: data.roomType,
+        isLookingForRoommate: data.isLookingForRoommate ?? false,
+        roommateGender: data.roommateGender ?? '',
+        rommateCriteria: data.rommateCriteria ?? ''
+      },
+      create: {
+        studentId,
+        wardId: data.wardId,
+        ...(data.universityId && { universityId: data.universityId }),
+        minPrice: data.minPrice,
+        maxPrice: data.maxPrice,
+        roomType: data.roomType,
+        isLookingForRoommate: data.isLookingForRoommate ?? false,
+        roommateGender: data.roommateGender ?? '',
+        rommateCriteria: data.rommateCriteria ?? ''
+      }
+    });
+
+    await tx.demand_amenity.deleteMany({
+      where: { studentId }
+    });
+
+    if (amenityIds.length > 0) {
+      await tx.demand_amenity.createMany({
+        data: amenityIds.map((amenityId) => ({
+          studentId,
+          amenityId
+        }))
+      });
+    }
+
+    return tx.student_demand.findUnique({
+      where: { studentId },
+      include: {
+        student: {
+          include: {
+            demandAmenities: {
+              include: {
+                amenity: true
+              }
+            }
+          }
+        },
+        ward: true,
+        university: true
+      }
+    });
   });
 
   return demand;

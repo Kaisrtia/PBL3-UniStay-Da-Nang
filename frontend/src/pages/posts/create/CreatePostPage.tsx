@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import { defaultAmenityNames, defaultBenefitNames } from '@/constants/rentalFeatures'
 import amenityService, { type Amenity } from '@/services/amenityService'
 import { uploadPostImages } from '@/services/cloudinaryService'
 import locationService, { type Ward } from '@/services/locationService'
@@ -45,40 +46,12 @@ const isValidCoordinate = (latitude: number, longitude: number) => {
   )
 }
 
-const amenities = [
-  'Ban công rộng',
-  'Cửa sổ',
-  'Máy giặt',
-  'Gác xép',
-  'Ban công rộng',
-  'Cửa sổ',
-  'Máy giặt',
-  'Gác xép',
-  'Ban công rộng',
-  'Cửa sổ',
-  'Máy giặt',
-  'Gác xép'
-]
-
-const fallbackAmenities: Amenity[] = amenities.slice(0, 5).map((name, index) => ({
+const fallbackAmenities: Amenity[] = defaultAmenityNames.map((name, index) => ({
   id: index + 1,
   name
 }))
 
-const benefits = [
-  'Nuôi thú cưng',
-  'Giờ giấc tự do',
-  'An ninh tốt',
-  'An toàn PCCC',
-  'Nuôi thú cưng',
-  'Giờ giấc tự do',
-  'An ninh tốt',
-  'An toàn PCCC',
-  'Nuôi thú cưng',
-  'Giờ giấc tự do',
-  'An ninh tốt',
-  'An toàn PCCC'
-]
+const benefits = defaultBenefitNames
 
 type FormSectionProps = {
   children: ReactNode
@@ -209,7 +182,7 @@ const CheckboxGrid = ({ items }: { items: string[] }) => (
   <div className='grid gap-x-20 gap-y-2 px-8 text-base text-[#111111] md:grid-cols-2'>
     {items.map((item, index) => (
       <label key={`${item}-${index}`} className='flex items-center gap-1'>
-        <input type='checkbox' defaultChecked className='h-4 w-4 accent-[#001D3D]' />
+        <input type='checkbox' className='h-4 w-4 accent-[#001D3D]' />
         <span>{item}</span>
       </label>
     ))}

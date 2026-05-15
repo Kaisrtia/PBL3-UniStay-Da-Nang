@@ -3,6 +3,70 @@ import prismaClient from '../../../core/config/prisma';
 import { AppError } from '../../../core/exceptions/AppError';
 import HttpStatus from 'http-status';
 
+export const getUserNotifications = async (
+  userId: string,
+  page = 1,
+  limit = 20
+) => {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(Math.max(1, limit), 50);
+  const skip = (safePage - 1) * safeLimit;
+
+  const [notifications, total] = await Promise.all([
+    prismaClient.notification.findMany({
+      where: { userId },
+      orderBy: [
+        { isRead: 'asc' },
+        { createdAt: 'desc' }
+      ],
+      skip,
+      take: safeLimit
+    }),
+    prismaClient.notification.count({ where: { userId } })
+  ]);
+
+  return {
+    data: notifications,
+    meta: {
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit)
+    }
+  };
+};
+
+export const markNotificationAsRead = async (
+  userId: string,
+  notificationId: number
+) => {
+  const notification = await prismaClient.notification.findFirst({
+    where: { id: notificationId, userId }
+  });
+
+  if (!notification) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Không tìm thấy thông báo.');
+  }
+
+  return prismaClient.notification.update({
+    where: { id: notificationId },
+    data: {
+      isRead: true,
+      updatedAt: new Date()
+    }
+  });
+};
+
+export const markAllNotificationsAsRead = async (userId: string) => {
+  return prismaClient.notification.updateMany({
+    where: { userId, isRead: false },
+    data: {
+      isRead: true,
+      updatedAt: new Date()
+    }
+  });
+};
+
 export const createPostCensorNotification = async (
   userId: string,
   postId: string,
@@ -35,8 +99,12 @@ export const createPostCensorNotification = async (
     throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
   }
 
-  const title = `Your post with id ${postId} was ${status === post_status.REJECTED ? 'rejected' : 'approved'} by system`;
-  const content = `Your post: ${post.title} was ${status === post_status.REJECTED ? 'rejected' : 'approved'}. ${status === post_status.REJECTED ? 'The reason is: ' + rejectionReason : 'Your post is now live on our platform.'}`;
+  const title = status === post_status.REJECTED
+    ? 'Bài đăng của bạn chưa được duyệt'
+    : 'Bài đăng của bạn đã được duyệt';
+  const content = status === post_status.REJECTED
+    ? `Bài đăng "${post.title}" chưa được duyệt. Lý do: ${rejectionReason}.`
+    : `Bài đăng "${post.title}" đã được duyệt và hiển thị trên hệ thống.`;
 
   const existingNotifs = await prismaClient.notification.findMany({
     where: {
@@ -103,17 +171,17 @@ export const createRequestSharedAccommodationNotification = async (
   const count = requests.length;
   let content: string;
   if (count === 1) {
-    content = `${requests[0].user.fullName} has requested to share accommodation with your post.`;
+    content = `${requests[0].user.fullName} đã gửi yêu cầu thuê hoặc ở ghép bài đăng của bạn.`;
   } else if (count === 2) {
-    content = `${requests[0].user.fullName} and ${requests[1].user.fullName} have requested to share accommodation with your post.`;
+    content = `${requests[0].user.fullName} và ${requests[1].user.fullName} đã gửi yêu cầu thuê hoặc ở ghép bài đăng của bạn.`;
   } else {
     const first = requests[0].user.fullName;
-    content = `${first} and ${count - 1} others have requested to share accommodation with your post.`;
+    content = `${first} và ${count - 1} người khác đã gửi yêu cầu thuê hoặc ở ghép bài đăng của bạn.`;
   }
 
   const title = count === 1
-    ? '1 new accommodation request'
-    : `${count} new accommodation requests`;
+    ? 'Có 1 yêu cầu thuê mới'
+    : `Có ${count} yêu cầu thuê mới`;
 
   // 3. Find existing notification
   const existingNotifs = await prismaClient.notification.findMany({
@@ -216,9 +284,9 @@ export const createCommentNotification = async (
   if (count === 1) {
     namesString = distinctUsers[0];
   } else if (count === 2) {
-    namesString = `${distinctUsers[0]} and ${distinctUsers[1]}`;
+    namesString = `${distinctUsers[0]} và ${distinctUsers[1]}`;
   } else {
-    namesString = `${distinctUsers[0]} and ${count - 1} others`;
+    namesString = `${distinctUsers[0]} và ${count - 1} người khác`;
   }
 
   let title: string;
@@ -227,16 +295,16 @@ export const createCommentNotification = async (
   if (isReply) {
     // Title: Your comment on post {post title} by {poster name} just received a reply from A
     // Note: {poster name} refers to the post owner's name
-    title = `Your comment on post ${currentComment.post.title} by ${currentComment.post.user.fullName} just received a reply from ${namesString}`;
+    title = `Bình luận của bạn trong bài "${currentComment.post.title}" vừa có phản hồi từ ${namesString}`;
   } else {
     // Title: Your post {post title} just received a notification
-    title = `Your post ${currentComment.post.title} just received a notification`;
+    title = `Bài đăng "${currentComment.post.title}" vừa có bình luận mới`;
     
     // Content: A just commented on your post / A and B have commented on your post
     if (count === 1) {
-      content = `${namesString} just commented on your post`;
+      content = `${namesString} vừa bình luận trong bài đăng của bạn.`;
     } else {
-      content = `${namesString} have commented on your post`;
+      content = `${namesString} vừa bình luận trong bài đăng của bạn.`;
     }
   }
 

@@ -9,6 +9,8 @@ import './modules/post/workers/cache.worker';
 import './modules/post/workers/matchDemand.worker';
 import './modules/demand/workers/cache.worker';
 import './modules/notification/workers/censorPost.notification';
+import './modules/notification/workers/comment.worker';
+import './modules/notification/workers/requestAccomodation.worker';
 
 import { initCacheJob } from './modules/post/queues/cache.queue';
 import { initDemandCacheJob } from './modules/demand/queues/cache.queue';

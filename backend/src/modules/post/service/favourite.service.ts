@@ -4,6 +4,59 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
 
+export const getFavouritePosts = async (
+  currentUser: user,
+  page: number = 1,
+  limit: number = 20
+) => {
+  const skip = (page - 1) * limit;
+
+  const where = { studentId: currentUser.id };
+
+  const [favourites, totalCount] = await Promise.all([
+    prismaClient.student_favorite_post.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        post: {
+          include: {
+            postImages: true,
+            postAmenities: {
+              include: { amenity: true }
+            },
+            ward: true,
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatarUrl: true,
+                hosts: {
+                  select: { isVerified: true }
+                }
+              }
+            },
+            _count: {
+              select: { comments: true }
+            }
+          }
+        }
+      }
+    }),
+    prismaClient.student_favorite_post.count({ where })
+  ]);
+
+  return {
+    data: favourites.map((favourite) => favourite.post),
+    meta: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
+
 export const addFavouritePost = async (currentUser: user, postId: string) => {
   await requirePost(postId);
 
@@ -14,7 +67,7 @@ export const addFavouritePost = async (currentUser: user, postId: string) => {
   if (existing) {
     throw new AppError(
       HttpStatus.CONFLICT,
-      'Post is already in your favourites'
+      'Bài đăng đã có trong danh sách yêu thích.'
     );
   }
 
@@ -34,7 +87,7 @@ export const removeFavouritePost = async (
   if (!existing) {
     throw new AppError(
       HttpStatus.NOT_FOUND,
-      'Post not found in your favourites'
+      'Bài đăng không có trong danh sách yêu thích.'
     );
   }
 

@@ -40,5 +40,21 @@ export const calculateScore = (post: any, demand: any) => {
     score += 0.05;
   }
 
-  return score;
+  const postAmenityIds = new Set(
+    (post.postAmenities ?? [])
+      .map((item: any) => Number(item.amenityId ?? item.amenity?.id))
+      .filter((item: number) => Number.isInteger(item))
+  );
+  const demandAmenityIds = (demand.student?.demandAmenities ?? demand.demandAmenities ?? [])
+    .map((item: any) => Number(item.amenityId ?? item.amenity?.id))
+    .filter((item: number) => Number.isInteger(item));
+
+  if (postAmenityIds.size > 0 && demandAmenityIds.length > 0) {
+    const matchedAmenities = demandAmenityIds.filter((amenityId: number) =>
+      postAmenityIds.has(amenityId)
+    ).length;
+    score += Math.min(0.1, (matchedAmenities / demandAmenityIds.length) * 0.1);
+  }
+
+  return Math.min(score, 1);
 };

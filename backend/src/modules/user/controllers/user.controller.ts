@@ -9,7 +9,7 @@ import { AppError } from '../../../core/exceptions/AppError';
 // -- User Info --
 
 export const handleGetUserInfo = async (req: Request, res: Response) => {
-  const user = toUserResponseDto(req.user!);
+  const user = await userInfoService.getUserProfile(req.user!.id);
   sendSuccess(res, HttpStatus.OK, user);
 };
 
@@ -41,17 +41,18 @@ export const handleSetupProfile = async (req: Request, res: Response) => {
 };
 
 export const handleUpdateProfile = async (req: Request, res: Response) => {
-  const { full_name, dob, gender, avatarUrl, universityId } = req.body;
+  const { full_name, fullName, phone, dob, gender, avatarUrl, universityId } = req.body;
 
   const result = await userInfoService.updateProfile(req.user!, {
-    fullName: full_name,
+    fullName: full_name || fullName,
+    phone,
     dob,
     gender,
     avatarUrl,
     universityId
   });
 
-  sendSuccess(res, HttpStatus.OK, toUserResponseDto(result), 'Profile updated successfully');
+  sendSuccess(res, HttpStatus.OK, toUserResponseDto(result), 'Đã cập nhật thông tin cá nhân.');
 };
 
 export const handleChangePassword = async (req: Request, res: Response) => {

@@ -26,3 +26,35 @@ export const handleCreateAccommodationRequest = async (
     'Accommodation request submitted successfully'
   );
 };
+
+export const handleGetReceivedAccommodationRequests = async (
+  req: Request,
+  res: Response
+) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 30;
+
+  const requests = await accommodationReqService.getReceivedAccommodationRequests(
+    req.user!,
+    page,
+    limit
+  );
+
+  sendSuccess(res, HttpStatus.OK, requests, 'Đã tải danh sách sinh viên đã liên hệ.');
+};
+
+export const handleGetSentAccommodationRequests = async (
+  req: Request,
+  res: Response
+) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 30;
+
+  const requests = await accommodationReqService.getSentAccommodationRequests(
+    req.user!,
+    page,
+    limit
+  );
+
+  sendSuccess(res, HttpStatus.OK, requests, 'Đã tải danh sách bài đăng bạn đã liên hệ.');
+};

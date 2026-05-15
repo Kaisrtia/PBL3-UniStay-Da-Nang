@@ -17,17 +17,17 @@ const getSuccessMessage = (action: AuthAction, response: AuthResponse) => {
   }
 
   return action === 'login'
-    ? 'Dang nhap thanh cong.'
-    : 'Dang ky thanh cong. Vui long kiem tra email de xac thuc tai khoan.'
+    ? 'Đăng nhập thành công.'
+    : 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.'
 }
 
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'Khong the ket noi den may chu. Vui long thu lai.'
+    return data?.error?.message || data?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.'
   }
 
-  return 'Da co loi xay ra. Vui long thu lai.'
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.'
 }
 
 export const useAuth = () => {

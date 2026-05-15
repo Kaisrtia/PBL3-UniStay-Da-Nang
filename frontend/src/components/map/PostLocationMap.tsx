@@ -40,7 +40,7 @@ const RecenterMap = ({ center }: { center: [number, number] }) => {
 const PostLocationMap = ({
   latitude,
   longitude,
-  title = 'Vi tri phong tro',
+  title = 'Vị trí phòng trọ',
   address,
   className,
   height = 360
@@ -66,7 +66,7 @@ const PostLocationMap = ({
         className={`flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500 ${className ?? ''}`}
         style={{ height }}
       >
-        Bai dang chua co toa do hop le de hien thi ban do.
+        Bài đăng chưa có tọa độ hợp lệ để hiển thị bản đồ.
       </div>
     )
   }
@@ -75,7 +75,7 @@ const PostLocationMap = ({
   const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`
 
   return (
-    <div className={`overflow-hidden rounded-lg border border-gray-200 shadow-sm ${className ?? ''}`}>
+    <div className={`post-location-map relative z-0 isolate overflow-hidden rounded-lg border border-gray-200 shadow-sm ${className ?? ''}`}>
       <MapContainer center={center} zoom={16} scrollWheelZoom={false} style={{ height, width: '100%' }}>
         <RecenterMap center={center} />
         <TileLayer attribution={mapTileAttribution} url='https://tile.openstreetmap.org/{z}/{x}/{y}.png' />
@@ -85,7 +85,7 @@ const PostLocationMap = ({
               <p className='font-semibold'>{title}</p>
               {address ? <p className='text-sm text-gray-600'>{address}</p> : null}
               <a href={googleMapsUrl} target='_blank' rel='noreferrer' className='text-sm text-blue-600 underline'>
-                Mo trong Google Maps
+                Mở trong Google Maps
               </a>
             </div>
           </Popup>

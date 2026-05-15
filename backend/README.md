@@ -28,6 +28,19 @@ To run the server and database in Docker:
 docker-compose up --build
 ```
 
+### 4. Local Data
+After migrations have run, initialize shared local accounts and listings:
+```bash
+npm run seed:local
+```
+
+Accounts:
+- `student@unistay.local` / `Unistay@123456`
+- `host@unistay.local` / `Unistay@123456`
+- `admin@unistay.local` / `Unistay@123456`
+
+The initializer creates wards, universities, amenities, approved listings, and image URLs so the local application starts with realistic content.
+
 ## Architecture
 - `src/core/`: Foundation files (Database config, Express middlewares, shared Utils).
 - `src/modules/`: Domain logic where each feature (like Users or Products) has its own controller, service, repository, and routes.

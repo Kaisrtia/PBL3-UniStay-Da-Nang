@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 
 import {
   FaBars,
@@ -12,14 +12,17 @@ import {
   FaSlidersH,
   FaSignOutAlt,
   FaTimes,
+  FaUserCircle,
   FaUsers
 } from 'react-icons/fa'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { logo } from '@/assets/images'
+import { defaultAmenityNames, defaultBenefitNames } from '@/constants/rentalFeatures'
 import amenityService, { type Amenity } from '@/services/amenityService'
 import { type AuthUser } from '@/services/authService'
 import locationService, { type Ward } from '@/services/locationService'
+import notificationService, { type AppNotification } from '@/services/notificationService'
 import { type PostPurpose, type RoomType } from '@/services/postService'
 
 type SiteHeaderProps = {
@@ -61,10 +64,11 @@ type AdvancedFilterState = {
 type HeaderUser = AuthUser & {
   fullName?: string
   email?: string
+  avatarUrl?: string | null
   roles?: string[]
 }
 
-const benefits = ['Nuôi thú cưng', 'Giờ giấc tự do', 'An ninh tốt', 'An toàn PCCC']
+const benefits = defaultBenefitNames
 
 const defaultAdvancedFilters: AdvancedFilterState = {
   wardId: '',
@@ -99,14 +103,10 @@ const sortOptions: SelectOption[] = [
   { label: 'Diện tích lớn nhất', value: 'area-desc' }
 ]
 
-const fallbackAmenities: Amenity[] = [
-  { id: 1, name: 'Ban công' },
-  { id: 2, name: 'Cửa sổ' },
-  { id: 3, name: 'Máy giặt' },
-  { id: 4, name: 'Gác xép' },
-  { id: 5, name: 'Wifi' },
-  { id: 6, name: 'Chỗ để xe' }
-]
+const fallbackAmenities: Amenity[] = defaultAmenityNames.map((name, index) => ({
+  id: index + 1,
+  name
+}))
 
 const parseStoredUser = (): HeaderUser | null => {
   const rawUser = localStorage.getItem('authUser')
@@ -123,6 +123,29 @@ const parseStoredUser = (): HeaderUser | null => {
   }
 }
 
+const formatNotificationTime = (value?: string) => {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit'
+  }).format(date)
+}
+
+const getNotificationPostPath = (notification: AppNotification) => {
+  const postId = notification.metaData?.postId
+  return typeof postId === 'string' && postId ? `/posts/${postId}` : null
+}
+
 const getInitials = (name?: string, email?: string) => {
   const source = name || email || 'U'
   const parts = source.trim().split(/\s+/).filter(Boolean)
@@ -133,6 +156,24 @@ const getInitials = (name?: string, email?: string) => {
 
   return source.slice(0, 2).toUpperCase()
 }
+
+const HeaderAvatar = ({
+  avatarUrl,
+  initials,
+  className
+}: {
+  avatarUrl?: string | null
+  initials: string
+  className: string
+}) => (
+  <span className={`${className} overflow-hidden rounded-full bg-[#FFC300] text-[#001D3D]`}>
+    {avatarUrl ? (
+      <img src={avatarUrl} alt='Ảnh đại diện' className='h-full w-full object-cover' />
+    ) : (
+      <span>{initials}</span>
+    )}
+  </span>
+)
 
 const FilterSelect = ({ label, options = [{ label: 'Tất cả', value: '' }], value, onChange, disabled }: FilterSelectProps) => {
   const normalizedOptions = options.map((option) =>
@@ -446,13 +487,20 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
   const [user, setUser] = useState<HeaderUser | null>(() => parseStoredUser())
   const [hasToken, setHasToken] = useState(() => Boolean(localStorage.getItem('accessToken')))
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
   const navigate = useNavigate()
 
   const isAuthenticated = hasToken || Boolean(user)
   const isAdmin = Boolean(user?.roles?.includes('ADMIN'))
+  const isStudent = Boolean(user?.roles?.includes('STUDENT'))
   const displayName = user?.fullName || user?.email || 'Tài khoản'
   const primaryRole = user?.roles?.find((role) => role !== 'USER') || user?.roles?.[0] || 'USER'
   const initials = useMemo(() => getInitials(user?.fullName, user?.email), [user?.email, user?.fullName])
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((notification) => !notification.isRead).length,
+    [notifications]
+  )
 
   useEffect(() => {
     const syncAuthState = () => {
@@ -462,12 +510,79 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
 
     window.addEventListener('storage', syncAuthState)
     window.addEventListener('focus', syncAuthState)
+    window.addEventListener('auth-user-updated', syncAuthState)
 
     return () => {
       window.removeEventListener('storage', syncAuthState)
       window.removeEventListener('focus', syncAuthState)
+      window.removeEventListener('auth-user-updated', syncAuthState)
     }
   }, [])
+
+  const loadNotifications = useCallback(async () => {
+    if (!isAuthenticated) {
+      setNotifications([])
+      return
+    }
+
+    setIsLoadingNotifications(true)
+    try {
+      const response = await notificationService.getNotifications({ limit: 10 })
+      setNotifications(response.data)
+    } catch {
+      setNotifications([])
+    } finally {
+      setIsLoadingNotifications(false)
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNotifications([])
+      return undefined
+    }
+
+    void loadNotifications()
+
+    const stream = notificationService.subscribe((notification) => {
+      setNotifications((current) => {
+        const existingIndex = current.findIndex((item) => item.id === notification.id)
+        if (existingIndex >= 0) {
+          const next = [...current]
+          next[existingIndex] = notification
+          return next
+        }
+
+        return [notification, ...current].slice(0, 10)
+      })
+    })
+
+    return () => {
+      stream?.close()
+    }
+  }, [isAuthenticated, loadNotifications])
+
+  const handleNotificationClick = async (notification: AppNotification) => {
+    const postPath = getNotificationPostPath(notification)
+
+    if (!notification.isRead) {
+      setNotifications((current) =>
+        current.map((item) => (item.id === notification.id ? { ...item, isRead: true } : item))
+      )
+      await notificationService.markAsRead(notification.id).catch(() => undefined)
+    }
+
+    setIsNotificationOpen(false)
+
+    if (postPath) {
+      navigate(postPath)
+    }
+  }
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    setNotifications((current) => current.map((notification) => ({ ...notification, isRead: true })))
+    await notificationService.markAllAsRead().catch(() => undefined)
+  }
 
   const closeHeaderMenus = () => {
     setIsAccountOpen(false)
@@ -529,7 +644,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
         </div>
 
         <div className='ml-5 flex items-center gap-4'>
-          {!isAdmin ? (
+          {isStudent ? (
           <div className='relative'>
             <button
               type='button'
@@ -556,11 +671,11 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                 </div>
                 <div className='p-3'>
                   <Link
-                    to={isAuthenticated ? '/posts/search' : '/login'}
+                    to={isAuthenticated ? '/posts/favourites' : '/login'}
                     onClick={() => setIsFavoriteOpen(false)}
                     className='block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
                   >
-                    {isAuthenticated ? 'Xem phòng phù hợp' : 'Đăng nhập để xem'}
+                    {isAuthenticated ? 'Xem danh sách yêu thích' : 'Đăng nhập để xem'}
                   </Link>
                 </div>
               </div>
@@ -575,24 +690,96 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                 setIsNotificationOpen((current) => !current)
                 setIsFavoriteOpen(false)
                 setIsAccountOpen(false)
+                void loadNotifications()
               }}
-              className='grid h-11 w-11 place-items-center rounded-full text-[#FFC300]'
+              className='relative grid h-11 w-11 place-items-center rounded-full text-[#FFC300]'
               aria-label='Mở thông báo'
             >
               <FaBell className='text-3xl' />
+              {unreadNotificationCount > 0 ? (
+                <span className='absolute -right-1 -top-1 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-extrabold leading-none text-white'>
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                </span>
+              ) : null}
             </button>
 
             {isNotificationOpen && (
               <div className='absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
                 <div className='border-b border-gray-100 px-5 py-4'>
-                  <p className='text-sm font-extrabold'>Thông báo</p>
-                  <p className='mt-1 text-xs font-medium text-gray-500'>
-                    {isAuthenticated
-                      ? 'Thông báo từ bài đăng, bình luận và yêu cầu thuê phòng sẽ hiện tại đây.'
-                      : 'Đăng nhập để nhận thông báo theo tài khoản.'}
-                  </p>
+                  <div className='flex items-start justify-between gap-3'>
+                    <span>
+                      <p className='text-sm font-extrabold'>Thông báo</p>
+                      <p className='mt-1 text-xs font-medium text-gray-500'>
+                        {isAuthenticated
+                          ? 'Cập nhật về bài đăng, bình luận và yêu cầu thuê phòng.'
+                          : 'Đăng nhập để nhận thông báo theo tài khoản.'}
+                      </p>
+                    </span>
+                    {unreadNotificationCount > 0 ? (
+                      <button
+                        type='button'
+                        onClick={handleMarkAllNotificationsAsRead}
+                        className='rounded-full bg-[#FFF7D6] px-3 py-1 text-[11px] font-extrabold text-[#7A5A00] hover:bg-[#FFE680]'
+                      >
+                        Đã đọc
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <div className='p-3 text-sm text-gray-500'>Chưa có thông báo mới.</div>
+                <div className='max-h-96 overflow-y-auto p-3'>
+                  {!isAuthenticated ? (
+                    <Link
+                      to='/login'
+                      onClick={() => setIsNotificationOpen(false)}
+                      className='block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    >
+                      Đăng nhập để xem thông báo
+                    </Link>
+                  ) : isLoadingNotifications ? (
+                    <div className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                      Đang tải thông báo...
+                    </div>
+                  ) : notifications.length > 0 ? (
+                    <div className='space-y-2'>
+                      {notifications.map((notification) => {
+                        const hasPostPath = Boolean(getNotificationPostPath(notification))
+
+                        return (
+                          <button
+                            key={notification.id}
+                            type='button'
+                            onClick={() => void handleNotificationClick(notification)}
+                            className={`w-full rounded-xl border px-4 py-3 text-left transition hover:border-[#FFC300] hover:bg-[#FFF7D6] ${
+                              notification.isRead
+                                ? 'border-gray-100 bg-white'
+                                : 'border-[#FFC300]/50 bg-[#FFF7D6]'
+                            }`}
+                          >
+                            <span className='flex items-start justify-between gap-3'>
+                              <span className='text-sm font-extrabold text-[#181A20]'>{notification.title}</span>
+                              {!notification.isRead ? (
+                                <span className='mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFC300]' />
+                              ) : null}
+                            </span>
+                            {notification.content ? (
+                              <span className='mt-1 block line-clamp-2 text-xs font-medium leading-5 text-gray-600'>
+                                {notification.content}
+                              </span>
+                            ) : null}
+                            <span className='mt-2 flex items-center justify-between text-[11px] font-bold text-gray-400'>
+                              <span>{formatNotificationTime(notification.createdAt)}</span>
+                              {hasPostPath ? <span>Xem bài đăng</span> : null}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                      Chưa có thông báo mới.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -609,9 +796,11 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                 className='flex h-12 items-center gap-3 rounded-full border border-white/20 bg-white/5 pl-1.5 pr-4 text-sm font-bold text-white transition hover:bg-white/10'
                 aria-expanded={isAccountOpen}
               >
-                <span className='grid h-9 w-9 place-items-center rounded-full bg-[#FFC300] text-xs font-extrabold text-[#001D3D]'>
-                  {initials}
-                </span>
+                <HeaderAvatar
+                  avatarUrl={user?.avatarUrl}
+                  initials={initials}
+                  className='grid h-9 w-9 place-items-center text-xs font-extrabold'
+                />
                 <span className='max-w-28 truncate'>{displayName}</span>
                 <FaChevronDown className={`text-xs transition ${isAccountOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -625,9 +814,11 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
               <div className='absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
                 <div className='bg-gradient-to-br from-[#001D3D] to-[#003566] px-5 py-5 text-white'>
                   <div className='flex items-center gap-3'>
-                    <span className='grid h-12 w-12 place-items-center rounded-full bg-[#FFC300] text-sm font-extrabold text-[#001D3D]'>
-                      {initials}
-                    </span>
+                    <HeaderAvatar
+                      avatarUrl={user?.avatarUrl}
+                      initials={initials}
+                      className='grid h-12 w-12 place-items-center text-sm font-extrabold'
+                    />
                     <span className='min-w-0'>
                       <span className='block truncate text-sm font-extrabold'>{displayName}</span>
                       <span className='mt-1 block text-xs font-semibold uppercase tracking-wide text-[#FFD60A]'>
@@ -647,6 +838,14 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                     Xem bài đăng
                   </Link>
                   <Link
+                    to='/account/profile'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaUserCircle className='text-[#003566]' />
+                    Thông tin cá nhân
+                  </Link>
+                  <Link
                     to='/posts/create'
                     onClick={() => setIsAccountOpen(false)}
                     className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
@@ -663,9 +862,17 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                     Bài đăng của tôi
                   </Link>
                   <Link
-                    to='/demands'
+                    to='/contacts'
                     onClick={() => setIsAccountOpen(false)}
                     className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
+                  >
+                    <FaUsers className='text-[#003566]' />
+                    Danh sách đã liên hệ
+                  </Link>
+                  <Link
+                    to='/demands'
+                    onClick={() => setIsAccountOpen(false)}
+                    className={`${isStudent ? 'flex' : 'hidden'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaSlidersH className='text-[#003566]' />
                     Nhu cầu và gợi ý
@@ -681,9 +888,9 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                     </Link>
                   ) : null}
                   <Link
-                    to='/posts/search'
+                    to='/posts/favourites'
                     onClick={() => setIsAccountOpen(false)}
-                    className={`${isAdmin ? 'hidden' : 'flex'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
+                    className={`${isStudent ? 'flex' : 'hidden'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaHeart className='text-[#FFC300]' />
                     Yêu thích

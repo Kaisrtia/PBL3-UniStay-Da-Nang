@@ -1,6 +1,7 @@
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 const CLOUDINARY_UPLOAD_FOLDER = import.meta.env.VITE_CLOUDINARY_UPLOAD_FOLDER || 'unistay/posts'
+const CLOUDINARY_AVATAR_FOLDER = import.meta.env.VITE_CLOUDINARY_AVATAR_FOLDER || 'unistay/avatars'
 
 type CloudinaryUploadResponse = {
   secure_url?: string
@@ -17,15 +18,15 @@ const getUploadEndpoint = () => {
   return `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
 }
 
-export const uploadPostImage = async (file: File) => {
+const uploadImageToCloudinary = async (file: File, folder: string, fileTypeError: string) => {
   if (!file.type.startsWith('image/')) {
-    throw new Error('Hiện tại hệ thống chỉ hỗ trợ upload ảnh cho bài đăng.')
+    throw new Error(fileTypeError)
   }
 
   const formData = new FormData()
   formData.append('file', file)
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
-  formData.append('folder', CLOUDINARY_UPLOAD_FOLDER)
+  formData.append('folder', folder)
 
   const response = await fetch(getUploadEndpoint(), {
     method: 'POST',
@@ -40,9 +41,16 @@ export const uploadPostImage = async (file: File) => {
   return data.secure_url
 }
 
+export const uploadPostImage = async (file: File) =>
+  uploadImageToCloudinary(file, CLOUDINARY_UPLOAD_FOLDER, 'Hiện tại hệ thống chỉ hỗ trợ upload ảnh cho bài đăng.')
+
 export const uploadPostImages = async (files: File[]) => Promise.all(files.map((file) => uploadPostImage(file)))
 
+export const uploadAvatarImage = async (file: File) =>
+  uploadImageToCloudinary(file, CLOUDINARY_AVATAR_FOLDER, 'Vui lòng chọn đúng định dạng ảnh đại diện.')
+
 export default {
+  uploadAvatarImage,
   uploadPostImage,
   uploadPostImages
 }

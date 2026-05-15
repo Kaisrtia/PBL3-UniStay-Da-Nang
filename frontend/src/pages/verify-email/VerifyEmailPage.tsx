@@ -38,7 +38,10 @@ const VerifyEmailPage = () => {
     <div className='min-h-screen flex items-center justify-center p-4'>
       <div className='text-center'>
         <h1 className='text-2xl font-bold text-[#0a183d]'>{status}</h1>
-        <Link to='/login' className='mt-4 inline-block text-orange-500 hover:underline font-bold'>
+        <Link
+          to='/login'
+          className='mt-5 inline-flex rounded-full bg-[#FFC300] px-6 py-3 text-sm font-extrabold text-[#001D3D] shadow-md transition hover:bg-[#FFD60A]'
+        >
           Quay lại đăng nhập
         </Link>
       </div>

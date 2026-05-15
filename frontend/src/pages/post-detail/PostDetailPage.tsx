@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
@@ -46,6 +46,12 @@ const areaFormatter = new Intl.NumberFormat('vi-VN', {
   maximumFractionDigits: 1
 })
 
+const roomTypeLabel: Record<string, string> = {
+  ROOM: 'Phòng trọ',
+  APARTMENT: 'Căn hộ',
+  HOUSE: 'Nhà nguyên căn'
+}
+
 const getAccessToken = () => {
   return localStorage.getItem('accessToken') ?? localStorage.getItem('token') ?? ''
 }
@@ -68,6 +74,7 @@ const toNumber = (value: string | number) => Number(value)
 
 const PostDetailPage = () => {
   const { postId } = useParams<{ postId: string }>()
+  const location = useLocation()
   const [post, setPost] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -76,14 +83,20 @@ const PostDetailPage = () => {
   const [actionError, setActionError] = useState('')
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [isAdmin] = useState(() => Boolean(getStoredUser()?.roles?.includes('ADMIN')))
+  const [storedUser] = useState(() => getStoredUser())
+  const [isFavourite, setIsFavourite] = useState(false)
+  const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
+  const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
+  const routeState = location.state as { returnTo?: string; returnLabel?: string } | null
+  const backTo = routeState?.returnTo || '/home'
+  const backLabel = routeState?.returnLabel || 'Quay lại trang chủ'
 
   useEffect(() => {
     const abortController = new AbortController()
 
     const loadPostDetail = async () => {
       if (!postId) {
-        setErrorMessage('Khong tim thay ma bai dang tren URL.')
+        setErrorMessage('Không tìm thấy mã bài đăng trên đường dẫn.')
         setIsLoading(false)
         return
       }
@@ -100,16 +113,25 @@ const PostDetailPage = () => {
         const payload = (await response.json()) as ApiResponse<PostDetail>
 
         if (!response.ok || !payload.success || !payload.data) {
-          throw new Error(payload.message ?? 'Khong the tai chi tiet bai dang.')
+          throw new Error(payload.message ?? 'Không thể tải chi tiết bài đăng.')
         }
 
         setPost(payload.data)
+
+        if (isStudent) {
+          try {
+            const favourites = await engagementService.getFavouritePosts({ limit: 200 })
+            setIsFavourite(favourites.data.some((item) => item.id === payload.data?.id))
+          } catch {
+            setIsFavourite(false)
+          }
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Khong the tai chi tiet bai dang.')
+        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải chi tiết bài đăng.')
       } finally {
         setIsLoading(false)
       }
@@ -118,7 +140,7 @@ const PostDetailPage = () => {
     void loadPostDetail()
 
     return () => abortController.abort()
-  }, [postId])
+  }, [isStudent, postId])
 
   const postImages = useMemo(() => post?.postImages?.filter((image) => Boolean(image.imageUrl)) ?? [], [post])
   const heroImage = postImages[selectedImageIndex]?.imageUrl
@@ -140,7 +162,7 @@ const PostDetailPage = () => {
       const response = await action()
       setActionMessage(response.message || fallbackMessage)
     } catch {
-      setActionError('Thao tac that bai. Hay dang nhap dung vai tro va thu lai.')
+      setActionError('Thao tác thất bại. Vui lòng đăng nhập đúng vai trò và thử lại.')
     } finally {
       setIsSubmittingAction(false)
     }
@@ -148,20 +170,26 @@ const PostDetailPage = () => {
 
   const handleAddFavourite = () => {
     if (!post) return
-    void runPostAction(() => engagementService.addFavouritePost(post.id), 'Da them vao danh sach yeu thich.')
+    if (isFavourite) return
+
+    void runPostAction(async () => {
+      const response = await engagementService.addFavouritePost(post.id)
+      setIsFavourite(true)
+      return response
+    }, 'Đã thêm vào danh sách yêu thích.')
   }
 
   const handleAccommodationRequest = () => {
     if (!post) return
-    void runPostAction(() => engagementService.createAccommodationRequest(post.id), 'Da gui yeu cau o ghep/thue phong.')
+    void runPostAction(() => engagementService.createAccommodationRequest(post.id), 'Đã gửi yêu cầu thuê/ở ghép.')
   }
 
   const handleReport = () => {
     if (!post) return
-    const reason = window.prompt('Nhap ly do bao cao bai dang:')
+    const reason = window.prompt('Nhập lý do báo cáo bài đăng:')
     if (!reason?.trim()) return
 
-    void runPostAction(() => engagementService.createReport(post.id, reason.trim()), 'Da gui bao cao bai dang.')
+    void runPostAction(() => engagementService.createReport(post.id, reason.trim()), 'Đã gửi báo cáo bài đăng.')
   }
 
   const handleBanPostOwner = () => {
@@ -227,7 +255,7 @@ const PostDetailPage = () => {
       const response = await engagementService.createComment(post.id, comment.trim())
       setComment('')
       return response
-    }, 'Da gui binh luan.')
+    }, 'Đã gửi bình luận.')
   }
 
   if (isLoading) {
@@ -236,7 +264,7 @@ const PostDetailPage = () => {
         <SiteHeader />
         <main className='px-4 py-10'>
           <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
-            <p className='text-sm text-gray-500'>Dang tai chi tiet bai dang...</p>
+            <p className='text-sm text-gray-500'>Đang tải chi tiết bài đăng...</p>
           </div>
         </main>
         <SiteFooter />
@@ -250,13 +278,16 @@ const PostDetailPage = () => {
         <SiteHeader />
         <main className='px-4 py-10'>
           <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
-            <Link to='/home' className='text-sm font-semibold text-blue-600 hover:underline'>
-              Quay lai trang chu
+            <Link
+              to={backTo}
+              className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+            >
+              {backLabel}
             </Link>
-            <h1 className='mt-4 text-2xl font-bold text-gray-900'>Khong the hien thi bai dang</h1>
-            <p className='mt-2 text-gray-600'>{errorMessage || 'Bai dang khong ton tai.'}</p>
+            <h1 className='mt-4 text-2xl font-bold text-gray-900'>Không thể hiển thị bài đăng</h1>
+            <p className='mt-2 text-gray-600'>{errorMessage || 'Bài đăng không tồn tại.'}</p>
             <p className='mt-4 text-sm text-gray-500'>
-              Neu API yeu cau dang nhap, hay luu access token vao localStorage voi key accessToken roi tai lai trang.
+              Vui lòng đăng nhập lại hoặc chọn một bài đăng khác trong danh sách.
             </p>
           </div>
         </main>
@@ -271,8 +302,11 @@ const PostDetailPage = () => {
       <main className='px-4 py-10'>
         <article className='mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_420px]'>
           <section className='rounded-lg bg-white p-6 shadow-sm'>
-          <Link to='/home' className='text-sm font-semibold text-blue-600 hover:underline'>
-            Quay lai trang chu
+          <Link
+            to={backTo}
+            className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+          >
+            {backLabel}
           </Link>
 
           {heroImage ? (
@@ -307,40 +341,42 @@ const PostDetailPage = () => {
             </div>
           ) : (
             <div className='mt-5 flex h-80 w-full items-center justify-center rounded-lg bg-gray-100 text-gray-500'>
-              Chua co hinh anh
+              Chưa có hình ảnh
             </div>
           )}
 
           <div className='mt-6'>
-            <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>{post.roomType}</p>
+            <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>
+              {roomTypeLabel[String(post.roomType)] || post.roomType}
+            </p>
             <h1 className='mt-2 text-3xl font-bold text-gray-950'>{post.title}</h1>
             <p className='mt-3 text-gray-600'>{post.detailAddress}</p>
           </div>
 
           <div className='mt-6 grid gap-3 sm:grid-cols-3'>
             <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Gia thue</p>
+              <p className='text-sm text-gray-500'>Giá thuê</p>
               <p className='mt-1 font-bold text-gray-950'>{currencyFormatter.format(toNumber(post.price))}</p>
             </div>
             <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Dien tich</p>
-              <p className='mt-1 font-bold text-gray-950'>{areaFormatter.format(toNumber(post.area))} m2</p>
+              <p className='text-sm text-gray-500'>Diện tích</p>
+              <p className='mt-1 font-bold text-gray-950'>{areaFormatter.format(toNumber(post.area))} m²</p>
             </div>
             <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Tien coc</p>
+              <p className='text-sm text-gray-500'>Tiền cọc</p>
               <p className='mt-1 font-bold text-gray-950'>{currencyFormatter.format(toNumber(post.deposit))}</p>
             </div>
           </div>
 
           <section className='mt-8'>
-            <h2 className='text-xl font-bold text-gray-950'>Mo ta</h2>
+            <h2 className='text-xl font-bold text-gray-950'>Mô tả</h2>
             <p className='mt-3 whitespace-pre-line leading-7 text-gray-700'>{post.description}</p>
           </section>
           </section>
 
           <aside className='space-y-4'>
           <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Thao tac</h2>
+            <h2 className='text-lg font-bold text-gray-950'>Thao tác</h2>
             <div className='mt-4 grid gap-3'>
               {isAdmin ? (
                 <>
@@ -373,11 +409,11 @@ const PostDetailPage = () => {
                 <>
                   <button
                     type='button'
-                    disabled={isSubmittingAction}
+                    disabled={isSubmittingAction || isFavourite}
                     onClick={handleAddFavourite}
                     className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
                   >
-                    Luu bai dang
+                    {isFavourite ? 'Đã lưu bài đăng' : 'Lưu bài đăng'}
                   </button>
                   <button
                     type='button'
@@ -385,7 +421,7 @@ const PostDetailPage = () => {
                     onClick={handleAccommodationRequest}
                     className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
                   >
-                    Gui yeu cau thue/o ghep
+                    Gửi yêu cầu thuê/ở ghép
                   </button>
                   <button
                     type='button'
@@ -393,7 +429,7 @@ const PostDetailPage = () => {
                     onClick={handleReport}
                     className='rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
                   >
-                    Bao cao bai dang
+                    Báo cáo bài đăng
                   </button>
                 </>
               )}
@@ -403,8 +439,8 @@ const PostDetailPage = () => {
           </section>
 
           <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Vi tri bai dang</h2>
-            <p className='mt-1 text-sm text-gray-500'>Ban do lay toa do latitude/longitude da luu trong bai dang.</p>
+            <h2 className='text-lg font-bold text-gray-950'>Vị trí bài đăng</h2>
+            <p className='mt-1 text-sm text-gray-500'>Bản đồ hiển thị đúng tọa độ chủ bài đăng đã cung cấp.</p>
             <PostLocationMap
               latitude={post.latitude}
               longitude={post.longitude}
@@ -417,12 +453,12 @@ const PostDetailPage = () => {
 
           {!isAdmin ? (
           <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Binh luan</h2>
+            <h2 className='text-lg font-bold text-gray-950'>Bình luận</h2>
             <form onSubmit={handleCreateComment} className='mt-4 grid gap-3'>
               <textarea
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
-                placeholder='Nhap binh luan cua ban'
+                placeholder='Nhập bình luận của bạn'
                 className='min-h-28 resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200'
               />
               <button
@@ -430,7 +466,7 @@ const PostDetailPage = () => {
                 disabled={isSubmittingAction || !comment.trim()}
                 className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
               >
-                Gui binh luan
+                Gửi bình luận
               </button>
             </form>
           </section>

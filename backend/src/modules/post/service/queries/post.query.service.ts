@@ -145,7 +145,18 @@ export const getRecommendedPosts = async (
   limit: number = 10
 ) => {
   const demand = await prismaClient.student_demand.findUnique({
-    where: { studentId: currentUser.id }
+    where: { studentId: currentUser.id },
+    include: {
+      student: {
+        include: {
+          demandAmenities: {
+            include: {
+              amenity: true
+            }
+          }
+        }
+      }
+    }
   });
   if (!demand) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Student demand not found');

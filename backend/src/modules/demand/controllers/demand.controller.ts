@@ -15,7 +15,9 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
     roomType,
     isLookingForRoommate,
     roommateGender,
-    rommateCriteria
+    rommateCriteria,
+    amenityIds,
+    demandAmenities
   } = req.body;
 
   if (wardId === undefined || minPrice === undefined || maxPrice === undefined || !roomType) {
@@ -33,8 +35,25 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
     roomType,
     isLookingForRoommate: isLookingForRoommate === true || isLookingForRoommate === 'true',
     roommateGender,
-    rommateCriteria
+    rommateCriteria,
+    amenityIds: normalizeAmenityIds(amenityIds ?? demandAmenities)
   });
 
   sendSuccess(res, HttpStatus.CREATED, demand, 'Student demand submitted successfully');
+};
+
+const normalizeAmenityIds = (value: unknown): number[] => {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  const rawValues = Array.isArray(value) ? value : String(value).split(',');
+
+  return Array.from(
+    new Set(
+      rawValues
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    )
+  );
 };

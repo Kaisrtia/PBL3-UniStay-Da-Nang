@@ -9,10 +9,10 @@ import postService, { type Post, type PostFilters, type PostPurpose, type RoomTy
 type ResultTab = 'all' | PostPurpose | 'recommended'
 
 const tabs: { label: string; value: ResultTab }[] = [
-  { label: 'Tat ca', value: 'all' },
-  { label: 'Cho thue', value: 'RENT' },
-  { label: 'O ghep', value: 'FIND_ROOMMATE' },
-  { label: 'Goi y cho toi', value: 'recommended' }
+  { label: 'Tất cả', value: 'all' },
+  { label: 'Cho thuê', value: 'RENT' },
+  { label: 'Ở ghép', value: 'FIND_ROOMMATE' },
+  { label: 'Gợi ý cho tôi', value: 'recommended' }
 ]
 
 const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=640&q=80'
@@ -24,9 +24,9 @@ const currencyFormatter = new Intl.NumberFormat('vi-VN', {
 })
 
 const roomTypeLabel: Record<string, string> = {
-  ROOM: 'Phong tro',
-  APARTMENT: 'Can ho',
-  HOUSE: 'Nha nguyen can'
+  ROOM: 'Phòng trọ',
+  APARTMENT: 'Căn hộ',
+  HOUSE: 'Nhà nguyên căn'
 }
 
 const formatCurrency = (value: string | number) => {
@@ -78,7 +78,7 @@ const SearchResultCard = ({ post }: { post: Post }) => (
         {post.user?.hosts?.some((host) => host.isVerified) && (
           <span className='absolute left-4 top-4 flex items-center gap-1 rounded bg-[#F2765B] px-3 py-1.5 text-xs font-extrabold text-white'>
             <FaBolt className='text-[10px]' />
-            VERIFIED
+            Đã xác thực
           </span>
         )}
       </div>
@@ -93,15 +93,15 @@ const SearchResultCard = ({ post }: { post: Post }) => (
         <div className='mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-gray-600'>
           <span className='flex items-center gap-1'>
             <FaBed />
-            {roomTypeLabel[String(post.roomType)] || post.roomType || 'Phong'}
+            {roomTypeLabel[String(post.roomType)] || post.roomType || 'Phòng'}
           </span>
           <span className='flex items-center gap-1'>
             <FaBath />
-            {post._count?.comments ?? 0} binh luan
+            {post._count?.comments ?? 0} bình luận
           </span>
           <span className='flex items-center gap-1'>
             <FaRulerCombined />
-            {post.area}m2
+            {post.area}m²
           </span>
         </div>
       </div>
@@ -180,8 +180,8 @@ const SearchResultsPage = () => {
       } catch {
         setErrorMessage(
           activeTab === 'recommended'
-            ? 'Khong tai duoc goi y. Hay dang nhap bang tai khoan sinh vien va tao nhu cau thue phong.'
-            : 'Khong tai duoc danh sach bai dang.'
+            ? 'Không tải được gợi ý. Hãy đăng nhập bằng tài khoản sinh viên và tạo nhu cầu thuê phòng.'
+            : 'Không tải được danh sách bài đăng.'
         )
       } finally {
         setLoading(false)
@@ -193,7 +193,7 @@ const SearchResultsPage = () => {
 
   const content = useMemo(() => {
     if (loading) {
-      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Dang tai danh sach bai dang...</p>
+      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Đang tải danh sách bài đăng...</p>
     }
 
     if (errorMessage) {
@@ -201,7 +201,7 @@ const SearchResultsPage = () => {
     }
 
     if (posts.length === 0) {
-      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Chua co bai dang phu hop.</p>
+      return <p className='py-12 text-center text-sm font-semibold text-gray-500'>Chưa có bài đăng phù hợp.</p>
     }
 
     return (
@@ -218,6 +218,14 @@ const SearchResultsPage = () => {
       <SiteHeader />
 
       <main className='px-8 py-10'>
+        <div className='mx-auto mb-6 max-w-7xl'>
+          <Link
+            to='/home'
+            className='inline-flex rounded-full border border-[#003566] bg-white px-5 py-2 text-sm font-extrabold text-[#003566] shadow-sm transition hover:bg-[#003566] hover:text-white'
+          >
+            Quay lại trang chủ
+          </Link>
+        </div>
         <section className='mx-auto max-w-7xl overflow-hidden rounded-2xl bg-white shadow-sm'>
           <div className='flex items-center gap-9 border-b border-gray-200 px-12 pt-8'>
             {tabs.map((tab) => (

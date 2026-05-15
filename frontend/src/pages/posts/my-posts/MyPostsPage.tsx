@@ -21,6 +21,12 @@ const statusClass = (status?: string) => {
   return 'bg-gray-100 text-gray-600'
 }
 
+const roomTypeLabels: Record<string, string> = {
+  ROOM: 'Phòng trọ',
+  APARTMENT: 'Căn hộ',
+  HOUSE: 'Nhà nguyên căn'
+}
+
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
   currency: 'VND',
@@ -77,7 +83,7 @@ const MyPostsPage = () => {
                   <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusClass(post.status)}`}>
                     {statusLabels[String(post.status)] || post.status}
                   </span>
-                  <span className='text-sm font-bold text-gray-500'>{post.roomType}</span>
+                  <span className='text-sm font-bold text-gray-500'>{roomTypeLabels[String(post.roomType)] || post.roomType}</span>
                 </div>
                 <h2 className='mt-3 truncate text-2xl font-extrabold'>{post.title}</h2>
                 <p className='mt-2 flex items-center gap-2 text-sm text-gray-500'>
@@ -89,13 +95,13 @@ const MyPostsPage = () => {
               <div className='flex items-center gap-3 md:flex-col md:items-end md:justify-center'>
                 <Link
                   to={`/posts/${post.id}`}
-                  className='rounded-full bg-[#001D3D] px-5 py-2 text-sm font-extrabold text-white'
+                  className='rounded-full bg-[#001D3D] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#003566]'
                 >
-                  Xem
+                  Xem chi tiết
                 </Link>
                 <Link
                   to={`/posts/create?edit=${post.id}`}
-                  className='inline-flex items-center gap-2 rounded-full bg-[#FFF1B8] px-5 py-2 text-sm font-extrabold text-[#6F5616]'
+                  className='inline-flex items-center gap-2 rounded-full bg-[#FFF1B8] px-5 py-2 text-sm font-extrabold text-[#6F5616] transition hover:bg-[#FFE28A]'
                 >
                   <FaEdit />
                   Sửa

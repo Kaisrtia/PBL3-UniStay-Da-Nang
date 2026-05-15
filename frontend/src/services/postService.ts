@@ -43,6 +43,8 @@ export type Post = {
   latitude?: string | number
   longitude?: string | number
   status?: PostStatus | string
+  createdAt?: string
+  updatedAt?: string | null
   postImages?: PostImage[]
   ward?: Ward
   user?: PostOwner

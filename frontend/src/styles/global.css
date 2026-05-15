@@ -6,6 +6,10 @@ html {
   scroll-behavior: smooth;
 }
 
+.post-location-map .leaflet-container {
+  z-index: 0;
+}
+
 .post-location-marker {
   background: transparent;
   border: 0;
