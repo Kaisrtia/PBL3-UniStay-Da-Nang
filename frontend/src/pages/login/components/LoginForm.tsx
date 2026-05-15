@@ -1,13 +1,19 @@
 import { type FormEvent } from 'react'
 
-import { FaGoogle } from 'react-icons/fa'
 import { Link, useNavigate } from 'react-router-dom'
 
-import useAuth from '@/hooks/useAuth'
+import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton'
+import useAuth, { getUserFromAuthResponse } from '@/hooks/useAuth'
+
+const shouldCompleteProfile = (response: unknown) => {
+  const user = getUserFromAuthResponse(response as Parameters<typeof getUserFromAuthResponse>[0])
+  const roles = user?.roles || []
+  return user?.status === 'SET_UP' || (!roles.includes('STUDENT') && !roles.includes('HOST') && !roles.includes('ADMIN'))
+}
 
 const LoginForm = () => {
   const navigate = useNavigate()
-  const { loading, login } = useAuth()
+  const { loading, login, loginWithGoogle } = useAuth()
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -23,11 +29,26 @@ const LoginForm = () => {
     })
 
     if (response) {
-      navigate('/home')
+      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
       return
     }
 
     alert('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
+  }
+
+  const handleGoogleCredential = async (idToken: string) => {
+    if (loading) {
+      return
+    }
+
+    const response = await loginWithGoogle({ idToken })
+
+    if (response) {
+      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
+      return
+    }
+
+    alert('Đăng nhập Google thất bại. Vui lòng thử lại.')
   }
 
   return (
@@ -66,12 +87,12 @@ const LoginForm = () => {
       >
         {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
       </button>
-      <button
-        type='button'
-        className='flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5 font-semibold transition hover:bg-gray-50'
-      >
-        <FaGoogle className='text-red-500' /> Đăng nhập với Google
-      </button>
+      <GoogleCredentialButton
+        disabled={loading}
+        text='signin_with'
+        onCredential={(idToken) => void handleGoogleCredential(idToken)}
+        onError={(message) => alert(message)}
+      />
       <div className='mt-4 text-center text-xs text-gray-500'>
         Chưa có tài khoản?{' '}
         <Link to='/register' className='font-bold text-orange-500 hover:underline'>

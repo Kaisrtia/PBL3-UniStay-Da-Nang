@@ -1,25 +1,32 @@
 import { type FormEvent } from 'react'
 
-import { FaGoogle } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
-import useAuth from '@/hooks/useAuth'
+import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton'
+import useAuth, { getUserFromAuthResponse } from '@/hooks/useAuth'
 import authService from '@/services/authService'
 
-export const RegisterForm = () => {
-  const { loading, register } = useAuth()
+const shouldCompleteProfile = (response: unknown) => {
+  const user = getUserFromAuthResponse(response as Parameters<typeof getUserFromAuthResponse>[0])
+  const roles = user?.roles || []
+  return user?.status === 'SET_UP' || (!roles.includes('STUDENT') && !roles.includes('HOST') && !roles.includes('ADMIN'))
+}
 
-  // Logic xử lý khi nhấn Đăng ký
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+export const RegisterForm = () => {
+  const navigate = useNavigate()
+  const { loading, register, loginWithGoogle } = useAuth()
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
 
     if (loading) {
       return
     }
 
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(event.currentTarget)
     const password = String(formData.get('password') || '')
     const confirmPassword = String(formData.get('confirmPassword') || '')
+    const email = String(formData.get('email') || '')
 
     if (password !== confirmPassword) {
       alert('Mật khẩu xác nhận không khớp.')
@@ -28,97 +35,104 @@ export const RegisterForm = () => {
 
     const response = await register({
       fullName: String(formData.get('fullName') || ''),
-      email: String(formData.get('email') || ''),
+      email,
       password
     })
 
     if (response) {
       const message = response.message || 'Đăng ký thành công.'
-      const shouldVerifyEmail = message.toLowerCase().includes('verify your email')
 
       try {
-        await authService.sendEmailVerification({
-          email: String(formData.get('email') || '')
-        })
+        await authService.sendEmailVerification({ email })
       } catch {
         alert('Đăng ký thành công nhưng chưa gửi được email xác thực. Vui lòng thử gửi lại mã xác thực sau.')
         return
       }
 
-      alert(shouldVerifyEmail ? `${message}\nVui lòng kiểm tra email để xác thực tài khoản.` : message)
+      alert(`${message}\nVui lòng kiểm tra email để xác thực tài khoản.`)
+      navigate('/login')
       return
     }
 
     alert('Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.')
   }
 
+  const handleGoogleCredential = async (idToken: string) => {
+    if (loading) {
+      return
+    }
+
+    const response = await loginWithGoogle({ idToken })
+
+    if (response) {
+      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
+      return
+    }
+
+    alert('Đăng ký bằng Google thất bại. Vui lòng thử lại.')
+  }
+
   return (
-    <form onSubmit={handleSubmit} className='flex flex-col gap-2 w-full'> 
-      {/* 1. Họ và tên */}
+    <form onSubmit={handleSubmit} className='flex w-full flex-col gap-2'>
       <div>
-        <label className='block text-xs font-semibold mb-1 text-gray-700'>Họ và tên</label>
+        <label className='mb-1 block text-xs font-semibold text-gray-700'>Họ và tên</label>
         <input
           name='fullName'
           type='text'
           placeholder='Nhập họ và tên của bạn'
-          className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
 
-      {/* 2. Email */}
       <div>
-        <label className='block text-xs font-semibold mb-1 text-gray-700'>Email</label>
+        <label className='mb-1 block text-xs font-semibold text-gray-700'>Email</label>
         <input
           name='email'
           type='email'
           placeholder='Nhập địa chỉ email'
-          className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
 
-      {/* 3. Mật khẩu */}
       <div>
-        <label className='block text-xs font-semibold mb-1 text-gray-700'>Mật khẩu</label>
+        <label className='mb-1 block text-xs font-semibold text-gray-700'>Mật khẩu</label>
         <input
           name='password'
           type='password'
           placeholder='********'
-          className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
 
-      {/* 4. Xác nhận mật khẩu */}
       <div>
-        <label className='block text-xs font-semibold mb-1 text-gray-700'>Xác nhận mật khẩu</label>
+        <label className='mb-1 block text-xs font-semibold text-gray-700'>Xác nhận mật khẩu</label>
         <input
           name='confirmPassword'
           type='password'
           placeholder='********'
-          className='w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400 transition'
+          className='w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
 
-      {/* Nút Đăng ký */}
       <button
         type='submit'
-        className='bg-yellow-400 text-white font-bold rounded-lg px-3 py-2 mt-2 hover:bg-yellow-500 transition shadow-md text-sm'
+        disabled={loading}
+        className='mt-2 rounded-lg bg-yellow-400 px-3 py-2 text-sm font-bold text-white shadow-md transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
       >
-        Đăng ký
+        {loading ? 'Đang đăng ký...' : 'Đăng ký'}
       </button>
 
-      {/* Nút Google */}
-      <button
-        type='button'
-        className='flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-3 py-2 font-semibold hover:bg-gray-50 transition text-sm'
-      >
-        <FaGoogle className='text-red-500' /> Đăng ký với Google
-      </button>
+      <GoogleCredentialButton
+        disabled={loading}
+        text='signup_with'
+        onCredential={(idToken) => void handleGoogleCredential(idToken)}
+        onError={(message) => alert(message)}
+      />
 
-      {/* Link về Đăng nhập */}
-      <div className='text-[11px] text-center mt-2 text-gray-500'>
+      <div className='mt-2 text-center text-[11px] text-gray-500'>
         Đã có tài khoản?{' '}
-        <Link to='/login' className='text-orange-500 hover:underline font-bold'>
-          Đăng nhập ngay!
+        <Link to='/login' className='font-bold text-orange-500 hover:underline'>
+          Đăng nhập ngay
         </Link>
       </div>
     </form>

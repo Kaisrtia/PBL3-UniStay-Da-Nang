@@ -6,6 +6,7 @@ import {
   FaChevronDown,
   FaHeart,
   FaHome,
+  FaKey,
   FaListAlt,
   FaPlusCircle,
   FaSearch,
@@ -844,6 +845,14 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   >
                     <FaUserCircle className='text-[#003566]' />
                     Thông tin cá nhân
+                  </Link>
+                  <Link
+                    to='/account/password'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaKey className='text-[#003566]' />
+                    Đổi mật khẩu
                   </Link>
                   <Link
                     to='/posts/create'

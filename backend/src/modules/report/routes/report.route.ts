@@ -7,6 +7,14 @@ import { account_role } from '@prisma/client';
 
 const reportRouter = Router();
 
+// Admin list reports
+reportRouter.get(
+  '/',
+  verifyToken,
+  authorize([account_role.ADMIN]),
+  asyncHandler(reportController.handleGetReports)
+);
+
 // Admin tackle report
 reportRouter.patch(
   '/:id/tackle',

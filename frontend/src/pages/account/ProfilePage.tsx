@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 
-import { FaCheckCircle, FaEdit, FaEnvelope, FaIdCard, FaPhoneAlt, FaSave, FaUniversity, FaUser } from 'react-icons/fa'
+import {
+  FaCheckCircle,
+  FaEdit,
+  FaEnvelope,
+  FaHome,
+  FaIdCard,
+  FaPhoneAlt,
+  FaSave,
+  FaUniversity,
+  FaUser,
+  FaUserGraduate
+} from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -16,6 +27,8 @@ type ProfileFormState = {
   avatarUrl: string
   universityId: string
 }
+
+type SetupRole = '' | 'STUDENT' | 'HOST'
 
 const emptyForm: ProfileFormState = {
   fullName: '',
@@ -51,6 +64,7 @@ const ProfilePage = () => {
   const [form, setForm] = useState<ProfileFormState>(emptyForm)
   const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([])
   const [isEditing, setIsEditing] = useState(false)
+  const [setupRole, setSetupRole] = useState<SetupRole>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -59,6 +73,10 @@ const ProfilePage = () => {
 
   const isStudent = Boolean(profile?.roles?.includes('STUDENT'))
   const isHost = Boolean(profile?.roles?.includes('HOST'))
+  const needsProfileSetup = Boolean(
+    profile && (profile.status === 'SET_UP' || (!isStudent && !isHost && !profile.roles?.includes('ADMIN')))
+  )
+  const isStudentForm = isStudent || setupRole === 'STUDENT'
   const hostInfo = profile?.hosts?.[0]
 
   const roleText = useMemo(
@@ -80,6 +98,15 @@ const ProfilePage = () => {
 
         if (currentProfile) {
           setProfile(currentProfile)
+          const existingRole = currentProfile.roles?.includes('STUDENT')
+            ? 'STUDENT'
+            : currentProfile.roles?.includes('HOST')
+              ? 'HOST'
+              : ''
+          setSetupRole(existingRole)
+          if (currentProfile.status === 'SET_UP' || (!existingRole && !currentProfile.roles?.includes('ADMIN'))) {
+            setIsEditing(true)
+          }
           setForm({
             fullName: currentProfile.fullName || '',
             phone: currentProfile.phone || '',
@@ -108,14 +135,32 @@ const ProfilePage = () => {
     setMessage('')
 
     try {
-      await userService.updateProfile({
-        fullName: form.fullName.trim(),
-        phone: form.phone.trim(),
-        dob: form.dob,
-        gender: form.gender,
-        avatarUrl: form.avatarUrl.trim(),
-        universityId: isStudent ? form.universityId : undefined
-      })
+      if (needsProfileSetup) {
+        if (!setupRole) {
+          setError('Vui lòng chọn vai trò Sinh viên hoặc Chủ trọ để hoàn tất hồ sơ.')
+          setSaving(false)
+          return
+        }
+
+        await userService.setupProfile({
+          role: setupRole,
+          fullName: form.fullName.trim(),
+          phone: form.phone.trim(),
+          dob: form.dob,
+          gender: form.gender,
+          avatarUrl: form.avatarUrl.trim(),
+          universityId: setupRole === 'STUDENT' ? form.universityId : undefined
+        })
+      } else {
+        await userService.updateProfile({
+          fullName: form.fullName.trim(),
+          phone: form.phone.trim(),
+          dob: form.dob,
+          gender: form.gender,
+          avatarUrl: form.avatarUrl.trim(),
+          universityId: isStudent ? form.universityId : undefined
+        })
+      }
 
       const refreshedProfile = await userService.getMyProfile()
       if (refreshedProfile) {
@@ -135,7 +180,7 @@ const ProfilePage = () => {
       }
 
       setIsEditing(false)
-      setMessage('Đã cập nhật thông tin cá nhân.')
+      setMessage(needsProfileSetup ? 'Đã hoàn tất hồ sơ. Bạn có thể sử dụng các chức năng theo vai trò đã chọn.' : 'Đã cập nhật thông tin cá nhân.')
     } catch {
       setError('Không thể cập nhật thông tin. Vui lòng kiểm tra lại các trường đã nhập.')
     } finally {
@@ -187,9 +232,48 @@ const ProfilePage = () => {
             className='inline-flex items-center gap-3 rounded-full bg-[#FFC300] px-6 py-3 text-sm font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20 transition hover:bg-[#FFD60A]'
           >
             <FaEdit />
-            {isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}
+            {needsProfileSetup ? 'Hoàn tất hồ sơ' : isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}
           </button>
         </div>
+
+        {needsProfileSetup ? (
+          <section className='mt-6 rounded-2xl border border-[#FFC300]/60 bg-[#FFF7D6] px-6 py-5 shadow-sm'>
+            <div className='flex flex-wrap items-start justify-between gap-4'>
+              <div>
+                <h2 className='text-xl font-black text-[#001D3D]'>Hoàn tất hồ sơ Google</h2>
+                <p className='mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#6F5616]'>
+                  Tài khoản Google mới cần chọn vai trò để hệ thống cấp quyền sử dụng các chức năng như lưu bài, gửi yêu cầu thuê hoặc đăng tin.
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-3'>
+                <button
+                  type='button'
+                  onClick={() => setSetupRole('STUDENT')}
+                  className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-extrabold transition ${
+                    setupRole === 'STUDENT'
+                      ? 'bg-[#001D3D] text-white'
+                      : 'bg-white text-[#001D3D] hover:bg-[#001D3D] hover:text-white'
+                  }`}
+                >
+                  <FaUserGraduate />
+                  Sinh viên
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setSetupRole('HOST')}
+                  className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-extrabold transition ${
+                    setupRole === 'HOST'
+                      ? 'bg-[#001D3D] text-white'
+                      : 'bg-white text-[#001D3D] hover:bg-[#001D3D] hover:text-white'
+                  }`}
+                >
+                  <FaHome />
+                  Chủ trọ
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {message ? <p className='mt-6 rounded-xl bg-green-50 px-5 py-3 text-sm font-bold text-green-700'>{message}</p> : null}
         {error ? <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{error}</p> : null}
@@ -228,7 +312,7 @@ const ProfilePage = () => {
                   <FaPhoneAlt className='text-[#003566]' />
                   <span className='font-bold'>{profile.phone || 'Chưa cập nhật số điện thoại'}</span>
                 </div>
-                {isStudent ? (
+                {isStudentForm ? (
                   <div className='flex items-center gap-3 rounded-xl bg-[#F5F7FA] px-4 py-3'>
                     <FaUniversity className='text-[#003566]' />
                     <span className='font-bold'>{profile.student?.university?.name || 'Chưa chọn trường học'}</span>
@@ -297,7 +381,7 @@ const ProfilePage = () => {
                     ))}
                   </select>
                 </label>
-                {isStudent ? (
+                {isStudentForm ? (
                   <label className='grid min-w-0 gap-2 text-sm font-extrabold'>
                     Trường học
                     <select

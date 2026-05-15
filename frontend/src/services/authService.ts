@@ -20,6 +20,19 @@ export type SendEmailVerificationPayload = {
   email: string
 }
 
+export type GoogleLoginPayload = {
+  idToken: string
+}
+
+export type ForgotPasswordPayload = {
+  email: string
+}
+
+export type ResetPasswordPayload = {
+  token: string
+  newPassword: string
+}
+
 export type AuthUser = {
   id?: string
   email?: string
@@ -49,6 +62,11 @@ export const authService = {
     return response.data
   },
 
+  googleLogin: async (payload: GoogleLoginPayload) => {
+    const response = await api.post<AuthResponse>('/auth/login/google', payload)
+    return response.data
+  },
+
   register: async (payload: RegisterPayload) => {
     const response = await api.post<AuthResponse>('/auth/register', payload)
     return response.data
@@ -61,6 +79,16 @@ export const authService = {
 
   sendEmailVerification: async (payload: SendEmailVerificationPayload) => {
     const response = await api.post<AuthResponse>('/auth/email-verification', payload)
+    return response.data
+  },
+
+  sendForgotPassword: async (payload: ForgotPasswordPayload) => {
+    const response = await api.post<AuthResponse>('/auth/forgot-password', payload)
+    return response.data
+  },
+
+  resetPassword: async (payload: ResetPasswordPayload) => {
+    const response = await api.patch<AuthResponse>('/auth/forgot-password', payload)
     return response.data
   }
 }

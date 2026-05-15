@@ -1,7 +1,15 @@
-import { AdminOverviewPage, AdminPostsPage, AdminUsersPage } from '@/pages/admin/AdminDashboardPage'
+import {
+  AdminHostsPage,
+  AdminOverviewPage,
+  AdminPostsPage,
+  AdminReportsPage,
+  AdminUsersPage
+} from '@/pages/admin/AdminDashboardPage'
+import ChangePasswordPage from '@/pages/account/ChangePasswordPage'
 import ProfilePage from '@/pages/account/ProfilePage'
 import ContactRequestsPage from '@/pages/contacts/ContactRequestsPage'
 import DemandPage from '@/pages/demand/DemandPage'
+import ForgotPasswordPage from '@/pages/forgot-password/ForgotPasswordPage'
 import HomePage from '@/pages/home/HomePage'
 import LandingPage from '@/pages/landing/LandingPage'
 import LoginPage from '@/pages/login/LoginPage'
@@ -11,15 +19,20 @@ import PostDetailPage from '@/pages/posts/detail/PostDetailPage'
 import MyPostsPage from '@/pages/posts/my-posts/MyPostsPage'
 import SearchResultsPage from '@/pages/posts/search/SearchResultsPage'
 import RegisterPage from '@/pages/register/RegisterPage'
+import ResetPasswordPage from '@/pages/reset-password/ResetPasswordPage'
 import VerifyEmailPage from '@/pages/verify-email/VerifyEmailPage'
 
 export {
   AdminOverviewPage,
+  AdminHostsPage,
   AdminPostsPage,
+  AdminReportsPage,
   AdminUsersPage,
+  ChangePasswordPage,
   ContactRequestsPage,
   CreatePostPage,
   DemandPage,
+  ForgotPasswordPage,
   HomePage,
   LandingPage,
   LoginPage,
@@ -28,6 +41,7 @@ export {
   MyPostsPage,
   PostDetailPage,
   RegisterPage,
+  ResetPasswordPage,
   SearchResultsPage,
   VerifyEmailPage
 }

@@ -33,33 +33,119 @@ const wards = [
 const universities = [
   {
     id: 'DUT',
-    name: 'Đại học Bách khoa - Đại học Đà Nẵng',
+    name: 'Trường Đại học Bách khoa',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Nguyễn Lương Bằng',
     houseNumber: '54'
   },
   {
     id: 'DUE',
-    name: 'Đại học Kinh tế - Đại học Đà Nẵng',
+    name: 'Trường Đại học Kinh tế',
     wardName: 'Phường Phước Mỹ',
     streetName: 'Ngũ Hành Sơn',
     houseNumber: '71'
   },
   {
-    id: 'DUTL',
+    id: 'UFL',
+    name: 'Trường Đại học Ngoại ngữ',
+    wardName: 'Phường Hòa Khánh Bắc',
+    streetName: 'Lương Nhữ Hộc',
+    houseNumber: '131'
+  },
+  {
+    id: 'UED',
+    name: 'Trường Đại học Sư phạm',
+    wardName: 'Phường Hòa Khánh Bắc',
+    streetName: 'Tôn Đức Thắng',
+    houseNumber: '459'
+  },
+  {
+    id: 'UTE',
+    name: 'Trường Đại học Sư phạm Kỹ thuật',
+    wardName: 'Phường Thanh Bình',
+    streetName: 'Nguyễn Lương Bằng',
+    houseNumber: '48'
+  },
+  {
+    id: 'VKU',
+    name: 'Trường Đại học Công nghệ thông tin và Truyền thông Việt - Hàn',
+    wardName: 'Phường Hòa Cường Nam',
+    streetName: 'Nam Kỳ Khởi Nghĩa',
+    houseNumber: '470'
+  },
+  {
+    id: 'VNUK',
+    name: 'Viện Nghiên cứu và Đào tạo Việt - Anh',
+    wardName: 'Phường Bình Thuận',
+    streetName: 'Lê Lợi',
+    houseNumber: '158A'
+  },
+  {
+    id: 'SMP',
+    name: 'Trường Y Dược, Đại học Đà Nẵng',
+    wardName: 'Phường Hòa Khánh Bắc',
+    streetName: 'Nam Kỳ Khởi Nghĩa',
+    houseNumber: '99'
+  },
+  {
+    id: 'YDN',
+    name: 'Trường Đại học Kỹ thuật Y Dược Đà Nẵng',
+    wardName: 'Phường Hòa Thuận Tây',
+    streetName: 'Hải Phòng',
+    houseNumber: '99'
+  },
+  {
+    id: 'DSU',
+    name: 'Trường Đại học Thể dục Thể thao Đà Nẵng',
+    wardName: 'Phường Hòa Khánh Bắc',
+    streetName: 'Nguyễn Lương Bằng',
+    houseNumber: '44'
+  },
+  {
+    id: 'DAU',
+    name: 'Trường Đại học Kiến trúc Đà Nẵng',
+    wardName: 'Phường Hòa Cường Nam',
+    streetName: 'Đô Đốc Lân',
+    houseNumber: '566'
+  },
+  {
+    id: 'UDA',
+    name: 'Trường Đại học Đông Á',
+    wardName: 'Phường Hòa Cường Bắc',
+    streetName: 'Xô Viết Nghệ Tĩnh',
+    houseNumber: '33'
+  },
+  {
+    id: 'PCTU',
+    name: 'Trường Đại học Phan Châu Trinh',
+    wardName: 'Phường Hòa Khánh Bắc',
+    streetName: 'Nguyễn Lương Bằng',
+    houseNumber: '09'
+  },
+  {
+    id: 'FPT',
+    name: 'Trường Đại học FPT tại Đà Nẵng',
+    wardName: 'Phường Hòa Cường Nam',
+    streetName: 'Nam Kỳ Khởi Nghĩa',
+    houseNumber: 'Khu đô thị FPT City'
+  },
+  {
+    id: 'GWU',
+    name: 'Đại học Greenwich',
+    wardName: 'Phường Hòa Cường Bắc',
+    streetName: 'Nguyễn Hữu Thọ',
+    houseNumber: '658'
+  },
+  {
+    id: 'DTU',
     name: 'Đại học Duy Tân',
     wardName: 'Phường Thanh Khê Tây',
     streetName: 'Nguyễn Văn Linh',
     houseNumber: '254'
-  },
-  {
-    id: 'VKU',
-    name: 'Đại học Công nghệ Thông tin và Truyền thông Việt - Hàn',
-    wardName: 'Phường Hòa Cường Nam',
-    streetName: 'Nam Kỳ Khởi Nghĩa',
-    houseNumber: '470'
   }
 ];
+
+const universityIds = universities.map((university) => university.id);
 
 const amenities = [
   { name: 'WiFi tốc độ cao', aliases: ['Wifi', 'WiFi', 'wifi'] },
@@ -229,6 +315,14 @@ const main = async () => {
     const ward = await ensureWard(wardName);
     wardByName.set(ward.name, ward);
   }
+
+  await prisma.university.deleteMany({
+    where: {
+      id: {
+        notIn: universityIds
+      }
+    }
+  });
 
   for (const university of universities) {
     const ward = wardByName.get(university.wardName);
@@ -431,7 +525,96 @@ const main = async () => {
     });
   }
 
-  console.log(`Đã khởi tạo ${wards.length} phường, ${amenities.length} tiện ích và ${posts.length} bài đăng đã duyệt.`);
+  const seededComments = [
+    {
+      id: 'cmt_seed_001',
+      userId: student.id,
+      postId: posts[0].id,
+      content: 'Phòng này gần trường, đường đi khá thuận tiện. Chủ nhà phản hồi nhanh và thông tin rõ ràng.'
+    },
+    {
+      id: 'cmt_seed_002',
+      userId: host.id,
+      postId: posts[0].id,
+      parentId: 'cmt_seed_001',
+      content: 'Cảm ơn bạn đã quan tâm. Phòng hiện vẫn còn trống và có thể xem trực tiếp vào cuối tuần.'
+    },
+    {
+      id: 'cmt_seed_003',
+      userId: student.id,
+      postId: posts[4].id,
+      content: 'Khu vực này phù hợp với nhóm sinh viên cần không gian yên tĩnh và có chỗ để xe.'
+    }
+  ];
+
+  for (const comment of seededComments) {
+    await prisma.comment.upsert({
+      where: { id: comment.id },
+      update: {
+        userId: comment.userId,
+        postId: comment.postId,
+        parentId: comment.parentId || null,
+        content: comment.content,
+        status: 'DISPLAYED',
+        updatedAt: new Date()
+      },
+      create: {
+        id: comment.id,
+        userId: comment.userId,
+        postId: comment.postId,
+        parentId: comment.parentId || null,
+        content: comment.content,
+        status: 'DISPLAYED'
+      }
+    });
+  }
+
+  const seededReports = [
+    {
+      id: 'rpt_seed_001',
+      userId: student.id,
+      reportedUserId: host.id,
+      postId: posts[2].id,
+      reason: 'Nội dung bài đăng cần được kiểm tra lại về thông tin giá thuê và tiện ích đi kèm.',
+      status: 'PENDING'
+    },
+    {
+      id: 'rpt_seed_002',
+      userId: student.id,
+      reportedUserId: host.id,
+      commentId: 'cmt_seed_002',
+      reason: 'Bình luận cần được quản trị viên xem xét để đảm bảo trao đổi phù hợp.',
+      status: 'PENDING'
+    }
+  ];
+
+  for (const report of seededReports) {
+    await prisma.report.upsert({
+      where: { id: report.id },
+      update: {
+        userId: report.userId,
+        reportedUserId: report.reportedUserId,
+        postId: report.postId || null,
+        commentId: report.commentId || null,
+        reason: report.reason,
+        status: report.status,
+        adminId: null,
+        adminNote: null,
+        tackledAt: null
+      },
+      create: {
+        id: report.id,
+        userId: report.userId,
+        reportedUserId: report.reportedUserId,
+        postId: report.postId || null,
+        commentId: report.commentId || null,
+        reason: report.reason,
+        status: report.status
+      }
+    });
+  }
+
+  console.log(`Đã khởi tạo ${wards.length} phường, ${universities.length} trường, ${amenities.length} tiện ích và ${posts.length} bài đăng đã duyệt.`);
   console.log('student@unistay.local / Unistay@123456');
   console.log('host@unistay.local / Unistay@123456');
   console.log('admin@unistay.local / Unistay@123456');

@@ -11,6 +11,26 @@ type ApiResponse<T = unknown> = {
   }
 }
 
+export type CommentAuthor = {
+  id: string
+  fullName?: string
+  avatarUrl?: string | null
+  roles?: string[]
+}
+
+export type PostComment = {
+  id: string
+  userId: string
+  postId: string
+  parentId?: string | null
+  content: string
+  status?: string
+  createdAt?: string
+  updatedAt?: string | null
+  user?: CommentAuthor
+  replies?: PostComment[]
+}
+
 export const engagementService = {
   getFavouritePosts: async (params?: { page?: number; limit?: number }) => {
     const search = new URLSearchParams()
@@ -38,7 +58,7 @@ export const engagementService = {
   },
 
   createComment: async (postId: string, content: string) => {
-    const response = await api.post<ApiResponse>('/comments', { postId, content })
+    const response = await api.post<ApiResponse<PostComment>>('/comments', { postId, content })
     return response.data
   },
 

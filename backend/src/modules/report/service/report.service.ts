@@ -3,6 +3,75 @@ import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 import { report_status, post_status, comment_status } from '@prisma/client';
 
+export const getReports = async (
+  page: number = 1,
+  limit: number = 10,
+  status?: report_status
+) => {
+  const skip = (page - 1) * limit;
+  const where = status ? { status } : {};
+
+  const [data, total] = await Promise.all([
+    prismaClient.report.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        },
+        reportedUser: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true,
+            status: true
+          }
+        },
+        admin: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true
+          }
+        },
+        post: {
+          select: {
+            id: true,
+            title: true,
+            status: true
+          }
+        },
+        comment: {
+          select: {
+            id: true,
+            content: true,
+            status: true
+          }
+        }
+      }
+    }),
+    prismaClient.report.count({ where })
+  ]);
+
+  return {
+    data,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+};
+
 export const tackleReport = async (
   adminId: string,
   reportId: string,

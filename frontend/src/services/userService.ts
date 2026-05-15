@@ -48,14 +48,33 @@ export type UpdateProfilePayload = {
   universityId?: string
 }
 
+export type SetupProfilePayload = UpdateProfilePayload & {
+  role: 'STUDENT' | 'HOST'
+}
+
+export type ChangePasswordPayload = {
+  currentPassword: string
+  newPassword: string
+}
+
 export const userService = {
   getMyProfile: async () => {
     const response = await api.get<ApiResponse<UserProfile>>('/users/me')
     return response.data.data
   },
 
+  setupProfile: async (payload: SetupProfilePayload) => {
+    const response = await api.patch<ApiResponse<UserProfile>>('/users/setup', payload)
+    return response.data
+  },
+
   updateProfile: async (payload: UpdateProfilePayload) => {
     const response = await api.patch<ApiResponse<UserProfile>>('/users/update', payload)
+    return response.data
+  },
+
+  changePassword: async (payload: ChangePasswordPayload) => {
+    const response = await api.patch<ApiResponse<null>>('/users/password', payload)
     return response.data
   }
 }

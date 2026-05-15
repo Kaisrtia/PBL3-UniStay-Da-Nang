@@ -1,12 +1,14 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
+import axios from 'axios'
 import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
 import adminService from '@/services/adminService'
 import { API_BASE_URL } from '@/services/api'
-import engagementService from '@/services/engagementService'
+import contactService from '@/services/contactService'
+import engagementService, { type PostComment } from '@/services/engagementService'
 
 type PostImage = {
   id: number
@@ -28,6 +30,7 @@ type PostDetail = {
   latitude: string | number
   longitude: string | number
   postImages?: PostImage[]
+  comments?: PostComment[]
 }
 
 type ApiResponse<T> = {
@@ -72,6 +75,61 @@ const getStoredUser = () => {
 
 const toNumber = (value: string | number) => Number(value)
 
+const formatCommentTime = (value?: string) => {
+  if (!value) return ''
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date)
+}
+
+const getInitials = (name?: string) => {
+  const source = name || 'U'
+  const parts = source.trim().split(/\s+/).filter(Boolean)
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+  }
+
+  return source.slice(0, 2).toUpperCase()
+}
+
+const CommentItem = ({ comment: item, isReply = false }: { comment: PostComment; isReply?: boolean }) => {
+  const authorName = item.user?.fullName || 'Người dùng UniStay'
+  const avatarUrl = item.user?.avatarUrl
+
+  return (
+    <article className={`${isReply ? 'ml-8 border-l border-gray-100 pl-4' : ''}`}>
+      <div className='flex gap-3'>
+        <div className='grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#001D3D] text-xs font-black text-[#FFC300]'>
+          {avatarUrl ? <img src={avatarUrl} alt={authorName} className='h-full w-full object-cover' /> : getInitials(authorName)}
+        </div>
+        <div className='min-w-0 flex-1 rounded-2xl bg-gray-50 px-4 py-3'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <p className='font-extrabold text-gray-950'>{authorName}</p>
+            {item.createdAt ? <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p> : null}
+          </div>
+          <p className='mt-2 whitespace-pre-line text-sm leading-6 text-gray-700'>{item.content}</p>
+        </div>
+      </div>
+      {item.replies && item.replies.length > 0 ? (
+        <div className='mt-3 grid gap-3'>
+          {item.replies.map((reply) => (
+            <CommentItem key={reply.id} comment={reply} isReply />
+          ))}
+        </div>
+      ) : null}
+    </article>
+  )
+}
+
 const PostDetailPage = () => {
   const { postId } = useParams<{ postId: string }>()
   const location = useLocation()
@@ -85,16 +143,16 @@ const PostDetailPage = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [storedUser] = useState(() => getStoredUser())
   const [isFavourite, setIsFavourite] = useState(false)
+  const [isAccommodationRequested, setIsAccommodationRequested] = useState(false)
   const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
   const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
+  const needsStudentSetup = Boolean(storedUser?.status === 'SET_UP' || (storedUser && !isStudent && !isAdmin))
   const routeState = location.state as { returnTo?: string; returnLabel?: string } | null
   const backTo = routeState?.returnTo || '/home'
   const backLabel = routeState?.returnLabel || 'Quay lại trang chủ'
 
-  useEffect(() => {
-    const abortController = new AbortController()
-
-    const loadPostDetail = async () => {
+  const loadPostDetail = useCallback(
+    async (signal?: AbortSignal, shouldSetLoading = true) => {
       if (!postId) {
         setErrorMessage('Không tìm thấy mã bài đăng trên đường dẫn.')
         setIsLoading(false)
@@ -102,13 +160,15 @@ const PostDetailPage = () => {
       }
 
       try {
-        setIsLoading(true)
+        if (shouldSetLoading) {
+          setIsLoading(true)
+        }
         setErrorMessage('')
 
         const token = getAccessToken()
         const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          signal: abortController.signal
+          signal
         })
         const payload = (await response.json()) as ApiResponse<PostDetail>
 
@@ -120,10 +180,15 @@ const PostDetailPage = () => {
 
         if (isStudent) {
           try {
-            const favourites = await engagementService.getFavouritePosts({ limit: 200 })
+            const [favourites, sentRequests] = await Promise.all([
+              engagementService.getFavouritePosts({ limit: 200 }),
+              contactService.getSentRequests({ limit: 200 })
+            ])
             setIsFavourite(favourites.data.some((item) => item.id === payload.data?.id))
+            setIsAccommodationRequested(sentRequests.data.some((request) => request.postId === payload.data?.id))
           } catch {
             setIsFavourite(false)
+            setIsAccommodationRequested(false)
           }
         }
       } catch (error) {
@@ -135,15 +200,21 @@ const PostDetailPage = () => {
       } finally {
         setIsLoading(false)
       }
-    }
+    },
+    [isStudent, postId]
+  )
 
-    void loadPostDetail()
+  useEffect(() => {
+    const abortController = new AbortController()
+
+    void loadPostDetail(abortController.signal)
 
     return () => abortController.abort()
-  }, [isStudent, postId])
+  }, [loadPostDetail])
 
   const postImages = useMemo(() => post?.postImages?.filter((image) => Boolean(image.imageUrl)) ?? [], [post])
   const heroImage = postImages[selectedImageIndex]?.imageUrl
+  const comments = useMemo(() => post?.comments ?? [], [post?.comments])
 
   useEffect(() => {
     setSelectedImageIndex(0)
@@ -172,6 +243,12 @@ const PostDetailPage = () => {
     if (!post) return
     if (isFavourite) return
 
+    if (needsStudentSetup) {
+      setActionMessage('')
+      setActionError('Vui lòng hoàn tất hồ sơ Sinh viên trong mục Thông tin cá nhân trước khi lưu bài đăng.')
+      return
+    }
+
     void runPostAction(async () => {
       const response = await engagementService.addFavouritePost(post.id)
       setIsFavourite(true)
@@ -181,7 +258,45 @@ const PostDetailPage = () => {
 
   const handleAccommodationRequest = () => {
     if (!post) return
-    void runPostAction(() => engagementService.createAccommodationRequest(post.id), 'Đã gửi yêu cầu thuê/ở ghép.')
+    if (isAccommodationRequested || isSubmittingAction) return
+
+    if (needsStudentSetup) {
+      setActionMessage('')
+      setActionError('Vui lòng hoàn tất hồ sơ Sinh viên trong mục Thông tin cá nhân trước khi gửi yêu cầu thuê/ở ghép.')
+      return
+    }
+
+    void (async () => {
+      try {
+        setIsSubmittingAction(true)
+        setActionError('')
+        setActionMessage('')
+
+        const response = await engagementService.createAccommodationRequest(post.id)
+        setIsAccommodationRequested(true)
+        setActionMessage(response.message || 'Đã gửi yêu cầu thuê/ở ghép.')
+      } catch (error) {
+        const message = axios.isAxiosError(error)
+          ? (error.response?.data as { error?: { message?: string }; message?: string } | undefined)?.error?.message ||
+            (error.response?.data as { message?: string } | undefined)?.message ||
+            ''
+          : ''
+        const hasAlreadyRequested =
+          axios.isAxiosError(error) &&
+          error.response?.status === 409 &&
+          message.toLowerCase().includes('already')
+
+        if (hasAlreadyRequested) {
+          setIsAccommodationRequested(true)
+          setActionMessage('Bạn đã gửi yêu cầu cho bài đăng này.')
+          return
+        }
+
+        setActionError('Không thể gửi yêu cầu. Vui lòng kiểm tra lại tài khoản sinh viên và thử lại.')
+      } finally {
+        setIsSubmittingAction(false)
+      }
+    })()
   }
 
   const handleReport = () => {
@@ -254,6 +369,7 @@ const PostDetailPage = () => {
     void runPostAction(async () => {
       const response = await engagementService.createComment(post.id, comment.trim())
       setComment('')
+      await loadPostDetail(undefined, false)
       return response
     }, 'Đã gửi bình luận.')
   }
@@ -417,11 +533,11 @@ const PostDetailPage = () => {
                   </button>
                   <button
                     type='button'
-                    disabled={isSubmittingAction}
+                    disabled={isSubmittingAction || isAccommodationRequested}
                     onClick={handleAccommodationRequest}
                     className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
                   >
-                    Gửi yêu cầu thuê/ở ghép
+                    {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
                   </button>
                   <button
                     type='button'
@@ -469,6 +585,20 @@ const PostDetailPage = () => {
                 Gửi bình luận
               </button>
             </form>
+
+            <div className='mt-6 border-t border-gray-100 pt-5'>
+              {comments.length > 0 ? (
+                <div className='grid gap-4'>
+                  {comments.map((item) => (
+                    <CommentItem key={item.id} comment={item} />
+                  ))}
+                </div>
+              ) : (
+                <p className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                  Chưa có bình luận nào cho bài đăng này.
+                </p>
+              )}
+            </div>
           </section>
           ) : null}
           </aside>
@@ -481,6 +611,7 @@ const PostDetailPage = () => {
 
 type StoredUser = {
   roles?: string[]
+  status?: string | null
 }
 
 export default PostDetailPage

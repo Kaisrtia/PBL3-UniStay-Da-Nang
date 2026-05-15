@@ -4,7 +4,7 @@ import axios from 'axios'
 import L from 'leaflet'
 import { FaChevronDown, FaImage, FaTimes } from 'react-icons/fa'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -99,6 +99,24 @@ type MediaPreview = {
   url: string
 }
 
+type PostFormState = {
+  title: string
+  detailAddress: string
+  area: string
+  price: string
+  deposit: string
+  description: string
+}
+
+const emptyPostForm: PostFormState = {
+  title: '',
+  detailAddress: '',
+  area: '',
+  price: '',
+  deposit: '',
+  description: ''
+}
+
 type SelectFieldProps = {
   label: string
   name?: string
@@ -133,18 +151,24 @@ const TextField = ({
   label,
   name,
   placeholder,
-  type = 'text'
+  type = 'text',
+  value,
+  onChange
 }: {
   label?: string
   name?: string
   placeholder?: string
   type?: string
+  value?: string
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void
 }) => (
   <label className={label ? 'flex items-center gap-3' : 'block'}>
     {label && <span className='w-36 shrink-0 whitespace-nowrap text-base font-extrabold text-[#111111]'>{label}</span>}
     <input
       name={name}
       type={type}
+      value={value}
+      onChange={onChange}
       className='h-11 w-full rounded-full border border-[#001D3D] bg-white px-6 text-sm font-semibold text-[#111111] outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
       placeholder={placeholder}
     />
@@ -317,8 +341,45 @@ const MediaPreviewGrid = ({
   )
 }
 
+const ExistingMediaGrid = ({
+  urls,
+  onRemove
+}: {
+  urls: string[]
+  onRemove: (url: string) => void
+}) => {
+  if (urls.length === 0) {
+    return null
+  }
+
+  return (
+    <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+      {urls.map((url) => (
+        <div key={url} className='group relative overflow-hidden rounded-2xl border border-[#F6D983] bg-white shadow-sm shadow-[#001D3D]/10'>
+          <img src={url} alt='Ảnh bài đăng hiện có' className='h-40 w-full object-cover' />
+          <div className='flex items-center justify-between gap-3 px-3 py-2'>
+            <span className='truncate text-xs font-bold text-[#111111]'>Ảnh đã lưu</span>
+            <button
+              type='button'
+              onClick={() => onRemove(url)}
+              className='grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#001D3D] text-xs text-white transition hover:bg-red-600'
+              aria-label='Xóa ảnh đã lưu'
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const CreatePostPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editPostId = searchParams.get('edit')
+  const isEditMode = Boolean(editPostId)
+  const [form, setForm] = useState<PostFormState>(emptyPostForm)
   const [roomType, setRoomType] = useState<RoomType>('ROOM')
   const [postPurpose, setPostPurpose] = useState<PostPurpose>('RENT')
   const [wardId, setWardId] = useState('')
@@ -329,8 +390,10 @@ const CreatePostPage = () => {
   const [latitude, setLatitude] = useState('16.054400')
   const [longitude, setLongitude] = useState('108.202200')
   const [mediaPreviews, setMediaPreviews] = useState<MediaPreview[]>([])
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([])
   const mediaPreviewsRef = useRef<MediaPreview[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingPost, setLoadingPost] = useState(false)
 
   useEffect(() => {
     const loadFormOptions = async () => {
@@ -350,6 +413,56 @@ const CreatePostPage = () => {
   }, [])
 
   useEffect(() => {
+    if (!editPostId) {
+      setForm(emptyPostForm)
+      setExistingImageUrls([])
+      return
+    }
+
+    const loadEditablePost = async () => {
+      setLoadingPost(true)
+
+      try {
+        const post = await postService.getPostDetail(editPostId)
+        if (!post) {
+          alert('Không tìm thấy bài đăng cần sửa.')
+          navigate('/posts/me')
+          return
+        }
+
+        setForm({
+          title: post.title || '',
+          detailAddress: post.detailAddress || '',
+          area: String(post.area || ''),
+          price: String(post.price || ''),
+          deposit: String(post.deposit || ''),
+          description: post.description || ''
+        })
+        setRoomType((post.roomType || 'ROOM') as RoomType)
+        setPostPurpose((post.postPurpose || post.purpose || 'RENT') as PostPurpose)
+        setWardId(post.wardId ? String(post.wardId) : '')
+        setLatitude(post.latitude !== undefined && post.latitude !== null ? String(post.latitude) : '16.054400')
+        setLongitude(post.longitude !== undefined && post.longitude !== null ? String(post.longitude) : '108.202200')
+        setExistingImageUrls((post.postImages || []).map((image) => image.imageUrl).filter(Boolean))
+
+        const currentPostAmenities = post.postAmenities || []
+        setSelectedAmenityIds(currentPostAmenities.map((item) => Number(item.amenityId)).filter(Number.isFinite))
+        const firstCondition = currentPostAmenities.find((item) => item.currentCondition)?.currentCondition
+        if (firstCondition) {
+          setAmenityCondition(firstCondition)
+        }
+      } catch {
+        alert('Không tải được dữ liệu bài đăng cần sửa.')
+        navigate('/posts/me')
+      } finally {
+        setLoadingPost(false)
+      }
+    }
+
+    void loadEditablePost()
+  }, [editPostId, navigate])
+
+  useEffect(() => {
     mediaPreviewsRef.current = mediaPreviews
   }, [mediaPreviews])
 
@@ -363,6 +476,10 @@ const CreatePostPage = () => {
     setSelectedAmenityIds((current) =>
       current.includes(amenityId) ? current.filter((id) => id !== amenityId) : [...current, amenityId]
     )
+  }
+
+  const updateForm = (key: keyof PostFormState, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }))
   }
 
   const handlePickLocation = (pickedLatitude: number, pickedLongitude: number) => {
@@ -403,17 +520,21 @@ const CreatePostPage = () => {
     })
   }
 
+  const handleRemoveExistingImage = (imageUrl: string) => {
+    setExistingImageUrls((current) => current.filter((url) => url !== imageUrl))
+  }
+
   const getBackendErrorMessage = (error: unknown) => {
     if (axios.isAxiosError(error)) {
       const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-      return data?.error?.message || data?.message || 'Tạo bài đăng thất bại.'
+      return data?.error?.message || data?.message || (isEditMode ? 'Cập nhật bài đăng thất bại.' : 'Tạo bài đăng thất bại.')
     }
 
     if (error instanceof Error) {
       return error.message
     }
 
-    return 'Tạo bài đăng thất bại.'
+    return isEditMode ? 'Cập nhật bài đăng thất bại.' : 'Tạo bài đăng thất bại.'
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -422,8 +543,6 @@ const CreatePostPage = () => {
     if (loading) {
       return
     }
-
-    const formData = new FormData(event.currentTarget)
 
     if (!wardId) {
       alert('Vui lòng chọn xã/phường.')
@@ -444,28 +563,31 @@ const CreatePostPage = () => {
       const uploadedImageUrls =
         mediaPreviews.length > 0 ? await uploadPostImages(mediaPreviews.map((preview) => preview.file)) : []
 
-      const response = await postService.createPost({
-        title: String(formData.get('title') || ''),
+      const payload = {
+        title: form.title.trim(),
         wardId: Number(wardId),
         purpose: postPurpose,
-        detailAddress: String(formData.get('detailAddress') || ''),
-        area: Number(formData.get('area') || 0),
-        price: Number(formData.get('price') || 0),
-        deposit: Number(formData.get('deposit') || 0),
+        detailAddress: form.detailAddress.trim(),
+        area: Number(form.area || 0),
+        price: Number(form.price || 0),
+        deposit: Number(form.deposit || 0),
         roomType,
         postPurpose,
-        description: String(formData.get('description') || ''),
+        description: form.description.trim(),
         latitude: latitudeValue,
         longitude: longitudeValue,
-        postImages: uploadedImageUrls,
+        postImages: isEditMode ? [...existingImageUrls, ...uploadedImageUrls] : uploadedImageUrls,
         postAmenities: selectedAmenityIds.map((amenityId) => ({
           amenityId,
           currentCondition: amenityCondition
         }))
-      })
+      }
 
-      alert(response.message || 'Tạo bài đăng thành công.')
-      navigate('/home')
+      const response =
+        isEditMode && editPostId ? await postService.updatePost(editPostId, payload) : await postService.createPost(payload)
+
+      alert(response.message || (isEditMode ? 'Cập nhật bài đăng thành công.' : 'Tạo bài đăng thành công.'))
+      navigate(isEditMode ? '/posts/me' : '/home')
     } catch (error) {
       alert(getBackendErrorMessage(error))
     } finally {
@@ -478,8 +600,15 @@ const CreatePostPage = () => {
       <SiteHeader accountLabel='Host' />
 
       <main className='px-6 py-10'>
-        <h1 className='text-center text-4xl font-extrabold tracking-wide text-[#6F5616]'>ĐĂNG TIN</h1>
+        <h1 className='text-center text-4xl font-extrabold tracking-wide text-[#6F5616]'>
+          {isEditMode ? 'SỬA BÀI ĐĂNG' : 'ĐĂNG TIN'}
+        </h1>
 
+        {loadingPost ? (
+          <section className='mx-auto mt-5 max-w-[1000px] rounded-2xl bg-white p-8 text-center font-bold text-gray-500 shadow-sm'>
+            Đang tải dữ liệu bài đăng...
+          </section>
+        ) : (
         <form onSubmit={handleSubmit} className='mx-auto mt-5 grid max-w-[1000px] gap-6'>
           <FormSection title='Loại trọ'>
             <div className='grid gap-4'>
@@ -523,13 +652,24 @@ const CreatePostPage = () => {
                   options={wardOptions.map((ward) => ({ label: ward.name, value: ward.id }))}
                 />
               </div>
-              <TextField label='Địa chỉ' name='detailAddress' />
+              <TextField
+                label='Địa chỉ'
+                name='detailAddress'
+                value={form.detailAddress}
+                onChange={(event) => updateForm('detailAddress', event.target.value)}
+              />
             </div>
           </FormSection>
 
           <FormSection title='Đặc điểm'>
             <div className='grid gap-6 px-8 md:grid-cols-2'>
-              <TextField label='Diện tích' name='area' type='number' />
+              <TextField
+                label='Diện tích'
+                name='area'
+                type='number'
+                value={form.area}
+                onChange={(event) => updateForm('area', event.target.value)}
+              />
               <SelectField
                 label='Tình trạng nội thất'
                 name='amenityCondition'
@@ -537,7 +677,13 @@ const CreatePostPage = () => {
                 onChange={(event) => setAmenityCondition((event.target.value || 'GOOD') as AmenityCondition)}
                 options={amenityConditionOptions}
               />
-              <TextField label='Tiền cọc' name='deposit' type='number' />
+              <TextField
+                label='Tiền cọc'
+                name='deposit'
+                type='number'
+                value={form.deposit}
+                onChange={(event) => updateForm('deposit', event.target.value)}
+              />
               <CoordinateField label='Vĩ độ' value={latitude} min={-90} max={90} onChange={setLatitude} />
               <CoordinateField label='Kinh độ' value={longitude} min={-180} max={180} onChange={setLongitude} />
               <div className='md:col-span-2'>
@@ -569,12 +715,26 @@ const CreatePostPage = () => {
                 />
               </label>
 
+              <ExistingMediaGrid urls={existingImageUrls} onRemove={handleRemoveExistingImage} />
               <MediaPreviewGrid items={mediaPreviews} onRemove={handleRemoveMediaPreview} />
 
-              <TextField name='title' placeholder='Tiêu đề' />
-              <TextField name='price' type='number' placeholder='Giá thuê' />
+              <TextField
+                name='title'
+                placeholder='Tiêu đề'
+                value={form.title}
+                onChange={(event) => updateForm('title', event.target.value)}
+              />
+              <TextField
+                name='price'
+                type='number'
+                placeholder='Giá thuê'
+                value={form.price}
+                onChange={(event) => updateForm('price', event.target.value)}
+              />
               <textarea
                 name='description'
+                value={form.description}
+                onChange={(event) => updateForm('description', event.target.value)}
                 className='min-h-52 resize-none rounded-2xl border border-[#001D3D] bg-white px-6 py-5 text-sm font-semibold text-[#111111] outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
                 placeholder='Mô tả'
               />
@@ -605,10 +765,11 @@ const CreatePostPage = () => {
               disabled={loading}
               className='rounded-2xl bg-[#FFE9A6] px-8 py-5 text-2xl font-extrabold text-[#111111] shadow-md shadow-[#001D3D]/15 transition hover:-translate-y-0.5 hover:bg-[#F7DE8B]'
             >
-              {loading ? 'ĐANG XỬ LÝ' : 'ĐĂNG BÀI'}
+              {loading ? 'ĐANG XỬ LÝ' : isEditMode ? 'CẬP NHẬT' : 'ĐĂNG BÀI'}
             </button>
           </div>
         </form>
+        )}
       </main>
 
       <SiteFooter />

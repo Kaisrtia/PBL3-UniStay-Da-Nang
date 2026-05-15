@@ -2,9 +2,14 @@ import { useState } from 'react'
 
 import axios from 'axios'
 
-import authService, { type AuthResponse, type LoginPayload, type RegisterPayload } from '@/services/authService'
+import authService, {
+  type AuthResponse,
+  type GoogleLoginPayload,
+  type LoginPayload,
+  type RegisterPayload
+} from '@/services/authService'
 
-type AuthAction = 'login' | 'register'
+type AuthAction = 'login' | 'register' | 'google'
 
 export const getTokenFromAuthResponse = (response: AuthResponse) =>
   response.data?.accessToken || response.data?.token || response.accessToken || response.token
@@ -16,9 +21,11 @@ const getSuccessMessage = (action: AuthAction, response: AuthResponse) => {
     return response.message
   }
 
-  return action === 'login'
-    ? 'Đăng nhập thành công.'
-    : 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.'
+  if (action === 'register') {
+    return 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.'
+  }
+
+  return 'Đăng nhập thành công.'
 }
 
 const getErrorMessage = (error: unknown) => {
@@ -35,7 +42,7 @@ export const useAuth = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const submitAuthRequest = async (action: AuthAction, payload: LoginPayload | RegisterPayload) => {
+  const submitAuthRequest = async (action: AuthAction, payload: LoginPayload | RegisterPayload | GoogleLoginPayload) => {
     setLoading(true)
     setError('')
     setSuccess('')
@@ -44,7 +51,9 @@ export const useAuth = () => {
       const response =
         action === 'login'
           ? await authService.login(payload as LoginPayload)
-          : await authService.register(payload as RegisterPayload)
+          : action === 'register'
+            ? await authService.register(payload as RegisterPayload)
+            : await authService.googleLogin(payload as GoogleLoginPayload)
       const token = getTokenFromAuthResponse(response)
 
       if (token) {
@@ -69,6 +78,7 @@ export const useAuth = () => {
 
   const login = (payload: LoginPayload) => submitAuthRequest('login', payload)
   const register = (payload: RegisterPayload) => submitAuthRequest('register', payload)
+  const loginWithGoogle = (payload: GoogleLoginPayload) => submitAuthRequest('google', payload)
 
   return {
     loading,
@@ -76,6 +86,7 @@ export const useAuth = () => {
     success,
     login,
     register,
+    loginWithGoogle,
     setError,
     setSuccess
   }

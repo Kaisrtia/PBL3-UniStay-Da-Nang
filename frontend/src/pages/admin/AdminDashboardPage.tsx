@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { FaCheck, FaEye, FaUsers, FaTimes } from 'react-icons/fa'
+import { FaCheck, FaClipboardList, FaEye, FaShieldAlt, FaTimes, FaUsers } from 'react-icons/fa'
 import { Link, useLocation } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import adminService, {
+  type AdminReport,
+  type AdminReportStatus,
   type AdminPostStatistic,
   type AdminStatsPeriod,
+  type HostVerificationCandidate,
   type AdminUser
 } from '@/services/adminService'
 import { type Post, type PostStatus } from '@/services/postService'
 
-type AdminTab = 'overview' | 'posts' | 'users'
+type AdminTab = 'overview' | 'posts' | 'users' | 'reports' | 'hosts'
 
 type AdminDashboardPageProps = {
   activeTab: AdminTab
@@ -29,16 +32,25 @@ const statusLabels: Record<string, string> = {
   SET_UP: 'Thiết lập'
 }
 
+const reportStatusLabels: Record<AdminReportStatus, string> = {
+  PENDING: 'Chờ xử lý',
+  RESOLVED: 'Đã xử lý',
+  REJECTED: 'Đã từ chối',
+  HIDDEN: 'Đã ẩn'
+}
+
 const adminTabs: { label: string; value: AdminTab; to: string }[] = [
   { label: 'Tổng quan', value: 'overview', to: '/admin/overview' },
   { label: 'Bài đăng', value: 'posts', to: '/admin/posts' },
-  { label: 'Người dùng', value: 'users', to: '/admin/users' }
+  { label: 'Người dùng', value: 'users', to: '/admin/users' },
+  { label: 'Báo cáo', value: 'reports', to: '/admin/reports' },
+  { label: 'Xác minh', value: 'hosts', to: '/admin/hosts' }
 ]
 
 const formatNumber = (value?: number) => new Intl.NumberFormat('vi-VN').format(value || 0)
 
 const getStatusClass = (status?: string) => {
-  if (status === 'APPROVED' || status === 'ACTIVE') return 'bg-green-100 text-green-700'
+  if (status === 'APPROVED' || status === 'ACTIVE' || status === 'RESOLVED') return 'bg-green-100 text-green-700'
   if (status === 'PENDING' || status === 'UPDATED' || status === 'SET_UP') return 'bg-yellow-100 text-yellow-700'
   if (status === 'REJECTED' || status === 'BANNED') return 'bg-red-100 text-red-700'
   return 'bg-gray-100 text-gray-600'
@@ -575,6 +587,318 @@ const AdminUsersContent = () => {
   )
 }
 
+const AdminReportsContent = () => {
+  const [reports, setReports] = useState<AdminReport[]>([])
+  const [statusFilter, setStatusFilter] = useState<AdminReportStatus | 'ALL'>('PENDING')
+  const [notesByReport, setNotesByReport] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+  const [processingReportId, setProcessingReportId] = useState('')
+  const [message, setMessage] = useState('')
+
+  const loadReports = useCallback(async () => {
+    setLoading(true)
+    const result = await adminService.getReports({ status: statusFilter, limit: 100 })
+    setReports(result.data)
+    setLoading(false)
+  }, [statusFilter])
+
+  useEffect(() => {
+    void loadReports().catch(() => {
+      setLoading(false)
+      setMessage('Không tải được danh sách báo cáo.')
+    })
+  }, [loadReports])
+
+  const handleTackleReport = async (reportId: string, status: 'RESOLVED' | 'REJECTED') => {
+    setProcessingReportId(reportId)
+    setMessage('')
+
+    try {
+      const response = await adminService.tackleReport(reportId, {
+        status,
+        adminNote: notesByReport[reportId]?.trim() || undefined
+      })
+      setMessage(response.message || 'Đã cập nhật trạng thái báo cáo.')
+      setNotesByReport((current) => ({ ...current, [reportId]: '' }))
+      await loadReports()
+    } catch {
+      setMessage('Không thể xử lý báo cáo. Vui lòng kiểm tra quyền admin và trạng thái báo cáo.')
+    } finally {
+      setProcessingReportId('')
+    }
+  }
+
+  return (
+    <AdminShell activeTab='reports'>
+      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+
+      <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
+        <div className='flex flex-wrap items-start justify-between gap-5'>
+          <div className='flex items-center gap-4'>
+            <span className='grid h-14 w-14 place-items-center rounded-full bg-[#FFC300] text-[#001D3D]'>
+              <FaClipboardList />
+            </span>
+            <div>
+              <h2 className='text-3xl font-extrabold'>Danh sách báo cáo</h2>
+              <p className='mt-1 text-sm font-semibold text-gray-500'>
+                Theo dõi báo cáo từ người dùng và xử lý nội dung vi phạm.
+              </p>
+            </div>
+          </div>
+
+          <div className='flex flex-wrap gap-2'>
+            {(['ALL', 'PENDING', 'RESOLVED', 'REJECTED'] as const).map((status) => (
+              <button
+                key={status}
+                type='button'
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
+                  statusFilter === status ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-600 hover:bg-[#FFF7D6]'
+                }`}
+              >
+                {status === 'ALL' ? 'Tất cả' : reportStatusLabels[status]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>Đang tải danh sách báo cáo...</p>
+        ) : (
+          <div className='mt-7 overflow-x-auto'>
+            <table className='w-full min-w-[1120px] text-left text-sm'>
+              <thead>
+                <tr className='text-sm font-extrabold text-[#181A20]'>
+                  <th className='py-3'>Người báo cáo</th>
+                  <th className='py-3'>Người bị báo cáo</th>
+                  <th className='py-3'>Nội dung</th>
+                  <th className='py-3'>Lý do</th>
+                  <th className='py-3'>Trạng thái</th>
+                  <th className='py-3'>Ghi chú</th>
+                  <th className='py-3 text-right'>Xử lý</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((report) => {
+                  const isPending = report.status === 'PENDING'
+                  const relatedPostPath = report.postId ? `/posts/${report.postId}` : ''
+
+                  return (
+                    <tr key={report.id} className='border-t border-gray-100 align-top'>
+                      <td className='py-4'>
+                        <p className='font-extrabold'>{report.user?.fullName || 'Người dùng'}</p>
+                        <p className='mt-1 text-xs font-semibold text-gray-500'>{report.user?.email}</p>
+                      </td>
+                      <td className='py-4'>
+                        <p className='font-extrabold'>{report.reportedUser?.fullName || 'Người dùng'}</p>
+                        <p className='mt-1 text-xs font-semibold text-gray-500'>{report.reportedUser?.email}</p>
+                      </td>
+                      <td className='max-w-xs py-4'>
+                        {report.post ? (
+                          <Link
+                            to={relatedPostPath}
+                            state={{ returnTo: '/admin/reports', returnLabel: 'Quay lại báo cáo' }}
+                            className='font-extrabold text-[#003566] hover:underline'
+                          >
+                            {report.post.title}
+                          </Link>
+                        ) : report.comment ? (
+                          <p className='line-clamp-3 font-semibold text-gray-700'>{report.comment.content}</p>
+                        ) : (
+                          <span className='font-semibold text-gray-400'>Không có nội dung</span>
+                        )}
+                      </td>
+                      <td className='max-w-xs py-4'>
+                        <p className='line-clamp-3 font-semibold text-gray-600'>{report.reason}</p>
+                      </td>
+                      <td className='py-4'>
+                        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClass(report.status)}`}>
+                          {reportStatusLabels[report.status] || report.status}
+                        </span>
+                      </td>
+                      <td className='py-4'>
+                        {isPending ? (
+                          <textarea
+                            value={notesByReport[report.id] || ''}
+                            onChange={(event) =>
+                              setNotesByReport((current) => ({ ...current, [report.id]: event.target.value }))
+                            }
+                            className='h-20 w-56 resize-none rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold outline-none focus:border-[#FFC300]'
+                            placeholder='Ghi chú xử lý'
+                          />
+                        ) : (
+                          <p className='max-w-[14rem] text-xs font-semibold text-gray-500'>{report.adminNote || 'Không có ghi chú'}</p>
+                        )}
+                      </td>
+                      <td className='py-4 text-right'>
+                        {isPending ? (
+                          <div className='flex justify-end gap-2'>
+                            <button
+                              type='button'
+                              onClick={() => void handleTackleReport(report.id, 'RESOLVED')}
+                              disabled={processingReportId === report.id}
+                              className='inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300'
+                            >
+                              <FaCheck />
+                              Xử lý
+                            </button>
+                            <button
+                              type='button'
+                              onClick={() => void handleTackleReport(report.id, 'REJECTED')}
+                              disabled={processingReportId === report.id}
+                              className='inline-flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-300'
+                            >
+                              <FaTimes />
+                              Từ chối
+                            </button>
+                          </div>
+                        ) : (
+                          <span className='text-xs font-bold text-gray-400'>Đã hoàn tất</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {reports.length === 0 ? (
+              <p className='rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>Không có báo cáo phù hợp.</p>
+            ) : null}
+          </div>
+        )}
+      </section>
+    </AdminShell>
+  )
+}
+
+const HostVerificationCard = ({
+  candidate,
+  onVerify,
+  loading
+}: {
+  candidate: HostVerificationCandidate
+  onVerify: (hostId: string) => void
+  loading: boolean
+}) => (
+  <article className='rounded-2xl border border-gray-100 bg-white p-6 shadow-lg shadow-black/10'>
+    <div className='flex items-start justify-between gap-5'>
+      <div className='min-w-0'>
+        <h3 className='truncate text-xl font-extrabold'>{candidate.user?.fullName || 'Chủ trọ'}</h3>
+        <p className='mt-1 truncate text-sm font-semibold text-gray-500'>{candidate.user?.email || 'Chưa có email'}</p>
+        <p className='mt-1 text-sm font-semibold text-gray-500'>{candidate.user?.phone || 'Chưa cập nhật số điện thoại'}</p>
+      </div>
+      <span className='grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFF7D6] text-[#001D3D]'>
+        <FaShieldAlt />
+      </span>
+    </div>
+
+    <div className='mt-5 grid grid-cols-3 gap-3 text-center text-sm'>
+      <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
+        <p className='font-black text-[#001D3D]'>{candidate.totalPost || 0}</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Bài đăng</p>
+      </div>
+      <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
+        <p className='font-black text-[#001D3D]'>{candidate.avgStar ?? '0'}</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Đánh giá</p>
+      </div>
+      <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
+        <p className='font-black text-[#001D3D]'>{candidate.isVerified ? 'Có' : 'Chưa'}</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Xác minh</p>
+      </div>
+    </div>
+
+    <button
+      type='button'
+      onClick={() => onVerify(candidate.hostId)}
+      disabled={loading || candidate.isVerified}
+      className='mt-5 w-full rounded-full bg-[#FFC300] px-5 py-3 text-sm font-extrabold text-[#001D3D] transition hover:bg-[#FFD60A] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500'
+    >
+      {candidate.isVerified ? 'Đã xác minh' : 'Xác minh chủ trọ'}
+    </button>
+  </article>
+)
+
+const AdminHostsContent = () => {
+  const [candidates, setCandidates] = useState<HostVerificationCandidate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [verifyingHostId, setVerifyingHostId] = useState('')
+  const [message, setMessage] = useState('')
+
+  const loadCandidates = async () => {
+    setLoading(true)
+    const result = await adminService.getHostVerificationCandidates({ limit: 50 })
+    setCandidates(result.data)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    void loadCandidates().catch(() => {
+      setLoading(false)
+      setMessage('Không tải được danh sách chủ trọ đủ điều kiện xác minh.')
+    })
+  }, [])
+
+  const handleVerifyHost = async (hostId: string) => {
+    setVerifyingHostId(hostId)
+    setMessage('')
+
+    try {
+      const response = await adminService.verifyHost(hostId)
+      setMessage(response.message || 'Đã xác minh chủ trọ.')
+      await loadCandidates()
+    } catch {
+      setMessage('Không thể xác minh chủ trọ. Hãy kiểm tra điều kiện đánh giá và quyền admin.')
+    } finally {
+      setVerifyingHostId('')
+    }
+  }
+
+  return (
+    <AdminShell activeTab='hosts'>
+      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+
+      <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
+        <div className='flex flex-wrap items-center justify-between gap-4'>
+          <div>
+            <h2 className='text-3xl font-extrabold'>Xác minh chủ trọ</h2>
+            <p className='mt-2 text-sm font-semibold text-gray-500'>
+              Duyệt các chủ trọ đủ điều kiện để hiển thị trạng thái đã xác minh.
+            </p>
+          </div>
+          <button
+            type='button'
+            onClick={() => void loadCandidates()}
+            className='rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+          >
+            Tải lại
+          </button>
+        </div>
+
+        {loading ? (
+          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>Đang tải danh sách xác minh...</p>
+        ) : candidates.length > 0 ? (
+          <div className='mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
+            {candidates.map((candidate) => (
+              <HostVerificationCard
+                key={candidate.hostId}
+                candidate={candidate}
+                loading={verifyingHostId === candidate.hostId}
+                onVerify={(hostId) => void handleVerifyHost(hostId)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>
+            Chưa có chủ trọ nào đủ điều kiện xác minh.
+          </p>
+        )}
+      </section>
+    </AdminShell>
+  )
+}
+
 export const AdminOverviewPage = () => <OverviewContent />
 export const AdminPostsPage = () => <AdminPostsContent />
 export const AdminUsersPage = () => <AdminUsersContent />
+export const AdminReportsPage = () => <AdminReportsContent />
+export const AdminHostsPage = () => <AdminHostsContent />

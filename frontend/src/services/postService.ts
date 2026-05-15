@@ -11,6 +11,16 @@ export type PostImage = {
   imageUrl: string
 }
 
+export type PostAmenity = {
+  postId?: string
+  amenityId: number
+  currentCondition?: AmenityCondition
+  amenity?: {
+    id: number
+    name: string
+  }
+}
+
 export type Ward = {
   id: number
   name: string
@@ -46,6 +56,7 @@ export type Post = {
   createdAt?: string
   updatedAt?: string | null
   postImages?: PostImage[]
+  postAmenities?: PostAmenity[]
   ward?: Ward
   user?: PostOwner
   _count?: {
@@ -155,6 +166,11 @@ export const postService = {
 
   createPost: async (payload: CreatePostPayload) => {
     const response = await api.post<PostResponse>('/posts', payload)
+    return response.data
+  },
+
+  updatePost: async (postId: string, payload: Partial<CreatePostPayload>) => {
+    const response = await api.patch<PostResponse<Post>>(`/posts/${postId}`, payload)
     return response.data
   }
 }

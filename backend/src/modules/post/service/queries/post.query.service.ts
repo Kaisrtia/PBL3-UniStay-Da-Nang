@@ -8,7 +8,8 @@ import {
   room_type,
   post_purpose,
   Prisma,
-  post_status
+  post_status,
+  comment_status
 } from '@prisma/client';
 
 export interface PostFilters {
@@ -332,7 +333,38 @@ export const getPostDetail = async (postId: string) => {
     where: { id: postId },
     include: {
       postImages: true,
-      postAmenities: true
+      postAmenities: true,
+      comments: {
+        where: {
+          status: comment_status.DISPLAYED,
+          parentId: null
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              avatarUrl: true,
+              roles: true
+            }
+          },
+          replies: {
+            where: { status: comment_status.DISPLAYED },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  avatarUrl: true,
+                  roles: true
+                }
+              }
+            }
+          }
+        }
+      }
     }
   });
 
