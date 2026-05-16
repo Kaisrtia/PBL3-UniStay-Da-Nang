@@ -16,20 +16,36 @@ type PostImage = {
   imageUrl: string
 }
 
+type PostAmenity = {
+  postId?: string
+  amenityId: number
+  currentCondition?: 'NEW' | 'GOOD' | 'OLD' | string
+  amenity?: {
+    id: number
+    name: string
+  }
+}
+
 type PostDetail = {
   id: string
   userId?: string
+  ward?: {
+    id: number
+    name: string
+  }
   title: string
   detailAddress: string
   area: string | number
   price: string | number
   deposit: string | number
+  purpose?: string
   roomType: string
   postPurpose: string
   description: string
   latitude: string | number
   longitude: string | number
   postImages?: PostImage[]
+  postAmenities?: PostAmenity[]
   comments?: PostComment[]
 }
 
@@ -53,6 +69,17 @@ const roomTypeLabel: Record<string, string> = {
   ROOM: 'Phòng trọ',
   APARTMENT: 'Căn hộ',
   HOUSE: 'Nhà nguyên căn'
+}
+
+const postPurposeLabel: Record<string, string> = {
+  RENT: 'Cho thuê',
+  FIND_ROOMMATE: 'Tìm bạn ở ghép'
+}
+
+const amenityConditionLabel: Record<string, string> = {
+  NEW: 'Mới',
+  GOOD: 'Còn tốt',
+  OLD: 'Đã sử dụng lâu'
 }
 
 const getAccessToken = () => {
@@ -215,6 +242,19 @@ const PostDetailPage = () => {
   const postImages = useMemo(() => post?.postImages?.filter((image) => Boolean(image.imageUrl)) ?? [], [post])
   const heroImage = postImages[selectedImageIndex]?.imageUrl
   const comments = useMemo(() => post?.comments ?? [], [post?.comments])
+  const postAmenities = useMemo(
+    () => post?.postAmenities?.filter((item) => Boolean(item.amenity?.name || item.amenityId)) ?? [],
+    [post?.postAmenities]
+  )
+  const listingCriteria = useMemo(() => {
+    if (!post) return []
+
+    return [
+      { label: 'Loại phòng', value: roomTypeLabel[String(post.roomType)] || post.roomType },
+      { label: 'Nhu cầu', value: postPurposeLabel[String(post.postPurpose)] || postPurposeLabel[String(post.purpose)] || post.postPurpose || post.purpose },
+      { label: 'Khu vực', value: post.ward?.name }
+    ].filter((item): item is { label: string; value: string } => Boolean(item.value))
+  }, [post])
 
   useEffect(() => {
     setSelectedImageIndex(0)
@@ -487,6 +527,47 @@ const PostDetailPage = () => {
           <section className='mt-8'>
             <h2 className='text-xl font-bold text-gray-950'>Mô tả</h2>
             <p className='mt-3 whitespace-pre-line leading-7 text-gray-700'>{post.description}</p>
+          </section>
+
+          <section className='mt-8 grid gap-5 border-t border-gray-100 pt-6'>
+            {listingCriteria.length > 0 ? (
+              <div>
+                <h2 className='text-xl font-bold text-gray-950'>Tiêu chí bài đăng</h2>
+                <div className='mt-4 grid gap-3 sm:grid-cols-3'>
+                  {listingCriteria.map((item) => (
+                    <div key={item.label} className='rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3'>
+                      <p className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>{item.label}</p>
+                      <p className='mt-1 font-bold text-[#001D3D]'>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div>
+              <h2 className='text-xl font-bold text-gray-950'>Tiện ích</h2>
+              {postAmenities.length > 0 ? (
+                <div className='mt-4 flex flex-wrap gap-3'>
+                  {postAmenities.map((item) => {
+                    const condition = item.currentCondition ? amenityConditionLabel[String(item.currentCondition)] : ''
+
+                    return (
+                      <div
+                        key={`${item.amenityId}-${item.amenity?.name || ''}`}
+                        className='rounded-full border border-[#F1C232] bg-[#FFF7D6] px-4 py-2 text-sm font-extrabold text-[#001D3D]'
+                      >
+                        {item.amenity?.name || `Tiện ích #${item.amenityId}`}
+                        {condition ? <span className='ml-2 text-xs font-bold text-gray-500'>({condition})</span> : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className='mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                  Chủ bài đăng chưa cập nhật tiện ích cho phòng này.
+                </p>
+              )}
+            </div>
           </section>
           </section>
 

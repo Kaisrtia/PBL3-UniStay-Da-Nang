@@ -332,8 +332,11 @@ export const getPostDetail = async (postId: string) => {
   const post = await prismaClient.post.findUnique({
     where: { id: postId },
     include: {
+      ward: true,
       postImages: true,
-      postAmenities: true,
+      postAmenities: {
+        include: { amenity: true }
+      },
       comments: {
         where: {
           status: comment_status.DISPLAYED,
