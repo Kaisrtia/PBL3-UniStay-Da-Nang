@@ -6,7 +6,6 @@ import {
   room_type,
   post_purpose,
   amenity_condition,
-  Prisma,
   post_status
 } from '@prisma/client';
 import { generateHybridId } from '../../../../core/utils/generateId';
@@ -136,9 +135,7 @@ export const createPost = async (
     }
   });
   // Enqueue moderation job to check for invalid image or description
-  await addModerationFlow({
-    postId: post.id
-  });
+  await addModerationFlow(post.id);
   return post;
 };
 

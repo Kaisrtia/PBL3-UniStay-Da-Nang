@@ -6,11 +6,11 @@ export const finalStatusQueue = new Queue('final-status-queue', { connection });
 export const imageModerationQueue = new Queue('image-moderation-queue', { connection });
 export const textModerationQueue = new Queue('text-moderation-queue', { connection });
 
-export const addModerationFlow = async (postId: any) => {
+export const addModerationFlow = async (postId: string) => {
   return flowProducer.add({
     name: 'final-moderation-status',
     queueName: 'final-status-queue',
-    data: postId,
+    data: { postId },
     children: [
       {
         name: 'image-moderation',

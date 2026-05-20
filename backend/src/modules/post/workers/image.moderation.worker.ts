@@ -12,7 +12,7 @@ export const imageModerationWorker = new Worker(
   async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.name}`);
 
-    const { postId } = job.data.postId;
+    const { postId } = job.data;
     let post;
     try {
       post = await prismaClient.post.findUnique({
@@ -79,7 +79,7 @@ export const imageModerationWorker = new Worker(
   { connection }
 );
 
-imageModerationWorker.on('failed', async (job: Job | undefined, err: Error) => {
+imageModerationWorker.on('failed', async (job: Job | undefined) => {
   if (job!.attemptsMade >= job!.opts.attempts!) {
     console.log("Error for moderating post's images!");
     // Send report for admin to handle manually
