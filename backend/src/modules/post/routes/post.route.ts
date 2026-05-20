@@ -97,8 +97,6 @@ postRouter.post(
 // Get detail post
 postRouter.get(
   '/:postId',
-  verifyToken,
-  authorize([account_role.USER]),
   asyncHandler(postController.handleGetPostDetail)
 );
 
