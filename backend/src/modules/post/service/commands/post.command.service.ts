@@ -13,6 +13,31 @@ import { addModerationFlow } from '../../queues/moderation.queue';
 import { addCensorPostNotificationJob } from '../../../notification/queues/notification.queue';
 import { addMatchDemandJob } from '../../queues/matchDemand.queue';
 
+const applyRolePostRules = <T extends {
+  purpose?: string;
+  postPurpose?: post_purpose;
+  roomType?: room_type;
+}>(currentUser: user, data: T): T => {
+  if (currentUser.roles.includes('HOST')) {
+    return {
+      ...data,
+      purpose: post_purpose.RENT,
+      postPurpose: post_purpose.RENT,
+      roomType: room_type.ROOM
+    };
+  }
+
+  if (currentUser.roles.includes('STUDENT')) {
+    return {
+      ...data,
+      purpose: post_purpose.FIND_ROOMMATE,
+      postPurpose: post_purpose.FIND_ROOMMATE
+    };
+  }
+
+  return data;
+};
+
 export const censorPost = async (
   admin: user,
   postId: string,
@@ -68,6 +93,9 @@ export const createPost = async (
     wardId: number;
     purpose: string;
     detailAddress: string;
+    exactAddress?: string;
+    district?: string;
+    city?: string;
     area: number;
     price: number;
     deposit: number;
@@ -83,9 +111,10 @@ export const createPost = async (
     }[];
   }
 ) => {
+  const normalizedData = applyRolePostRules(currentUser, data);
   // Validate ward exists
   const ward = await prismaClient.ward.findUnique({
-    where: { id: data.wardId }
+    where: { id: normalizedData.wardId }
   });
   if (!ward) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
@@ -96,33 +125,36 @@ export const createPost = async (
     data: {
       id: generateHybridId('pst_'),
       userId: currentUser.id,
-      title: data.title,
-      wardId: data.wardId,
-      purpose: data.purpose,
-      detailAddress: data.detailAddress,
-      area: data.area,
-      price: data.price,
-      deposit: data.deposit,
-      roomType: data.roomType,
-      postPurpose: data.postPurpose,
-      description: data.description,
-      latitude: data.latitude,
-      longitude: data.longitude,
+      title: normalizedData.title,
+      wardId: normalizedData.wardId,
+      purpose: normalizedData.purpose,
+      detailAddress: normalizedData.detailAddress,
+      exactAddress: normalizedData.exactAddress,
+      district: normalizedData.district,
+      city: normalizedData.city,
+      area: normalizedData.area,
+      price: normalizedData.price,
+      deposit: normalizedData.deposit,
+      roomType: normalizedData.roomType,
+      postPurpose: normalizedData.postPurpose,
+      description: normalizedData.description,
+      latitude: normalizedData.latitude,
+      longitude: normalizedData.longitude,
       // Default status is PENDING, we wait for AI moderation.
 
-      ...(data.postImages &&
-        data.postImages.length > 0 && {
+      ...(normalizedData.postImages &&
+        normalizedData.postImages.length > 0 && {
           postImages: {
-            create: data.postImages.map((imageUrl) => ({
+            create: normalizedData.postImages.map((imageUrl) => ({
               imageUrl
             }))
           }
         }),
 
-      ...(data.postAmenities &&
-        data.postAmenities.length > 0 && {
+      ...(normalizedData.postAmenities &&
+        normalizedData.postAmenities.length > 0 && {
           postAmenities: {
-            create: data.postAmenities.map((amenity) => ({
+            create: normalizedData.postAmenities.map((amenity) => ({
               amenityId: amenity.amenityId,
               currentCondition: amenity.currentCondition
             }))
@@ -147,6 +179,9 @@ export const updatePost = async (
     wardId?: number;
     purpose?: string;
     detailAddress?: string;
+    exactAddress?: string;
+    district?: string;
+    city?: string;
     area?: number;
     price?: number;
     deposit?: number;
@@ -162,6 +197,7 @@ export const updatePost = async (
     }[];
   }
 ) => {
+  const normalizedData = applyRolePostRules(currentUser, data);
   const post = await prismaClient.post.findUnique({
     where: { id: postId }
   });
@@ -177,9 +213,9 @@ export const updatePost = async (
     );
   }
 
-  if (data.wardId) {
+  if (normalizedData.wardId) {
     const ward = await prismaClient.ward.findUnique({
-      where: { id: data.wardId }
+      where: { id: normalizedData.wardId }
     });
     if (!ward) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
@@ -201,29 +237,32 @@ export const updatePost = async (
     await tx.post.update({
       where: { id: postId },
       data: {
-        ...(data.title && { title: data.title }),
-        ...(data.wardId && { wardId: data.wardId }),
-        ...(data.purpose && { purpose: data.purpose }),
-        ...(data.detailAddress && { detailAddress: data.detailAddress }),
-        ...(data.area && { area: data.area }),
-        ...(data.price && { price: data.price }),
-        ...(data.deposit && { deposit: data.deposit }),
-        ...(data.roomType && { roomType: data.roomType }),
-        ...(data.postPurpose && { postPurpose: data.postPurpose }),
-        ...(data.description && { description: data.description }),
-        ...(data.latitude && { latitude: data.latitude }),
-        ...(data.longitude && { longitude: data.longitude }),
+        ...(normalizedData.title && { title: normalizedData.title }),
+        ...(normalizedData.wardId && { wardId: normalizedData.wardId }),
+        ...(normalizedData.purpose && { purpose: normalizedData.purpose }),
+        ...(normalizedData.detailAddress && { detailAddress: normalizedData.detailAddress }),
+        ...(normalizedData.exactAddress && { exactAddress: normalizedData.exactAddress }),
+        ...(normalizedData.district && { district: normalizedData.district }),
+        ...(normalizedData.city && { city: normalizedData.city }),
+        ...(normalizedData.area && { area: normalizedData.area }),
+        ...(normalizedData.price && { price: normalizedData.price }),
+        ...(normalizedData.deposit && { deposit: normalizedData.deposit }),
+        ...(normalizedData.roomType && { roomType: normalizedData.roomType }),
+        ...(normalizedData.postPurpose && { postPurpose: normalizedData.postPurpose }),
+        ...(normalizedData.description && { description: normalizedData.description }),
+        ...(normalizedData.latitude && { latitude: normalizedData.latitude }),
+        ...(normalizedData.longitude && { longitude: normalizedData.longitude }),
         status: 'UPDATED',
         updatedAt: new Date()
       }
     });
 
     // Handle images: replace all
-    if (data.postImages) {
+    if (normalizedData.postImages) {
       await tx.post_image.deleteMany({ where: { postId } });
-      if (data.postImages.length > 0) {
+      if (normalizedData.postImages.length > 0) {
         await tx.post_image.createMany({
-          data: data.postImages.map((imageUrl) => ({
+          data: normalizedData.postImages.map((imageUrl) => ({
             postId,
             imageUrl
           }))
@@ -232,11 +271,11 @@ export const updatePost = async (
     }
 
     // Handle amenities: replace all
-    if (data.postAmenities) {
+    if (normalizedData.postAmenities) {
       await tx.post_amenity.deleteMany({ where: { postId } });
-      if (data.postAmenities.length > 0) {
+      if (normalizedData.postAmenities.length > 0) {
         await tx.post_amenity.createMany({
-          data: data.postAmenities.map((amenity) => ({
+          data: normalizedData.postAmenities.map((amenity) => ({
             postId,
             amenityId: amenity.amenityId,
             currentCondition: amenity.currentCondition

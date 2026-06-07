@@ -201,6 +201,9 @@ model post {
   moderatorId          String?
   purpose              String                  @db.VarChar(50)
   detailAddress        String                  @db.Text
+  exactAddress         String?                 @db.Text
+  district             String?                 @db.VarChar(100)
+  city                 String?                 @db.VarChar(100)
   area                 Decimal                 @db.Decimal(10, 2)
   price                Decimal                 @db.Decimal(15, 2)
   deposit              Decimal                 @db.Decimal(15, 2)

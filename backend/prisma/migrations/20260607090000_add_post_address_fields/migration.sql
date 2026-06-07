@@ -1,0 +1,4 @@
+ALTER TABLE "post"
+ADD COLUMN "exactAddress" TEXT,
+ADD COLUMN "district" VARCHAR(100),
+ADD COLUMN "city" VARCHAR(100);

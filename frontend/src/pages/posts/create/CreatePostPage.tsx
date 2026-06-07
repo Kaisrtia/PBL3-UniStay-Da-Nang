@@ -102,6 +102,9 @@ type MediaPreview = {
 type PostFormState = {
   title: string
   detailAddress: string
+  exactAddress: string
+  district: string
+  city: string
   area: string
   price: string
   deposit: string
@@ -111,6 +114,9 @@ type PostFormState = {
 const emptyPostForm: PostFormState = {
   title: '',
   detailAddress: '',
+  exactAddress: '',
+  district: '',
+  city: 'Đà Nẵng',
   area: '',
   price: '',
   deposit: '',
@@ -374,6 +380,21 @@ const ExistingMediaGrid = ({
   )
 }
 
+type StoredPostUser = {
+  roles?: string[]
+}
+
+const getStoredPostUser = () => {
+  const rawUser = localStorage.getItem('authUser')
+  if (!rawUser) return null
+
+  try {
+    return JSON.parse(rawUser) as StoredPostUser
+  } catch {
+    return null
+  }
+}
+
 const CreatePostPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -394,6 +415,10 @@ const CreatePostPage = () => {
   const mediaPreviewsRef = useRef<MediaPreview[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingPost, setLoadingPost] = useState(false)
+  const [storedUser] = useState(() => getStoredPostUser())
+  const isHostUser = Boolean(storedUser?.roles?.includes('HOST'))
+  const isStudentUser = Boolean(storedUser?.roles?.includes('STUDENT'))
+  const isRoleLocked = isHostUser || isStudentUser
 
   useEffect(() => {
     const loadFormOptions = async () => {
@@ -433,6 +458,9 @@ const CreatePostPage = () => {
         setForm({
           title: post.title || '',
           detailAddress: post.detailAddress || '',
+          exactAddress: post.exactAddress || '',
+          district: post.district || '',
+          city: post.city || 'Đà Nẵng',
           area: String(post.area || ''),
           price: String(post.price || ''),
           deposit: String(post.deposit || ''),
@@ -461,6 +489,18 @@ const CreatePostPage = () => {
 
     void loadEditablePost()
   }, [editPostId, navigate])
+
+  useEffect(() => {
+    if (isHostUser) {
+      setRoomType('ROOM')
+      setPostPurpose('RENT')
+      return
+    }
+
+    if (isStudentUser) {
+      setPostPurpose('FIND_ROOMMATE')
+    }
+  }, [isHostUser, isStudentUser])
 
   useEffect(() => {
     mediaPreviewsRef.current = mediaPreviews
@@ -549,6 +589,11 @@ const CreatePostPage = () => {
       return
     }
 
+    if (!form.exactAddress.trim() || !form.district.trim() || !form.city.trim()) {
+      alert('Vui lòng nhập đầy đủ địa chỉ chính xác, quận/huyện và thành phố.')
+      return
+    }
+
     const latitudeValue = Number(latitude)
     const longitudeValue = Number(longitude)
 
@@ -566,13 +611,16 @@ const CreatePostPage = () => {
       const payload = {
         title: form.title.trim(),
         wardId: Number(wardId),
-        purpose: postPurpose,
-        detailAddress: form.detailAddress.trim(),
+        purpose: isStudentUser ? 'FIND_ROOMMATE' : 'RENT',
+        detailAddress: `${form.exactAddress.trim()}, ${form.district.trim()}, ${form.city.trim()}`,
+        exactAddress: form.exactAddress.trim(),
+        district: form.district.trim(),
+        city: form.city.trim(),
         area: Number(form.area || 0),
         price: Number(form.price || 0),
         deposit: Number(form.deposit || 0),
-        roomType,
-        postPurpose,
+        roomType: isHostUser ? 'ROOM' : roomType,
+        postPurpose: isStudentUser ? 'FIND_ROOMMATE' : 'RENT',
         description: form.description.trim(),
         latitude: latitudeValue,
         longitude: longitudeValue,
@@ -613,11 +661,13 @@ const CreatePostPage = () => {
           <FormSection title='Loại trọ'>
             <div className='grid gap-4'>
               <div className='flex flex-wrap gap-5 pl-8'>
-                {stayTypes.map((type) => (
+                  {stayTypes.map((type) => (
                   <PillButton
                     key={type.value}
                     selected={roomType === type.value}
-                    onClick={() => setRoomType(type.value)}
+                    onClick={() => {
+                      if (!isHostUser) setRoomType(type.value)
+                    }}
                   >
                     {type.label}
                   </PillButton>
@@ -631,12 +681,19 @@ const CreatePostPage = () => {
                     <PillButton
                       key={purpose.value}
                       selected={postPurpose === purpose.value}
-                      onClick={() => setPostPurpose(purpose.value)}
+                      onClick={() => {
+                        if (!isRoleLocked) setPostPurpose(purpose.value)
+                      }}
                     >
                       {purpose.label}
                     </PillButton>
                   ))}
                 </div>
+                {isRoleLocked ? (
+                  <p className='mt-3 pl-8 text-sm font-semibold text-[#6F5616]'>
+                    Loại bài đăng được tự động áp dụng theo vai trò tài khoản hiện tại.
+                  </p>
+                ) : null}
               </div>
             </div>
           </FormSection>
@@ -653,10 +710,22 @@ const CreatePostPage = () => {
                 />
               </div>
               <TextField
-                label='Địa chỉ'
-                name='detailAddress'
-                value={form.detailAddress}
-                onChange={(event) => updateForm('detailAddress', event.target.value)}
+                label='Số nhà, đường'
+                name='exactAddress'
+                value={form.exactAddress}
+                onChange={(event) => updateForm('exactAddress', event.target.value)}
+              />
+              <TextField
+                label='Quận/Huyện'
+                name='district'
+                value={form.district}
+                onChange={(event) => updateForm('district', event.target.value)}
+              />
+              <TextField
+                label='Thành phố'
+                name='city'
+                value={form.city}
+                onChange={(event) => updateForm('city', event.target.value)}
               />
             </div>
           </FormSection>

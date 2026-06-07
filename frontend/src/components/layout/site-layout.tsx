@@ -607,9 +607,9 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
 
   return (
     <header className='sticky top-0 z-30 bg-gradient-to-r from-[#000814] via-[#001D3D] to-[#003566] shadow-lg shadow-[#001D3D]/20'>
-      <div className='mx-auto flex h-24 max-w-[1440px] items-center px-8'>
-        <Link to='/home' className='mr-8 flex w-56 items-center'>
-          <img src={logo} alt='UniStay' className='h-20 w-32 object-contain' />
+      <div className='mx-auto flex h-32 max-w-[1440px] items-center px-8'>
+        <Link to='/home' className='mr-8 flex w-72 items-center'>
+          <img src={logo} alt='UniStay' className='h-28 w-52 object-contain' />
         </Link>
 
         <button className='mr-5 grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-[#001D3D] shadow-md'>

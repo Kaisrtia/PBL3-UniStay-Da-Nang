@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const LOCAL_PASSWORD = 'Unistay@123456';
+const LOCAL_PASSWORD = 'Test@123456';
 
 const wards = [
   'Phường Bình Thuận',
@@ -258,30 +258,30 @@ const pickAmenities = (amenityByName, names) => {
 
 const buildPosts = (wardByName, amenityByName, hostId, adminId) => {
   const templates = [
-    ['Phòng trọ gần Đại học Bách khoa', 'Phường Hòa Khánh Bắc', 'ROOM', 'RENT', 24, 2500000, 16.073982, 108.149487, ['WiFi tốc độ cao', 'Máy giặt', 'Chỗ để xe']],
-    ['Phòng có gác lửng khu Hòa Minh', 'Phường Hòa Minh', 'ROOM', 'RENT', 28, 3000000, 16.07103, 108.17203, ['Gác lửng', 'WiFi tốc độ cao', 'Cửa sổ']],
-    ['Căn hộ mini gần cầu Rồng', 'Phường An Hải Bắc', 'APARTMENT', 'RENT', 32, 5200000, 16.067928, 108.227012, ['Điều hòa', 'Tủ lạnh', 'Thang máy']],
-    ['Tìm bạn ở ghép khu Thanh Khê', 'Phường Thanh Khê Tây', 'ROOM', 'FIND_ROOMMATE', 28, 1800000, 16.07084, 108.190297, ['WiFi tốc độ cao', 'Ban công', 'Máy giặt']],
-    ['Nhà nguyên căn nhỏ gần biển', 'Phường Phước Mỹ', 'HOUSE', 'RENT', 55, 7500000, 16.06122, 108.24372, ['Bếp riêng', 'Chỗ để xe', 'Camera an ninh']],
-    ['Phòng sáng có ban công', 'Phường Bình Thuận', 'ROOM', 'RENT', 22, 2300000, 16.06001, 108.21752, ['Ban công', 'Cửa sổ', 'WiFi tốc độ cao']],
-    ['Căn hộ studio full nội thất', 'Phường Hòa Cường Bắc', 'APARTMENT', 'RENT', 35, 5800000, 16.04757, 108.22091, ['Điều hòa', 'Nóng lạnh', 'Tủ lạnh']],
-    ['Phòng trọ giá tốt khu An Khê', 'Phường An Khê', 'ROOM', 'RENT', 20, 1900000, 16.06191, 108.18149, ['WiFi tốc độ cao', 'Chỗ để xe', 'Camera an ninh']],
-    ['Tìm nữ ở ghép gần Duy Tân', 'Phường Thanh Khê Đông', 'ROOM', 'FIND_ROOMMATE', 26, 1600000, 16.06991, 108.19784, ['Máy giặt', 'Bếp riêng', 'Cửa sổ']],
-    ['Nhà nguyên căn cho nhóm sinh viên', 'Phường Hòa Khánh Nam', 'HOUSE', 'RENT', 70, 6800000, 16.05846, 108.15327, ['Chỗ để xe', 'Bếp riêng', 'WiFi tốc độ cao']],
-    ['Phòng trọ yên tĩnh khu Mân Thái', 'Phường Mân Thái', 'ROOM', 'RENT', 23, 2400000, 16.08945, 108.24392, ['Cửa sổ', 'Nóng lạnh', 'Camera an ninh']],
-    ['Căn hộ dịch vụ gần trung tâm', 'Phường Hòa Thuận Tây', 'APARTMENT', 'RENT', 38, 6200000, 16.0671, 108.2208, ['Thang máy', 'Điều hòa', 'Tủ lạnh']],
-    ['Phòng ở ghép khu Chính Gián', 'Phường Chính Gián', 'ROOM', 'FIND_ROOMMATE', 25, 1700000, 16.06452, 108.20118, ['WiFi tốc độ cao', 'Máy giặt', 'Chỗ để xe']],
-    ['Phòng rộng gần công viên', 'Phường Tân Chính', 'ROOM', 'RENT', 30, 3200000, 16.06572, 108.21011, ['Ban công', 'Điều hòa', 'Nóng lạnh']],
-    ['Căn hộ mini khu Thuận Phước', 'Phường Thuận Phước', 'APARTMENT', 'RENT', 34, 5000000, 16.08403, 108.22014, ['Tủ lạnh', 'Bếp riêng', 'Camera an ninh']],
-    ['Nhà nguyên căn gần bến xe', 'Phường Hòa Khê', 'HOUSE', 'RENT', 60, 6500000, 16.05974, 108.18588, ['Chỗ để xe', 'Bếp riêng', 'Máy giặt']],
-    ['Phòng trọ có thang máy', 'Phường Hòa Thuận Đông', 'ROOM', 'RENT', 27, 3600000, 16.05431, 108.21418, ['Thang máy', 'WiFi tốc độ cao', 'Điều hòa']],
-    ['Tìm bạn ở ghép khu Thọ Quang', 'Phường Thọ Quang', 'ROOM', 'FIND_ROOMMATE', 24, 1500000, 16.1078, 108.25271, ['Cửa sổ', 'Chỗ để xe', 'Máy giặt']],
-    ['Căn hộ gần trường Việt Hàn', 'Phường Hòa Cường Nam', 'APARTMENT', 'RENT', 36, 4800000, 16.03683, 108.22441, ['Điều hòa', 'Nóng lạnh', 'WiFi tốc độ cao']],
-    ['Phòng trọ gần chợ Thanh Bình', 'Phường Thanh Bình', 'ROOM', 'RENT', 21, 2100000, 16.07318, 108.21387, ['WiFi tốc độ cao', 'Cửa sổ', 'Chỗ để xe']]
+    ['Phòng trọ gần Đại học Bách khoa', 'Phường Hòa Khánh Bắc', 'ROOM', 'RENT', 24, 2500000, '54 Nguyễn Lương Bằng', 'Quận Liên Chiểu', 16.073982, 108.149487, ['WiFi tốc độ cao', 'Máy giặt', 'Chỗ để xe']],
+    ['Phòng có gác lửng khu Hòa Minh', 'Phường Hòa Minh', 'ROOM', 'RENT', 28, 3000000, '88 Tôn Đức Thắng', 'Quận Liên Chiểu', 16.07103, 108.17203, ['Gác lửng', 'WiFi tốc độ cao', 'Cửa sổ']],
+    ['Căn hộ mini gần cầu Rồng', 'Phường An Hải Bắc', 'APARTMENT', 'RENT', 32, 5200000, '15 Trần Hưng Đạo', 'Quận Sơn Trà', 16.067928, 108.227012, ['Điều hòa', 'Tủ lạnh', 'Thang máy']],
+    ['Tìm bạn ở ghép khu Thanh Khê', 'Phường Thanh Khê Tây', 'ROOM', 'FIND_ROOMMATE', 28, 1800000, '42 Hà Huy Tập', 'Quận Thanh Khê', 16.07084, 108.190297, ['WiFi tốc độ cao', 'Ban công', 'Máy giặt']],
+    ['Nhà nguyên căn nhỏ gần biển', 'Phường Phước Mỹ', 'HOUSE', 'RENT', 55, 7500000, '29 Võ Nguyên Giáp', 'Quận Sơn Trà', 16.06122, 108.24372, ['Bếp riêng', 'Chỗ để xe', 'Camera an ninh']],
+    ['Phòng sáng có ban công', 'Phường Bình Thuận', 'ROOM', 'RENT', 22, 2300000, '21 Lê Đình Dương', 'Quận Hải Châu', 16.06001, 108.21752, ['Ban công', 'Cửa sổ', 'WiFi tốc độ cao']],
+    ['Căn hộ studio full nội thất', 'Phường Hòa Cường Bắc', 'APARTMENT', 'RENT', 35, 5800000, '37 Nguyễn Hữu Thọ', 'Quận Hải Châu', 16.04757, 108.22091, ['Điều hòa', 'Nóng lạnh', 'Tủ lạnh']],
+    ['Phòng trọ giá tốt khu An Khê', 'Phường An Khê', 'ROOM', 'RENT', 20, 1900000, '63 Điện Biên Phủ', 'Quận Thanh Khê', 16.06191, 108.18149, ['WiFi tốc độ cao', 'Chỗ để xe', 'Camera an ninh']],
+    ['Tìm nữ ở ghép gần Duy Tân', 'Phường Thanh Khê Đông', 'ROOM', 'FIND_ROOMMATE', 26, 1600000, '254 Nguyễn Văn Linh', 'Quận Thanh Khê', 16.06991, 108.19784, ['Máy giặt', 'Bếp riêng', 'Cửa sổ']],
+    ['Nhà nguyên căn cho nhóm sinh viên', 'Phường Hòa Khánh Nam', 'HOUSE', 'RENT', 70, 6800000, '105 Âu Cơ', 'Quận Liên Chiểu', 16.05846, 108.15327, ['Chỗ để xe', 'Bếp riêng', 'WiFi tốc độ cao']],
+    ['Phòng trọ yên tĩnh khu Mân Thái', 'Phường Mân Thái', 'ROOM', 'RENT', 23, 2400000, '18 Hoàng Sa', 'Quận Sơn Trà', 16.08945, 108.24392, ['Cửa sổ', 'Nóng lạnh', 'Camera an ninh']],
+    ['Căn hộ dịch vụ gần trung tâm', 'Phường Hòa Thuận Tây', 'APARTMENT', 'RENT', 38, 6200000, '99 Hải Phòng', 'Quận Hải Châu', 16.0671, 108.2208, ['Thang máy', 'Điều hòa', 'Tủ lạnh']],
+    ['Phòng ở ghép khu Chính Gián', 'Phường Chính Gián', 'ROOM', 'FIND_ROOMMATE', 25, 1700000, '73 Nguyễn Tri Phương', 'Quận Thanh Khê', 16.06452, 108.20118, ['WiFi tốc độ cao', 'Máy giặt', 'Chỗ để xe']],
+    ['Phòng rộng gần công viên', 'Phường Tân Chính', 'ROOM', 'RENT', 30, 3200000, '12 Hàm Nghi', 'Quận Thanh Khê', 16.06572, 108.21011, ['Ban công', 'Điều hòa', 'Nóng lạnh']],
+    ['Căn hộ mini khu Thuận Phước', 'Phường Thuận Phước', 'APARTMENT', 'RENT', 34, 5000000, '41 Trần Phú', 'Quận Hải Châu', 16.08403, 108.22014, ['Tủ lạnh', 'Bếp riêng', 'Camera an ninh']],
+    ['Nhà nguyên căn gần bến xe', 'Phường Hòa Khê', 'HOUSE', 'RENT', 60, 6500000, '201 Nguyễn Tất Thành', 'Quận Thanh Khê', 16.05974, 108.18588, ['Chỗ để xe', 'Bếp riêng', 'Máy giặt']],
+    ['Phòng trọ có thang máy', 'Phường Hòa Thuận Đông', 'ROOM', 'RENT', 27, 3600000, '66 Núi Thành', 'Quận Hải Châu', 16.05431, 108.21418, ['Thang máy', 'WiFi tốc độ cao', 'Điều hòa']],
+    ['Tìm bạn ở ghép khu Thọ Quang', 'Phường Thọ Quang', 'ROOM', 'FIND_ROOMMATE', 24, 1500000, '22 Lê Đức Thọ', 'Quận Sơn Trà', 16.1078, 108.25271, ['Cửa sổ', 'Chỗ để xe', 'Máy giặt']],
+    ['Căn hộ gần trường Việt Hàn', 'Phường Hòa Cường Nam', 'APARTMENT', 'RENT', 36, 4800000, '470 Nam Kỳ Khởi Nghĩa', 'Quận Hải Châu', 16.03683, 108.22441, ['Điều hòa', 'Nóng lạnh', 'WiFi tốc độ cao']],
+    ['Phòng trọ gần chợ Thanh Bình', 'Phường Thanh Bình', 'ROOM', 'RENT', 21, 2100000, '35 Ông Ích Khiêm', 'Quận Hải Châu', 16.07318, 108.21387, ['WiFi tốc độ cao', 'Cửa sổ', 'Chỗ để xe']]
   ];
 
   return templates.map((item, index) => {
-    const [title, wardName, roomType, postPurpose, area, price, latitude, longitude, amenityNames] = item;
+    const [title, wardName, roomType, postPurpose, area, price, exactAddress, district, latitude, longitude, amenityNames] = item;
     const ward = wardByName.get(wardName) ?? wardByName.get('Phường Bình Thuận');
 
     return {
@@ -291,7 +291,10 @@ const buildPosts = (wardByName, amenityByName, hostId, adminId) => {
       title,
       wardId: ward.id,
       purpose: postPurpose,
-      detailAddress: `${12 + index} ${wardName.replace('Phường ', '')}, Đà Nẵng`,
+      detailAddress: `${exactAddress}, ${wardName}, ${district}, Đà Nẵng`,
+      exactAddress,
+      district,
+      city: 'Đà Nẵng',
       area,
       price,
       deposit: Math.round(price / 2),
@@ -351,7 +354,7 @@ const main = async () => {
   }
 
   const student = await upsertUser({
-    email: 'student@unistay.local',
+    email: 'student.test@unistay.local',
     fullName: 'Nguyễn Minh Anh',
     phone: '0900000001',
     dob: '2004-08-12',
@@ -361,7 +364,7 @@ const main = async () => {
   });
 
   const host = await upsertUser({
-    email: 'host@unistay.local',
+    email: 'host.test@unistay.local',
     fullName: 'Trần Quốc Huy',
     phone: '0900000002',
     dob: '1992-03-24',
@@ -371,7 +374,7 @@ const main = async () => {
   });
 
   const admin = await upsertUser({
-    email: 'admin@unistay.local',
+    email: 'admin.test@unistay.local',
     fullName: 'Quản trị UniStay',
     phone: '0900000003',
     dob: '1990-01-10',
@@ -456,6 +459,9 @@ const main = async () => {
         wardId: post.wardId,
         purpose: post.purpose,
         detailAddress: post.detailAddress,
+        exactAddress: post.exactAddress,
+        district: post.district,
+        city: post.city,
         area: post.area,
         price: post.price,
         deposit: post.deposit,
@@ -476,6 +482,9 @@ const main = async () => {
         wardId: post.wardId,
         purpose: post.purpose,
         detailAddress: post.detailAddress,
+        exactAddress: post.exactAddress,
+        district: post.district,
+        city: post.city,
         area: post.area,
         price: post.price,
         deposit: post.deposit,
@@ -615,9 +624,9 @@ const main = async () => {
   }
 
   console.log(`Đã khởi tạo ${wards.length} phường, ${universities.length} trường, ${amenities.length} tiện ích và ${posts.length} bài đăng đã duyệt.`);
-  console.log('student@unistay.local / Unistay@123456');
-  console.log('host@unistay.local / Unistay@123456');
-  console.log('admin@unistay.local / Unistay@123456');
+  console.log('student.test@unistay.local / Test@123456');
+  console.log('host.test@unistay.local / Test@123456');
+  console.log('admin.test@unistay.local / Test@123456');
 };
 
 main()

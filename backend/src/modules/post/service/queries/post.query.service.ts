@@ -115,6 +115,7 @@ export const getPosts = async (filters: PostFilters) => {
           select: {
             id: true,
             fullName: true,
+            phone: true,
             avatarUrl: true,
             hosts: {
               select: { isVerified: true }
@@ -365,6 +366,19 @@ export const getPostDetail = async (postId: string) => {
                 }
               }
             }
+          }
+        }
+      }
+      ,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          avatarUrl: true,
+          roles: true,
+          hosts: {
+            select: { isVerified: true, avgStar: true }
           }
         }
       }

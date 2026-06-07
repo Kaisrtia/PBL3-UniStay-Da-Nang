@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import axios from 'axios'
+import { FaCheckCircle, FaEllipsisV, FaFlag, FaHeart, FaPhoneAlt, FaRegHeart, FaUserCircle } from 'react-icons/fa'
 import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -29,6 +30,17 @@ type PostAmenity = {
 type PostDetail = {
   id: string
   userId?: string
+  user?: {
+    id: string
+    fullName?: string
+    phone?: string | null
+    avatarUrl?: string | null
+    roles?: string[]
+    hosts?: {
+      isVerified?: boolean
+      avgStar?: string | number
+    }[]
+  }
   ward?: {
     id: number
     name: string
@@ -41,6 +53,9 @@ type PostDetail = {
   purpose?: string
   roomType: string
   postPurpose: string
+  exactAddress?: string | null
+  district?: string | null
+  city?: string | null
   description: string
   latitude: string | number
   longitude: string | number
@@ -101,6 +116,16 @@ const getStoredUser = () => {
 }
 
 const toNumber = (value: string | number) => Number(value)
+
+const formatPhoneNumber = (value?: string | null) => value || 'Chưa cập nhật'
+
+const reportReasonOptions = [
+  'Thông tin giá thuê không chính xác',
+  'Địa chỉ hoặc vị trí không đúng',
+  'Hình ảnh hoặc mô tả không phù hợp',
+  'Bài đăng có dấu hiệu lừa đảo',
+  'Khác'
+]
 
 const formatCommentTime = (value?: string) => {
   if (!value) return ''
@@ -171,6 +196,10 @@ const PostDetailPage = () => {
   const [storedUser] = useState(() => getStoredUser())
   const [isFavourite, setIsFavourite] = useState(false)
   const [isAccommodationRequested, setIsAccommodationRequested] = useState(false)
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [selectedReportReason, setSelectedReportReason] = useState(reportReasonOptions[0])
+  const [customReportReason, setCustomReportReason] = useState('')
   const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
   const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
   const needsStudentSetup = Boolean(storedUser?.status === 'SET_UP' || (storedUser && !isStudent && !isAdmin))
@@ -255,6 +284,19 @@ const PostDetailPage = () => {
       { label: 'Khu vực', value: post.ward?.name }
     ].filter((item): item is { label: string; value: string } => Boolean(item.value))
   }, [post])
+  const owner = post?.user
+  const ownerName = owner?.fullName || 'Chủ bài đăng'
+  const ownerPhone = formatPhoneNumber(owner?.phone)
+  const ownerVerified = Boolean(owner?.hosts?.some((host) => host.isVerified))
+  const ownerRating = owner?.hosts?.find((host) => host.avgStar !== undefined)?.avgStar
+  const addressLines = useMemo(() => {
+    if (!post) return []
+
+    return [
+      post.exactAddress || post.detailAddress,
+      [post.ward?.name, post.district, post.city].filter(Boolean).join(', ')
+    ].filter(Boolean)
+  }, [post])
 
   useEffect(() => {
     setSelectedImageIndex(0)
@@ -281,7 +323,6 @@ const PostDetailPage = () => {
 
   const handleAddFavourite = () => {
     if (!post) return
-    if (isFavourite) return
 
     if (needsStudentSetup) {
       setActionMessage('')
@@ -289,11 +330,30 @@ const PostDetailPage = () => {
       return
     }
 
-    void runPostAction(async () => {
-      const response = await engagementService.addFavouritePost(post.id)
-      setIsFavourite(true)
-      return response
-    }, 'Đã thêm vào danh sách yêu thích.')
+    if (isSubmittingAction) {
+      return
+    }
+
+    void (async () => {
+      try {
+        setIsSubmittingAction(true)
+        setActionError('')
+        setActionMessage('')
+
+        if (isFavourite) {
+          await engagementService.removeFavouritePost(post.id)
+          setIsFavourite(false)
+          return
+        }
+
+        await engagementService.addFavouritePost(post.id)
+        setIsFavourite(true)
+      } catch {
+        setActionError('Không thể cập nhật trạng thái lưu bài. Vui lòng đăng nhập đúng vai trò và thử lại.')
+      } finally {
+        setIsSubmittingAction(false)
+      }
+    })()
   }
 
   const handleAccommodationRequest = () => {
@@ -341,10 +401,29 @@ const PostDetailPage = () => {
 
   const handleReport = () => {
     if (!post) return
-    const reason = window.prompt('Nhập lý do báo cáo bài đăng:')
-    if (!reason?.trim()) return
+    setIsActionMenuOpen(false)
+    setSelectedReportReason(reportReasonOptions[0])
+    setCustomReportReason('')
+    setIsReportModalOpen(true)
+  }
 
-    void runPostAction(() => engagementService.createReport(post.id, reason.trim()), 'Đã gửi báo cáo bài đăng.')
+  const handleSubmitReport = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!post) return
+
+    const reason =
+      selectedReportReason === 'Khác'
+        ? customReportReason.trim()
+        : [selectedReportReason, customReportReason.trim()].filter(Boolean).join(' - ')
+
+    if (!reason) {
+      setActionError('Vui lòng nhập lý do báo cáo.')
+      return
+    }
+
+    setIsReportModalOpen(false)
+    void runPostAction(() => engagementService.createReport(post.id, reason), 'Đã gửi báo cáo bài đăng.')
   }
 
   const handleBanPostOwner = () => {
@@ -502,18 +581,67 @@ const PostDetailPage = () => {
           )}
 
           <div className='mt-6'>
-            <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>
-              {roomTypeLabel[String(post.roomType)] || post.roomType}
+            <div className='flex flex-wrap items-start justify-between gap-4'>
+              <div className='min-w-0 flex-1'>
+                <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>
+                  {roomTypeLabel[String(post.roomType)] || post.roomType}
+                </p>
+                <h1 className='mt-2 text-3xl font-black text-gray-950'>{post.title}</h1>
+              </div>
+              {!isAdmin ? (
+                <div className='relative flex shrink-0 items-center gap-2'>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleAddFavourite}
+                    className={`grid h-11 w-11 place-items-center rounded-full border text-lg transition ${
+                      isFavourite
+                        ? 'border-[#FFC300] bg-[#FFF2B8] text-[#D79A00]'
+                        : 'border-gray-200 bg-white text-gray-800 hover:border-[#FFC300] hover:text-[#D79A00]'
+                    } disabled:cursor-not-allowed disabled:opacity-70`}
+                    aria-label={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
+                    title={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
+                  >
+                    {isFavourite ? <FaHeart /> : <FaRegHeart />}
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => setIsActionMenuOpen((current) => !current)}
+                    className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                    aria-expanded={isActionMenuOpen}
+                    aria-label='Mở menu thao tác'
+                    title='Thao tác'
+                  >
+                    <FaEllipsisV />
+                  </button>
+                  {isActionMenuOpen ? (
+                    <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                      <button
+                        type='button'
+                        disabled={isSubmittingAction}
+                        onClick={handleReport}
+                        className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                      >
+                        <FaFlag />
+                        Report Post
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div className='mt-4 grid gap-1 text-sm font-semibold text-gray-600'>
+              {addressLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+            <p className='mt-5 text-4xl font-black leading-tight text-[#FF5A3D] drop-shadow-sm'>
+              {currencyFormatter.format(toNumber(post.price))}
+              <span className='ml-2 text-xl font-extrabold text-[#FF5A3D]'>/tháng</span>
             </p>
-            <h1 className='mt-2 text-3xl font-bold text-gray-950'>{post.title}</h1>
-            <p className='mt-3 text-gray-600'>{post.detailAddress}</p>
           </div>
 
-          <div className='mt-6 grid gap-3 sm:grid-cols-3'>
-            <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Giá thuê</p>
-              <p className='mt-1 font-bold text-gray-950'>{currencyFormatter.format(toNumber(post.price))}</p>
-            </div>
+          <div className='mt-6 grid gap-3 sm:grid-cols-2'>
             <div className='rounded-lg bg-gray-50 p-4'>
               <p className='text-sm text-gray-500'>Diện tích</p>
               <p className='mt-1 font-bold text-gray-950'>{areaFormatter.format(toNumber(post.area))} m²</p>
@@ -572,6 +700,30 @@ const PostDetailPage = () => {
           </section>
 
           <aside className='space-y-4'>
+          <section className='rounded-xl bg-[#FFF0C7] p-5 shadow-sm shadow-[#001D3D]/10'>
+            <div className='flex items-center gap-3'>
+              <div className='grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#001D3D]/20 bg-white text-2xl text-[#001D3D]'>
+                {owner?.avatarUrl ? <img src={owner.avatarUrl} alt={ownerName} className='h-full w-full object-cover' /> : <FaUserCircle />}
+              </div>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-2'>
+                  <h2 className='truncate text-lg font-black text-gray-950'>{ownerName}</h2>
+                  {ownerVerified ? <FaCheckCircle className='shrink-0 text-green-500' aria-label='Đã xác minh' /> : null}
+                </div>
+                <p className='mt-1 text-xs font-semibold text-gray-600'>
+                  {ownerRating && Number(ownerRating) >= 0 ? `Đánh giá ${Number(ownerRating).toFixed(1)} sao` : 'Chủ bài đăng UniStay'}
+                </p>
+              </div>
+            </div>
+            <a
+              href={owner?.phone ? `tel:${owner.phone}` : undefined}
+              className='mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#C7A643] px-4 py-3 text-sm font-black text-[#001D3D] shadow-md shadow-[#001D3D]/10 transition hover:bg-[#B9972E]'
+            >
+              <FaPhoneAlt />
+              <span>{ownerPhone}</span>
+            </a>
+          </section>
+
           <section className='rounded-lg bg-white p-5 shadow-sm'>
             <h2 className='text-lg font-bold text-gray-950'>Thao tác</h2>
             <div className='mt-4 grid gap-3'>
@@ -606,27 +758,11 @@ const PostDetailPage = () => {
                 <>
                   <button
                     type='button'
-                    disabled={isSubmittingAction || isFavourite}
-                    onClick={handleAddFavourite}
-                    className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    {isFavourite ? 'Đã lưu bài đăng' : 'Lưu bài đăng'}
-                  </button>
-                  <button
-                    type='button'
                     disabled={isSubmittingAction || isAccommodationRequested}
                     onClick={handleAccommodationRequest}
                     className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
                   >
                     {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
-                  </button>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction}
-                    onClick={handleReport}
-                    className='rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    Báo cáo bài đăng
                   </button>
                 </>
               )}
@@ -685,6 +821,72 @@ const PostDetailPage = () => {
           </aside>
         </article>
       </main>
+      {isReportModalOpen ? (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-[#000814]/60 px-4 backdrop-blur-sm'>
+          <div className='w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl shadow-[#000814]/30'>
+            <div className='flex items-start justify-between gap-4'>
+              <div>
+                <h2 className='text-2xl font-black text-gray-950'>Báo cáo bài đăng</h2>
+                <p className='mt-1 text-sm font-semibold text-gray-500'>Chọn lý do hoặc nhập thêm mô tả để quản trị viên xử lý nhanh hơn.</p>
+              </div>
+              <button
+                type='button'
+                onClick={() => setIsReportModalOpen(false)}
+                className='grid h-9 w-9 place-items-center rounded-full bg-gray-100 text-xl font-bold text-gray-600 transition hover:bg-gray-200'
+                aria-label='Hủy báo cáo'
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReport} className='mt-5 grid gap-4'>
+              <label className='grid gap-2'>
+                <span className='text-sm font-extrabold text-gray-800'>Lý do báo cáo</span>
+                <select
+                  value={selectedReportReason}
+                  onChange={(event) => setSelectedReportReason(event.target.value)}
+                  className='h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+                >
+                  {reportReasonOptions.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className='grid gap-2'>
+                <span className='text-sm font-extrabold text-gray-800'>
+                  {selectedReportReason === 'Khác' ? 'Mô tả lý do' : 'Thông tin bổ sung'}
+                </span>
+                <textarea
+                  value={customReportReason}
+                  onChange={(event) => setCustomReportReason(event.target.value)}
+                  className='min-h-32 resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+                  placeholder='Nhập thêm chi tiết nếu cần...'
+                />
+              </label>
+
+              <div className='mt-2 flex justify-end gap-3'>
+                <button
+                  type='button'
+                  onClick={() => setIsReportModalOpen(false)}
+                  className='rounded-xl border border-gray-200 px-5 py-3 text-sm font-extrabold text-gray-700 transition hover:bg-gray-50'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='submit'
+                  disabled={isSubmittingAction}
+                  className='rounded-xl bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                >
+                  Gửi báo cáo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
       <SiteFooter />
     </div>
   )

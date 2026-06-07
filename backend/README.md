@@ -35,9 +35,9 @@ npm run seed:local
 ```
 
 Accounts:
-- `student@unistay.local` / `Unistay@123456`
-- `host@unistay.local` / `Unistay@123456`
-- `admin@unistay.local` / `Unistay@123456`
+- `student.test@unistay.local` / `Test@123456`
+- `host.test@unistay.local` / `Test@123456`
+- `admin.test@unistay.local` / `Test@123456`
 
 The initializer creates wards, universities, amenities, approved listings, and image URLs so the local application starts with realistic content.
 

@@ -33,8 +33,10 @@ export type HostInfo = {
 export type PostOwner = {
   id: string
   fullName?: string
+  phone?: string | null
   avatarUrl?: string | null
   hosts?: HostInfo[]
+  roles?: string[]
 }
 
 export type Post = {
@@ -44,6 +46,9 @@ export type Post = {
   wardId?: number
   purpose?: PostPurpose | string
   detailAddress: string
+  exactAddress?: string | null
+  district?: string | null
+  city?: string | null
   area: string | number
   price: string | number
   deposit?: string | number
@@ -96,6 +101,9 @@ export type CreatePostPayload = {
   wardId: number
   purpose: PostPurpose
   detailAddress: string
+  exactAddress?: string
+  district?: string
+  city?: string
   area: number
   price: number
   deposit: number
