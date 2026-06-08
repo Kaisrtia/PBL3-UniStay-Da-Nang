@@ -5,6 +5,14 @@ export const demandCacheQueue = new Queue('demandCacheQueue', {
   connection
 });
 
+export const addDemandCacheRefreshJob = async () => {
+  return demandCacheQueue.add('cacheStudentDemands:on-demand', {}, {
+    jobId: 'cacheStudentDemands:on-demand',
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+};
+
 // Initialize the repeatable job to trace and cache student demands
 export const initDemandCacheJob = async () => {
   await demandCacheQueue.add('cacheStudentDemands:startup', {}, {

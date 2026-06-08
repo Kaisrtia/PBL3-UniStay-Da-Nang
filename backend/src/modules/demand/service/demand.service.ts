@@ -2,6 +2,7 @@ import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 import { room_type } from '@prisma/client';
+import { addDemandCacheRefreshJob } from '../queues/cache.queue';
 
 export const createStudentDemand = async (
   studentId: string,
@@ -17,26 +18,6 @@ export const createStudentDemand = async (
     amenityIds?: number[];
   }
 ) => {
-  // Validate the ward
-  const ward = await prismaClient.ward.findUnique({
-    where: { id: data.wardId }
-  });
-
-  if (!ward) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Ward not found');
-  }
-
-  // Validate the university only if provided
-  if (data.universityId) {
-    const university = await prismaClient.university.findUnique({
-      where: { id: data.universityId }
-    });
-
-    if (!university) {
-      throw new AppError(HttpStatus.NOT_FOUND, 'University not found');
-    }
-  }
-
   if (data.minPrice < 0 || data.maxPrice < 0 || data.minPrice > data.maxPrice) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid price range');
   }
@@ -47,25 +28,51 @@ export const createStudentDemand = async (
 
   const amenityIds = Array.from(new Set(data.amenityIds ?? []));
 
-  if (amenityIds.length > 0) {
-    const existingAmenities = await prismaClient.amenity.findMany({
-      where: {
-        id: {
-          in: amenityIds
-        }
-      },
-      select: {
-        id: true
-      }
-    });
-
-    if (existingAmenities.length !== amenityIds.length) {
-      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid amenity IDs');
-    }
-  }
-
   // Upsert the demand limit to 1 per student (since studentId is @id in student_demand)
   const demand = await prismaClient.$transaction(async (tx) => {
+    const student = await tx.student.findUnique({
+      where: { studentId }
+    });
+
+    if (!student) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Student profile not found');
+    }
+
+    const ward = await tx.ward.findUnique({
+      where: { id: data.wardId }
+    });
+
+    if (!ward) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Ward not found');
+    }
+
+    if (data.universityId) {
+      const university = await tx.university.findUnique({
+        where: { id: data.universityId }
+      });
+
+      if (!university) {
+        throw new AppError(HttpStatus.NOT_FOUND, 'University not found');
+      }
+    }
+
+    if (amenityIds.length > 0) {
+      const existingAmenities = await tx.amenity.findMany({
+        where: {
+          id: {
+            in: amenityIds
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (existingAmenities.length !== amenityIds.length) {
+        throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid amenity IDs');
+      }
+    }
+
     await tx.student_demand.upsert({
       where: { studentId },
       update: {
@@ -120,6 +127,10 @@ export const createStudentDemand = async (
         university: true
       }
     });
+  });
+
+  addDemandCacheRefreshJob().catch(err => {
+    console.error('Error enqueueing demand cache refresh job:', err);
   });
 
   return demand;
