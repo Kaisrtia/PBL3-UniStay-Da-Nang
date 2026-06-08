@@ -47,7 +47,9 @@ export const createAccommodationRequest = async (
     throw error;
   }
 
-  await addRequestSharedAccommodationNotificationJob(postId, post.userId);
+  addRequestSharedAccommodationNotificationJob(postId, post.userId).catch(err => {
+    console.error('Error enqueueing accommodation request notification job:', err);
+  });
 
   return request;
 };

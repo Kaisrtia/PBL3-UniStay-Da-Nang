@@ -83,8 +83,10 @@ export const censorPost = async (
     rejectionReason
   );
 
-  await addCensorPostNotificationJob('automated_censoring', {
+  addCensorPostNotificationJob('automated_censoring', {
     notificationId: notification.id
+  }).catch(err => {
+    console.error('Error enqueueing post censor notification job:', err);
   });
 
   if (status === post_status.APPROVED) {

@@ -1,7 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { connection } from '../../../core/config/redis.connection';
 import prismaClient from '../../../core/config/prisma';
-import { notification_type } from '@prisma/client';
 import { addCensorPostNotificationJob } from '../../notification/queues/notification.queue';
 import { createPostCensorNotification } from '../../notification/services/notification.service';
 import { addMatchDemandJob } from '../queues/matchDemand.queue';
@@ -44,6 +43,8 @@ export const finalModerationWorker = new Worker(
       );
       addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
+      }).catch(err => {
+        console.error('Error enqueueing post censor notification job:', err);
       });
     } else if (!textModerationResult.isApproved) {
       await prismaClient.post.update({
@@ -63,6 +64,8 @@ export const finalModerationWorker = new Worker(
       );
       addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
+      }).catch(err => {
+        console.error('Error enqueueing post censor notification job:', err);
       });
     } else {
       await prismaClient.post.update({
@@ -78,8 +81,10 @@ export const finalModerationWorker = new Worker(
         job.data.postId,
         'APPROVED'
       );
-      await addCensorPostNotificationJob('automated_censoring', {
+      addCensorPostNotificationJob('automated_censoring', {
         notificationId: notification.id
+      }).catch(err => {
+        console.error('Error enqueueing post censor notification job:', err);
       });
       await addMatchDemandJob('match_approved_post_ai', {
         postId: job.data.postId
