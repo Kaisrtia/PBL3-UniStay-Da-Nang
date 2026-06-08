@@ -25,22 +25,6 @@ export const setupProfile = async (
     );
   }
 
-  if (user.status !== account_status.SET_UP) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'User profile is already set up or locked'
-    );
-  }
-
-  if (data.phone) {
-    const existingPhone = await prismaClient.user.findFirst({
-      where: { phone: data.phone, id: { not: user.id } }
-    });
-    if (existingPhone) {
-      throw new AppError(HttpStatus.CONFLICT, 'Phone number is already in use');
-    }
-  }
-
   if (data.role === account_role.STUDENT && data.universityId) {
     const university = await prismaClient.university.findUnique({
       where: { id: data.universityId }
@@ -51,10 +35,21 @@ export const setupProfile = async (
   }
 
   const updatedUser = await prismaClient.$transaction(async (tx) => {
+    const currentUser = await tx.user.findUnique({
+      where: { id: user.id }
+    });
+
+    if (!currentUser || currentUser.status !== account_status.SET_UP) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'User profile is already set up or locked'
+      );
+    }
+
     const userUpdated = await tx.user.update({
       where: { id: user.id },
       data: {
-        roles: Array.from(new Set([...user.roles, data.role])),
+        roles: Array.from(new Set([...currentUser.roles, data.role])),
         gender: data.gender,
         dob: data.dob ? new Date(data.dob) : null,
         phone: data.phone,
@@ -107,15 +102,6 @@ export const updateProfile = async (
       HttpStatus.BAD_REQUEST,
       'At least one field is required to update'
     );
-  }
-
-  if (data.phone) {
-    const existingPhone = await prismaClient.user.findFirst({
-      where: { phone: data.phone, id: { not: user.id } }
-    });
-    if (existingPhone) {
-      throw new AppError(HttpStatus.CONFLICT, 'Số điện thoại đã được sử dụng.');
-    }
   }
 
   if (data.universityId && user.roles.includes(account_role.STUDENT)) {
@@ -190,7 +176,20 @@ export const changePassword = async (
 export const getUserProfile = async (targetUserId: string) => {
   const targetUser = await prismaClient.user.findUnique({
     where: { id: targetUserId },
-    include: {
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      phone: true,
+      dob: true,
+      gender: true,
+      avatarUrl: true,
+      emailVerified: true,
+      phoneVerified: true,
+      provider: true,
+      status: true,
+      roles: true,
+      createdAt: true,
       hosts: true,
       student: {
         include: {
@@ -204,10 +203,7 @@ export const getUserProfile = async (targetUserId: string) => {
     throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
   }
 
-  // Remove highly sensitive properties directly
-  const { hashedPassword, ...safeUser } = targetUser;
-
-  return safeUser;
+  return targetUser;
 };
 
 export const getVerificationCandidates = async (
