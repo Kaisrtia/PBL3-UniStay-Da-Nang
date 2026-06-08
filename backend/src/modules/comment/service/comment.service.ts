@@ -1,7 +1,7 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user, comment_status } from '@prisma/client';
+import { user, comment_status, post_status } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
 import { addCommentNotificationJob } from '../../notification/queues/notification.queue';
 
@@ -13,35 +13,55 @@ export const createComment = async (
     parentId?: string;
   }
 ) => {
-  // Validate Post
-  const post = await prismaClient.post.findUnique({ where: { id: data.postId } });
-  if (!post) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  const content = data.content.trim();
+
+  if (!content) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'content is required');
   }
 
-  // Validate parent comment if provided
-  if (data.parentId) {
-    const parentComment = await prismaClient.comment.findUnique({
-      where: { id: data.parentId }
+  const newComment = await prismaClient.$transaction(async (tx) => {
+    const post = await tx.post.findUnique({ where: { id: data.postId } });
+    if (!post) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+    }
+
+    if (post.status !== post_status.APPROVED) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'Cannot comment on a post that is not approved'
+      );
+    }
+
+    if (data.parentId) {
+      const parentComment = await tx.comment.findUnique({
+        where: { id: data.parentId }
+      });
+
+      if (!parentComment) {
+        throw new AppError(HttpStatus.NOT_FOUND, 'Parent comment not found');
+      }
+
+      if (parentComment.postId !== data.postId) {
+        throw new AppError(HttpStatus.BAD_REQUEST, 'Parent comment belongs to a different post');
+      }
+
+      if (parentComment.status !== comment_status.DISPLAYED) {
+        throw new AppError(
+          HttpStatus.BAD_REQUEST,
+          'Cannot reply to a hidden comment'
+        );
+      }
+    }
+
+    return tx.comment.create({
+      data: {
+        id: generateHybridId('cmt_'),
+        userId: currentUser.id,
+        postId: data.postId,
+        content,
+        parentId: data.parentId || null
+      }
     });
-
-    if (!parentComment) {
-      throw new AppError(HttpStatus.NOT_FOUND, 'Parent comment not found');
-    }
-
-    if (parentComment.postId !== data.postId) {
-      throw new AppError(HttpStatus.BAD_REQUEST, 'Parent comment belongs to a different post');
-    }
-  }
-
-  const newComment = await prismaClient.comment.create({
-    data: {
-      id: generateHybridId('cmt_'),
-      userId: currentUser.id,
-      postId: data.postId,
-      content: data.content,
-      parentId: data.parentId || null
-    }
   });
 
   addCommentNotificationJob(newComment.id).catch(err => {
@@ -56,44 +76,94 @@ export const updateComment = async (
   commentId: string,
   content: string
 ) => {
-  const comment = await prismaClient.comment.findUnique({ where: { id: commentId } });
+  const normalizedContent = content.trim();
+
+  if (!normalizedContent) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'content is required');
+  }
+
+  const comment = await prismaClient.$transaction(async (tx) => {
+    const existingComment = await tx.comment.findUnique({
+      where: { id: commentId }
+    });
+
+    if (!existingComment) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
+    }
+
+    if (existingComment.userId !== currentUser.id) {
+      throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to update this comment');
+    }
+
+    const result = await tx.comment.updateMany({
+      where: {
+        id: commentId,
+        userId: currentUser.id,
+        status: comment_status.DISPLAYED
+      },
+      data: {
+        content: normalizedContent,
+        updatedAt: new Date()
+      }
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return tx.comment.findFirst({
+      where: { id: commentId, userId: currentUser.id }
+    });
+  });
 
   if (!comment) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
   }
 
-  if (comment.userId !== currentUser.id) {
-    throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to update this comment');
-  }
-
-  return prismaClient.comment.update({
-    where: { id: commentId },
-    data: {
-      content,
-      updatedAt: new Date()
-    }
-  });
+  return comment;
 };
 
 export const hideComment = async (
   currentUser: user,
   commentId: string
 ) => {
-  const comment = await prismaClient.comment.findUnique({ where: { id: commentId } });
+  const comment = await prismaClient.$transaction(async (tx) => {
+    const existingComment = await tx.comment.findUnique({
+      where: { id: commentId }
+    });
+
+    if (!existingComment) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
+    }
+
+    if (existingComment.userId !== currentUser.id) {
+      throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to hide this comment');
+    }
+
+    const result = await tx.comment.updateMany({
+      where: {
+        id: commentId,
+        userId: currentUser.id,
+        status: comment_status.DISPLAYED
+      },
+      data: {
+        status: comment_status.HIDDEN,
+        updatedAt: new Date()
+      }
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return tx.comment.findFirst({
+      where: { id: commentId, userId: currentUser.id }
+    });
+  });
 
   if (!comment) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
   }
 
-  if (comment.userId !== currentUser.id) {
-    throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to hide this comment');
-  }
-
-  return prismaClient.comment.update({
-    where: { id: commentId },
-    data: {
-      status: comment_status.HIDDEN,
-      updatedAt: new Date()
-    }
-  });
+  return comment;
 };
