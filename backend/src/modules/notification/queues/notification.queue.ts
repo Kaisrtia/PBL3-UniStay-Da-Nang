@@ -17,24 +17,23 @@ const censorManualNotificationQueue = new Queue(
   }
 );
 
-type CensorPostNotificationJob =
-  | {
-      name: 'automated_censoring';
-      data: { notificationId: number };
-    }
-  | {
-      name: 'manual_censoring';
-      data: {
-        postId: string;
-        userId: string;
-        status: post_status;
-        rejectionReason?: string;
-      };
-    };
+type CensorPostNotificationJobData = {
+  automated_censoring: {
+    notificationId: number;
+  };
+  manual_censoring: {
+    postId: string;
+    userId: string;
+    status: post_status;
+    rejectionReason?: string;
+  };
+};
 
-export const addCensorPostNotificationJob = async (
-  name: CensorPostNotificationJob['name'],
-  data: CensorPostNotificationJob['data']
+export const addCensorPostNotificationJob = async <
+  TName extends keyof CensorPostNotificationJobData
+>(
+  name: TName,
+  data: CensorPostNotificationJobData[TName]
 ) => {
   if (name === 'automated_censoring') {
     return await censorAutomaticalNotificationQueue.add(name, data, {
@@ -78,6 +77,8 @@ export const addRequestSharedAccommodationNotificationJob = async (
       jobId,
       delay: 30000,
       attempts: 3,
+      removeOnComplete: true,
+      removeOnFail: true,
       backoff: {
         type: 'exponential',
         delay: 3000
