@@ -239,7 +239,7 @@ model post_image {
 
 model amenity {
   id              Int              @id @default(autoincrement())
-  name            String           @db.VarChar(100)
+  name            String           @unique @db.VarChar(100)
   postAmenities   post_amenity[]
   demandAmenities demand_amenity[]
 }
