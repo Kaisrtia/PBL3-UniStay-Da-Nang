@@ -1,7 +1,6 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import bcrypt from 'bcrypt';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
@@ -70,7 +69,18 @@ export const sendEmailOtpCode = async (email: string) => {
     text: `Your verification code is: ${code}`
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch {
+    await prismaClient.email_verification.update({
+      where: { email },
+      data: { code: null, expiresAt: null }
+    });
+    throw new AppError(
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      'Failed to send verification email'
+    );
+  }
 };
 
 export const verifyEmailOtpCode = async (email: string, code: string) => {
@@ -116,22 +126,27 @@ export const verifyEmailOtpCode = async (email: string, code: string) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid verification code');
   }
 
-  // Mark the email as verified
-  await prismaClient.user.update({
-    where: {
-      email
-    },
-    data: {
-      emailVerified: true,
-      status: 'SET_UP'
-    }
-  });
+  await prismaClient.$transaction([
+    prismaClient.user.update({
+      where: {
+        email
+      },
+      data: {
+        emailVerified: true,
+        status: 'SET_UP'
+      }
+    }),
+    prismaClient.email_verification.delete({
+      where: {
+        email
+      }
+    })
+  ]);
+};
 
-  // Delete the verification token
-  await prismaClient.email_verification.delete({
-    where: {
-      email
-    }
+const cleanupPasswordResetToken = async (email: string) => {
+  await prismaClient.email_verification.deleteMany({
+    where: { email }
   });
 };
 
@@ -201,7 +216,15 @@ export const sendPasswordResetLink = async (email: string) => {
     `
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch {
+    await cleanupPasswordResetToken(email);
+    throw new AppError(
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      'Failed to send password reset email'
+    );
+  }
 };
 
 export const resetPasswordWithToken = async (
@@ -229,13 +252,13 @@ export const resetPasswordWithToken = async (
 
   const newHashedPassword = bcrypt.hashSync(newPassword, 10);
 
-  await prismaClient.user.update({
-    where: { email: record.email },
-    data: { hashedPassword: newHashedPassword }
-  });
-
-  // Delete the token so it cannot be reused
-  await prismaClient.email_verification.delete({
-    where: { email: record.email }
-  });
+  await prismaClient.$transaction([
+    prismaClient.user.update({
+      where: { email: record.email },
+      data: { hashedPassword: newHashedPassword }
+    }),
+    prismaClient.email_verification.delete({
+      where: { email: record.email }
+    })
+  ]);
 };
