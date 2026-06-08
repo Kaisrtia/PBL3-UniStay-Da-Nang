@@ -1,7 +1,7 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user } from '@prisma/client';
+import { Prisma, user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
 import { addRequestSharedAccommodationNotificationJob } from '../../notification/queues/notification.queue';
 
@@ -29,9 +29,23 @@ export const createAccommodationRequest = async (
     );
   }
 
-  const request = await prismaClient.accomodation_request.create({
-    data: { postId, userId: currentUser.id }
-  });
+  let request;
+  try {
+    request = await prismaClient.accomodation_request.create({
+      data: { postId, userId: currentUser.id }
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new AppError(
+        HttpStatus.CONFLICT,
+        'You have already submitted a request for this post'
+      );
+    }
+    throw error;
+  }
 
   await addRequestSharedAccommodationNotificationJob(postId, post.userId);
 
