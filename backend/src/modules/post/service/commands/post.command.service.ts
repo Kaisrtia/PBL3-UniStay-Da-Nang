@@ -6,13 +6,47 @@ import {
   room_type,
   post_purpose,
   amenity_condition,
-  post_status
+  post_status,
+  Prisma
 } from '@prisma/client';
 import { generateHybridId } from '../../../../core/utils/generateId';
 import { addModerationFlow } from '../../queues/moderation.queue';
 import { addCensorPostNotificationJob } from '../../../notification/queues/notification.queue';
 import { addMatchDemandJob } from '../../queues/matchDemand.queue';
 import { createPostCensorNotification } from '../../../notification/services/notification.service';
+
+type PostAmenityInput = {
+  amenityId: number;
+  currentCondition?: amenity_condition;
+};
+
+const validatePostAmenities = async (
+  postAmenities: PostAmenityInput[] | undefined,
+  client: Prisma.TransactionClient | typeof prismaClient
+) => {
+  if (!postAmenities || postAmenities.length === 0) return;
+
+  const amenityIds = postAmenities.map(({ amenityId }) => amenityId);
+
+  if (new Set(amenityIds).size !== amenityIds.length) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Post amenities must not contain duplicate amenity IDs'
+    );
+  }
+
+  const existingAmenities = await client.amenity.count({
+    where: {
+      id: {
+        in: amenityIds
+      }
+    }
+  });
+
+  if (existingAmenities !== amenityIds.length) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid amenity IDs');
+  }
+};
 
 const applyRolePostRules = <T extends {
   purpose?: string;
@@ -128,6 +162,7 @@ export const createPost = async (
   if (!ward) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Ward not found');
   }
+  await validatePostAmenities(normalizedData.postAmenities, prismaClient);
 
   // Create post with nested images and amenities
   const post = await prismaClient.post.create({
@@ -252,6 +287,8 @@ export const updatePost = async (
   }
 
   return prismaClient.$transaction(async (tx) => {
+    await validatePostAmenities(normalizedData.postAmenities, tx);
+
     // Basic update
     await tx.post.update({
       where: { id: postId },
