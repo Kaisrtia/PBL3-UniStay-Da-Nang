@@ -12,6 +12,7 @@ import { generateHybridId } from '../../../../core/utils/generateId';
 import { addModerationFlow } from '../../queues/moderation.queue';
 import { addCensorPostNotificationJob } from '../../../notification/queues/notification.queue';
 import { addMatchDemandJob } from '../../queues/matchDemand.queue';
+import { createPostCensorNotification } from '../../../notification/services/notification.service';
 
 const applyRolePostRules = <T extends {
   purpose?: string;
@@ -74,12 +75,18 @@ export const censorPost = async (
       }
     }
   });
-  await addCensorPostNotificationJob('manual_censoring', {
-    postId: post.id,
-    userId: post.userId,
+
+  const notification = await createPostCensorNotification(
+    post.userId,
+    post.id,
     status,
     rejectionReason
+  );
+
+  await addCensorPostNotificationJob('automated_censoring', {
+    notificationId: notification.id
   });
+
   if (status === post_status.APPROVED) {
     await addMatchDemandJob('match_approved_post_admin', { postId: post.id });
   }
@@ -167,7 +174,17 @@ export const createPost = async (
     }
   });
   // Enqueue moderation job to check for invalid image or description
-  await addModerationFlow(post.id);
+  try {
+    await addModerationFlow(post.id);
+  } catch {
+    await prismaClient.post.update({
+      where: { id: post.id },
+      data: {
+        rejectionReason:
+          'Post was created, but automatic moderation could not be queued. Please review manually.'
+      }
+    });
+  }
   return post;
 };
 
