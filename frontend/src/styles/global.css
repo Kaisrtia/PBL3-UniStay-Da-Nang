@@ -38,3 +38,85 @@ html {
   content: '';
   transform: translate(-50%, -50%);
 }
+
+.nearby-map .leaflet-container {
+  z-index: 0;
+}
+
+.nearby-map .leaflet-popup-content,
+.nearby-map .leaflet-popup-content * {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.nearby-post-marker-icon,
+.nearby-origin-marker-icon {
+  background: transparent;
+  border: 0;
+}
+
+.nearby-post-marker {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 3px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  box-shadow: 0 12px 24px rgb(0 29 61 / 28%);
+  transform: rotate(-45deg);
+}
+
+.nearby-post-marker svg {
+  width: 21px;
+  height: 21px;
+  fill: currentColor;
+  transform: rotate(45deg);
+}
+
+.nearby-post-marker--rent {
+  background: #0d63c2;
+  color: #ffffff;
+}
+
+.nearby-post-marker--roommate {
+  background: #ffc300;
+  color: #001d3d;
+}
+
+.nearby-origin-marker {
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  background: #001d3d;
+  box-shadow: 0 10px 22px rgb(0 29 61 / 30%);
+}
+
+.nearby-origin-marker::before,
+.nearby-origin-marker::after {
+  position: absolute;
+  background: #ffc300;
+  content: '';
+}
+
+.nearby-origin-marker::before {
+  top: 50%;
+  left: 7px;
+  right: 7px;
+  height: 3px;
+  transform: translateY(-50%);
+}
+
+.nearby-origin-marker::after {
+  top: 7px;
+  bottom: 7px;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+}

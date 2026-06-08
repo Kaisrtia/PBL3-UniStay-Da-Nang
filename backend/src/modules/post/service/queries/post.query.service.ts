@@ -32,6 +32,35 @@ export interface PostFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
+export interface NearbyPostFilters {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  limit?: number;
+}
+
+const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+const calculateDistanceKm = (
+  originLatitude: number,
+  originLongitude: number,
+  targetLatitude: number,
+  targetLongitude: number
+) => {
+  const earthRadiusKm = 6371;
+  const latitudeDistance = degreesToRadians(targetLatitude - originLatitude);
+  const longitudeDistance = degreesToRadians(targetLongitude - originLongitude);
+
+  const a =
+    Math.sin(latitudeDistance / 2) * Math.sin(latitudeDistance / 2) +
+    Math.cos(degreesToRadians(originLatitude)) *
+      Math.cos(degreesToRadians(targetLatitude)) *
+      Math.sin(longitudeDistance / 2) *
+      Math.sin(longitudeDistance / 2);
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 export const getPosts = async (
   filters: PostFilters,
   currentUserId?: string
@@ -146,6 +175,89 @@ export const getPosts = async (
       page,
       limit,
       totalPages: Math.ceil(totalCount / limit)
+    }
+  };
+};
+
+export const getNearbyPosts = async (
+  filters: NearbyPostFilters,
+  currentUserId?: string
+) => {
+  const limit = filters.limit ?? 80;
+  const where: Prisma.postWhereInput = {
+    status: 'APPROVED'
+  };
+
+  const blockedPostFilter =
+    await blockService.getBlockedUserFilter(currentUserId);
+  if (Object.keys(blockedPostFilter).length > 0) {
+    where.AND = [blockedPostFilter];
+  }
+
+  const posts = await prismaClient.post.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      postImages: true,
+      postAmenities: {
+        include: { amenity: true }
+      },
+      ward: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          avatarUrl: true,
+          hosts: {
+            select: { isVerified: true }
+          }
+        }
+      },
+      _count: {
+        select: { comments: true }
+      }
+    }
+  });
+
+  const nearbyPosts = posts
+    .map((post) => {
+      const latitude = Number(post.latitude);
+      const longitude = Number(post.longitude);
+
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return null;
+      }
+
+      const distanceKm = calculateDistanceKm(
+        filters.latitude,
+        filters.longitude,
+        latitude,
+        longitude
+      );
+
+      return {
+        ...post,
+        distanceKm: Number(distanceKm.toFixed(2))
+      };
+    })
+    .filter(
+      (post): post is NonNullable<typeof post> =>
+        post !== null && post.distanceKm <= filters.radiusKm
+    )
+    .sort((first, second) => first.distanceKm - second.distanceKm)
+    .slice(0, limit);
+
+  return {
+    data: nearbyPosts,
+    meta: {
+      total: nearbyPosts.length,
+      limit,
+      radiusKm: filters.radiusKm,
+      origin: {
+        latitude: filters.latitude,
+        longitude: filters.longitude
+      }
     }
   };
 };

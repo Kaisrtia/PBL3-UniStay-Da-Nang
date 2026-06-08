@@ -5,10 +5,12 @@ export type Ward = {
   name: string
 }
 
-type University = {
+export type University = {
   id: string
   name: string
   ward?: Ward | null
+  latitude?: string | number | null
+  longitude?: string | number | null
 }
 
 type ApiResponse<T> = {
