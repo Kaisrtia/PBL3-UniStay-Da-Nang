@@ -119,6 +119,19 @@ export type NearbyPostsResponse = {
   }
 }
 
+export type RoutePathFilters = {
+  fromLat: number
+  fromLng: number
+  toLat: number
+  toLng: number
+}
+
+export type RoutePath = {
+  distanceKm: number
+  durationMinutes: number
+  geometry: [number, number][]
+}
+
 export type CreatePostPayload = {
   title: string
   wardId: number
@@ -192,6 +205,11 @@ export const postService = {
   getNearbyPosts: async (filters: NearbyPostFilters) => {
     const response = await api.get<PostResponse<NearbyPostsResponse>>(`/posts/nearby${buildPostQuery(filters)}`)
     return response.data.data || { data: [] }
+  },
+
+  getRoutePath: async (filters: RoutePathFilters) => {
+    const response = await api.get<PostResponse<RoutePath>>(`/posts/route${buildPostQuery(filters)}`)
+    return response.data.data
   },
 
   getMyPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'>) => {

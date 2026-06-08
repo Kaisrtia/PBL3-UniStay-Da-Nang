@@ -71,6 +71,12 @@ postRouter.get(
   asyncHandler(postController.handleGetNearbyPosts)
 );
 
+// Calculate one road-network route after a user selects a specific post marker
+postRouter.get(
+  '/route',
+  asyncHandler(postController.handleGetRoutePath)
+);
+
 // -- Favourite Posts --
 
 // List favourite posts (Student only)

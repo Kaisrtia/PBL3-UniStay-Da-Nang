@@ -6,6 +6,7 @@ import {
   MapContainer,
   Marker,
   Popup,
+  Polyline,
   TileLayer,
   useMap,
   useMapEvents
@@ -25,13 +26,17 @@ import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import locationService, { type University } from '@/services/locationService'
-import postService, { type NearbyPost } from '@/services/postService'
+import postService, { type NearbyPost, type RoutePath } from '@/services/postService'
 
 type SelectedPoint = {
   lat: number
   lng: number
   label: string
   source: 'custom' | 'university'
+}
+
+type SelectedRoute = RoutePath & {
+  postId: string
 }
 
 const defaultMapCenter: [number, number] = [16.0544, 108.2022]
@@ -68,6 +73,14 @@ const formatDistance = (distanceKm?: number) => {
   }
 
   return distanceKm! < 1 ? `${Math.round(distanceKm! * 1000)} m` : `${distanceKm!.toFixed(1)} km`
+}
+
+const formatDuration = (durationMinutes?: number) => {
+  if (!Number.isFinite(durationMinutes)) {
+    return 'Chưa rõ'
+  }
+
+  return durationMinutes! <= 1 ? 'Khoảng 1 phút' : `Khoảng ${Math.round(durationMinutes!)} phút`
 }
 
 const isValidCoordinate = (latitude: number, longitude: number) =>
@@ -191,6 +204,9 @@ const NearbyPostsPage = () => {
   const [radiusKm, setRadiusKm] = useState(3)
   const [posts, setPosts] = useState<NearbyPost[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectedRoute, setSelectedRoute] = useState<SelectedRoute | null>(null)
+  const [routeLoadingPostId, setRouteLoadingPostId] = useState<string | null>(null)
+  const [routeErrorPostId, setRouteErrorPostId] = useState<string | null>(null)
   const [loadingUniversities, setLoadingUniversities] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -225,12 +241,18 @@ const NearbyPostsPage = () => {
     const loadNearbyPosts = async () => {
       if (!selectedPoint) {
         setPosts([])
+        setSelectedRoute(null)
+        setRouteLoadingPostId(null)
+        setRouteErrorPostId(null)
         return
       }
 
       try {
         setLoading(true)
         setErrorMessage('')
+        setSelectedRoute(null)
+        setRouteLoadingPostId(null)
+        setRouteErrorPostId(null)
         const result = await postService.getNearbyPosts({
           lat: selectedPoint.lat,
           lng: selectedPoint.lng,
@@ -251,6 +273,9 @@ const NearbyPostsPage = () => {
 
   const handlePickPoint = (lat: number, lng: number) => {
     setSelectedUniversityId('')
+    setSelectedRoute(null)
+    setRouteLoadingPostId(null)
+    setRouteErrorPostId(null)
     setSelectedPoint({
       lat,
       lng,
@@ -265,7 +290,46 @@ const NearbyPostsPage = () => {
     const point = university ? getUniversityPoint(university) : null
 
     if (point) {
+      setSelectedRoute(null)
+      setRouteLoadingPostId(null)
+      setRouteErrorPostId(null)
       setSelectedPoint(point)
+    }
+  }
+
+  const handlePostMarkerClick = async (post: NearbyPost) => {
+    if (!selectedPoint) {
+      return
+    }
+
+    const lat = Number(post.latitude)
+    const lng = Number(post.longitude)
+
+    if (!isValidCoordinate(lat, lng)) {
+      return
+    }
+
+    try {
+      setRouteLoadingPostId(post.id)
+      setRouteErrorPostId(null)
+      const route = await postService.getRoutePath({
+        fromLat: selectedPoint.lat,
+        fromLng: selectedPoint.lng,
+        toLat: lat,
+        toLng: lng
+      })
+
+      if (route) {
+        setSelectedRoute({
+          ...route,
+          postId: post.id
+        })
+      }
+    } catch {
+      setSelectedRoute(null)
+      setRouteErrorPostId(post.id)
+    } finally {
+      setRouteLoadingPostId(null)
     }
   }
 
@@ -361,6 +425,12 @@ const NearbyPostsPage = () => {
                     </Marker>
                   </>
                 )}
+                {selectedRoute && selectedRoute.geometry.length > 1 && (
+                  <Polyline
+                    positions={selectedRoute.geometry}
+                    pathOptions={{ color: '#0D63C2', opacity: 0.92, weight: 6 }}
+                  />
+                )}
                 {posts.map((post) => {
                   const lat = Number(post.latitude)
                   const lng = Number(post.longitude)
@@ -370,12 +440,28 @@ const NearbyPostsPage = () => {
                   }
 
                   return (
-                    <Marker key={post.id} position={[lat, lng]} icon={createPostIcon(post)}>
+                    <Marker
+                      key={post.id}
+                      position={[lat, lng]}
+                      icon={createPostIcon(post)}
+                      eventHandlers={{ click: () => void handlePostMarkerClick(post) }}
+                    >
                       <Popup minWidth={260}>
                         <div className='w-64 space-y-3'>
                           <img src={getPostImage(post)} alt={post.title} className='h-28 w-full rounded-md object-cover' />
                           <div>
                             <p className='text-xs font-extrabold text-[#0D63C2]'>{formatDistance(post.distanceKm)} từ điểm chọn</p>
+                            {routeLoadingPostId === post.id && (
+                              <p className='mt-1 text-xs font-bold text-gray-500'>Đang tính đường đi...</p>
+                            )}
+                            {selectedRoute?.postId === post.id && (
+                              <p className='mt-1 text-xs font-bold text-[#0D63C2]'>
+                                {formatDistance(selectedRoute.distanceKm)} theo đường đi · {formatDuration(selectedRoute.durationMinutes)}
+                              </p>
+                            )}
+                            {routeErrorPostId === post.id && (
+                              <p className='mt-1 text-xs font-bold text-red-500'>Không tính được tuyến đường.</p>
+                            )}
                             <h3 className='mt-1 line-clamp-2 text-sm font-extrabold text-[#181A20]'>{post.title}</h3>
                             <p className='mt-1 text-sm font-bold text-[#003566]'>{formatCurrency(post.price)}</p>
                           </div>
