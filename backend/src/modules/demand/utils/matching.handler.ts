@@ -1,4 +1,32 @@
-export const calculateScore = (post: any, demand: any) => {
+type AmenityRef = {
+  amenityId?: unknown;
+  amenity?: {
+    id?: unknown;
+  } | null;
+};
+
+type MatchablePost = {
+  price: unknown;
+  wardId: number;
+  area: unknown;
+  postPurpose: string;
+  roomType: string;
+  postAmenities?: AmenityRef[] | null;
+};
+
+type MatchableDemand = {
+  minPrice: unknown;
+  maxPrice: unknown;
+  wardId: number;
+  isLookingForRoommate: boolean;
+  roomType: string;
+  demandAmenities?: AmenityRef[] | null;
+  student?: {
+    demandAmenities?: AmenityRef[] | null;
+  } | null;
+};
+
+export const calculateScore = (post: MatchablePost, demand: MatchableDemand) => {
   let score = 0;
 
   // 1. Price (0.35 weight)
@@ -42,11 +70,11 @@ export const calculateScore = (post: any, demand: any) => {
 
   const postAmenityIds = new Set(
     (post.postAmenities ?? [])
-      .map((item: any) => Number(item.amenityId ?? item.amenity?.id))
+      .map((item) => Number(item.amenityId ?? item.amenity?.id))
       .filter((item: number) => Number.isInteger(item))
   );
   const demandAmenityIds = (demand.student?.demandAmenities ?? demand.demandAmenities ?? [])
-    .map((item: any) => Number(item.amenityId ?? item.amenity?.id))
+    .map((item) => Number(item.amenityId ?? item.amenity?.id))
     .filter((item: number) => Number.isInteger(item));
 
   if (postAmenityIds.size > 0 && demandAmenityIds.length > 0) {

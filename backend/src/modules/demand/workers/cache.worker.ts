@@ -4,7 +4,7 @@ import prismaClient from '../../../core/config/prisma';
 
 export const demandCacheWorker = new Worker(
   'demandCacheQueue',
-  async (job) => {
+  async () => {
     try {
       console.log(
         'Running demandCacheWorker: caching student demands to Redis'
