@@ -1,7 +1,7 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { user } from '@prisma/client';
+import { Prisma, user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
 
 export const getFavouritePosts = async (
@@ -71,9 +71,22 @@ export const addFavouritePost = async (currentUser: user, postId: string) => {
     );
   }
 
-  return prismaClient.student_favorite_post.create({
-    data: { studentId: currentUser.id, postId }
-  });
+  try {
+    return await prismaClient.student_favorite_post.create({
+      data: { studentId: currentUser.id, postId }
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new AppError(
+        HttpStatus.CONFLICT,
+        'Bài đăng đã có trong danh sách yêu thích.'
+      );
+    }
+    throw error;
+  }
 };
 
 export const removeFavouritePost = async (
@@ -91,7 +104,20 @@ export const removeFavouritePost = async (
     );
   }
 
-  await prismaClient.student_favorite_post.delete({
-    where: { studentId_postId: { studentId: currentUser.id, postId } }
-  });
+  try {
+    await prismaClient.student_favorite_post.delete({
+      where: { studentId_postId: { studentId: currentUser.id, postId } }
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2025'
+    ) {
+      throw new AppError(
+        HttpStatus.NOT_FOUND,
+        'Bài đăng không có trong danh sách yêu thích.'
+      );
+    }
+    throw error;
+  }
 };
