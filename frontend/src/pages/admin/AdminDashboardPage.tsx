@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { FaCheck, FaClipboardList, FaEye, FaShieldAlt, FaTimes, FaUsers } from 'react-icons/fa'
+import { FaCheck, FaClipboardList, FaEye, FaShieldAlt, FaSyncAlt, FaTimes, FaUsers } from 'react-icons/fa'
 import { Link, useLocation } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -21,30 +21,30 @@ type AdminDashboardPageProps = {
 }
 
 const statusLabels: Record<string, string> = {
-  PENDING: 'Chá» duyá»‡t',
-  APPROVED: 'ÄÃ£ duyá»‡t',
-  REJECTED: 'Tá»« chá»‘i',
-  UPDATED: 'Cáº­p nháº­t',
-  HIDDEN: 'ÄÃ£ áº©n',
-  ACTIVE: 'Hoáº¡t Ä‘á»™ng',
-  BANNED: 'Bá»‹ khÃ³a',
-  LOCKED: 'Chá» má»Ÿ',
-  SET_UP: 'Thiáº¿t láº­p'
+  PENDING: 'Chờ duyệt',
+  APPROVED: 'Đã duyệt',
+  REJECTED: 'Từ chối',
+  UPDATED: 'Cập nhật',
+  HIDDEN: 'Đã ẩn',
+  ACTIVE: 'Hoạt động',
+  BANNED: 'Bị khóa',
+  LOCKED: 'Chờ mở',
+  SET_UP: 'Thiết lập'
 }
 
 const reportStatusLabels: Record<AdminReportStatus, string> = {
-  PENDING: 'Chá» xá»­ lÃ½',
-  RESOLVED: 'ÄÃ£ xá»­ lÃ½',
-  REJECTED: 'ÄÃ£ tá»« chá»‘i',
-  HIDDEN: 'ÄÃ£ áº©n'
+  PENDING: 'Chờ xử lý',
+  RESOLVED: 'Đã xử lý',
+  REJECTED: 'Đã từ chối',
+  HIDDEN: 'Đã ẩn'
 }
 
 const adminTabs: { label: string; value: AdminTab; to: string }[] = [
-  { label: 'Tá»•ng quan', value: 'overview', to: '/admin/overview' },
-  { label: 'BÃ i Ä‘Äƒng', value: 'posts', to: '/admin/posts' },
-  { label: 'NgÆ°á»i dÃ¹ng', value: 'users', to: '/admin/users' },
-  { label: 'BÃ¡o cÃ¡o', value: 'reports', to: '/admin/reports' },
-  { label: 'XÃ¡c minh', value: 'hosts', to: '/admin/hosts' }
+  { label: 'Tổng quan', value: 'overview', to: '/admin/overview' },
+  { label: 'Bài đăng', value: 'posts', to: '/admin/posts' },
+  { label: 'Người dùng', value: 'users', to: '/admin/users' },
+  { label: 'Báo cáo', value: 'reports', to: '/admin/reports' },
+  { label: 'Xác minh', value: 'hosts', to: '/admin/hosts' }
 ]
 
 const formatNumber = (value?: number) => new Intl.NumberFormat('vi-VN').format(value || 0)
@@ -58,6 +58,8 @@ const getStatusClass = (status?: string) => {
 
 const getPostCountByStatus = (stats: AdminPostStatistic, status: string) =>
   stats.byStatus?.find((item) => item.status === status)?.count || 0
+
+const REPORTS_PER_PAGE = 10
 
 type ChartPoint = {
   label: string
@@ -116,43 +118,43 @@ const ActivityChart = ({ title, data }: { title: string; data: ChartPoint[] }) =
   const maxValue = Math.max(...data.flatMap((item) => [item.posts, item.approved]), 1)
 
   return (
-  <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
-    <div className='flex items-start justify-between gap-6'>
-      <h2 className='text-3xl font-extrabold text-[#181A20]'>{title}</h2>
-      <div className='flex items-center gap-5 text-xs font-bold text-gray-500'>
-        <span className='flex items-center gap-2'>
-          <span className='h-3 w-3 rounded-full bg-[#001D3D]' />
-          BÃ i Ä‘Äƒng
-        </span>
-        <span className='flex items-center gap-2'>
-          <span className='h-3 w-3 rounded-full bg-[#FFC300]' />
-          ÄÃ£ duyá»‡t
-        </span>
-      </div>
-    </div>
-    <div className='mt-7 flex h-64 items-end gap-4 border-y border-gray-100 px-2 py-4'>
-      {data.map((item) => (
-        <div key={item.label} className='flex h-full min-w-0 flex-1 flex-col justify-end'>
-          <div className='flex h-full items-end justify-center gap-1'>
-            <span
-              className='w-4 rounded-t-md bg-[#001D3D]'
-              title={`${item.posts} bÃ i Ä‘Äƒng`}
-              style={{ height: `${Math.max(8, (item.posts / maxValue) * 100)}%` }}
-            />
-            <span
-              className='w-4 rounded-t-md bg-[#FFC300]'
-              title={`${item.approved} bÃ i Ä‘Ã£ duyá»‡t`}
-              style={{ height: `${Math.max(8, (item.approved / maxValue) * 100)}%` }}
-            />
-          </div>
-          <span className='mt-3 truncate text-center text-[10px] font-extrabold text-gray-400'>{item.label}</span>
+    <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
+      <div className='flex items-start justify-between gap-6'>
+        <h2 className='text-3xl font-extrabold text-[#181A20]'>{title}</h2>
+        <div className='flex items-center gap-5 text-xs font-bold text-gray-500'>
+          <span className='flex items-center gap-2'>
+            <span className='h-3 w-3 rounded-full bg-[#001D3D]' />
+            Bài đăng
+          </span>
+          <span className='flex items-center gap-2'>
+            <span className='h-3 w-3 rounded-full bg-[#FFC300]' />
+            Đã duyệt
+          </span>
         </div>
-      ))}
-    </div>
-    <p className='mt-3 text-xs font-semibold text-gray-500'>
-      Dá»±a trÃªn thá»i Ä‘iá»ƒm táº¡o cá»§a cÃ¡c bÃ i Ä‘Äƒng Ä‘ang táº£i trong trang quáº£n trá»‹.
-    </p>
-  </section>
+      </div>
+      <div className='mt-7 flex h-64 items-end gap-4 border-y border-gray-100 px-2 py-4'>
+        {data.map((item) => (
+          <div key={item.label} className='flex h-full min-w-0 flex-1 flex-col justify-end'>
+            <div className='flex h-full items-end justify-center gap-1'>
+              <span
+                className='w-4 rounded-t-md bg-[#001D3D]'
+                title={`${item.posts} bài đăng`}
+                style={{ height: `${Math.max(8, (item.posts / maxValue) * 100)}%` }}
+              />
+              <span
+                className='w-4 rounded-t-md bg-[#FFC300]'
+                title={`${item.approved} bài đã duyệt`}
+                style={{ height: `${Math.max(8, (item.approved / maxValue) * 100)}%` }}
+              />
+            </div>
+            <span className='mt-3 truncate text-center text-[10px] font-extrabold text-gray-400'>{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <p className='mt-3 text-xs font-semibold text-gray-500'>
+        Dựa trên thời điểm tạo của các bài đăng đang tải trong trang quản trị.
+      </p>
+    </section>
   )
 }
 
@@ -164,7 +166,7 @@ const AdminShell = ({ activeTab, children }: AdminDashboardPageProps & { childre
       <SiteHeader accountLabel='Admin' />
       <main className='mx-auto max-w-[1440px] px-8 py-10'>
         <div className='flex flex-wrap items-center justify-between gap-5'>
-          <h1 className='text-4xl font-black tracking-wide'>TRANG THá»NG KÃŠ</h1>
+          <h1 className='text-4xl font-black tracking-wide'>TRANG THỐNG KÊ</h1>
           <nav className='flex rounded-lg bg-gray-200 p-1 text-sm font-bold shadow-inner'>
             {adminTabs.map((tab) => (
               <Link
@@ -208,9 +210,9 @@ const PeriodControls = ({
   <section className='rounded-2xl bg-white p-5 shadow-lg shadow-black/15'>
     <div className='flex gap-4'>
       {[
-        ['day', 'HÃ´m nay'],
-        ['week', 'Tuáº§n nÃ y'],
-        ['month', 'ThÃ¡ng nÃ y']
+        ['day', 'Hôm nay'],
+        ['week', 'Tuần này'],
+        ['month', 'Tháng này']
       ].map(([value, label]) => (
         <button
           key={value}
@@ -230,12 +232,18 @@ const PeriodControls = ({
 const DateFilterCard = () => (
   <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
     <label className='flex items-center justify-between gap-4 text-lg font-medium'>
-      NgÃ y báº¯t Ä‘áº§u
-      <input type='date' className='h-10 w-44 rounded-full border border-[#001D3D] px-4 outline-none focus:ring-2 focus:ring-[#FFC300]' />
+      Ngày bắt đầu
+      <input
+        type='date'
+        className='h-10 w-44 rounded-full border border-[#001D3D] px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+      />
     </label>
     <label className='mt-5 flex items-center justify-between gap-4 text-lg font-medium'>
-      NgÃ y káº¿t thÃºc
-      <input type='date' className='h-10 w-44 rounded-full border border-[#001D3D] px-4 outline-none focus:ring-2 focus:ring-[#FFC300]' />
+      Ngày kết thúc
+      <input
+        type='date'
+        className='h-10 w-44 rounded-full border border-[#001D3D] px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+      />
     </label>
   </section>
 )
@@ -244,7 +252,7 @@ const RegionalStatistics = ({ posts }: { posts: Post[] }) => {
   const regionalData = useMemo(() => {
     const counts = new Map<string, number>()
     posts.forEach((post) => {
-      const wardName = post.ward?.name || 'ChÆ°a rÃµ'
+      const wardName = post.ward?.name || 'Chưa rõ'
       counts.set(wardName, (counts.get(wardName) || 0) + 1)
     })
 
@@ -257,7 +265,7 @@ const RegionalStatistics = ({ posts }: { posts: Post[] }) => {
 
   return (
     <section className='rounded-2xl bg-white p-6 shadow-lg shadow-black/15'>
-      <h2 className='text-xl font-extrabold text-gray-700'>Thá»‘ng kÃª theo khu vá»±c</h2>
+      <h2 className='text-xl font-extrabold text-gray-700'>Thống kê theo khu vực</h2>
       <div className='mt-6 grid gap-5'>
         {regionalData.map((item) => (
           <div key={item.name}>
@@ -272,7 +280,7 @@ const RegionalStatistics = ({ posts }: { posts: Post[] }) => {
         ))}
       </div>
       <button className='mt-8 h-14 w-full rounded-lg bg-gray-100 text-base font-extrabold text-gray-500'>
-        Xem chi tiáº¿t
+        Xem chi tiết
       </button>
     </section>
   )
@@ -298,30 +306,34 @@ const OverviewContent = () => {
         setPosts(postResult.data)
         setUsers(userResult.data)
       } catch {
-        setErrorMessage('KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u admin. HÃ£y Ä‘Äƒng nháº­p báº±ng tÃ i khoáº£n ADMIN.')
+        setErrorMessage('Không tải được dữ liệu admin. Hãy đăng nhập bằng tài khoản ADMIN.')
       }
     }
 
     void loadOverview()
   }, [period])
 
-  const recentFlaggedPosts = posts.filter((post) => (post._count?.comments || 0) > 0 || post.status !== 'APPROVED').slice(0, 3)
+  const recentFlaggedPosts = posts
+    .filter((post) => (post._count?.comments || 0) > 0 || post.status !== 'APPROVED')
+    .slice(0, 3)
   const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
   const hourlyChartData = useMemo(() => buildHourlyChartData(posts), [posts])
 
   return (
     <AdminShell activeTab='overview'>
-      {errorMessage ? <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{errorMessage}</p>
+      ) : null}
 
       <section className='mt-12 grid gap-16 lg:grid-cols-2'>
-        <StatCard label='Tá»•ng ngÆ°á»i dÃ¹ng' value={users.length ? users.length : 0} />
-        <StatCard label='Sá»‘ lÆ°á»£ng bÃ i Ä‘Äƒng má»›i' value={stats.totalPosts || posts.length} />
+        <StatCard label='Tổng người dùng' value={users.length ? users.length : 0} />
+        <StatCard label='Số lượng bài đăng mới' value={stats.totalPosts || posts.length} />
       </section>
 
       <section className='mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_360px]'>
         <div className='grid gap-10'>
-          <ActivityChart title='Thá»‘ng kÃª theo ngÃ y' data={dailyChartData} />
-          <ActivityChart title='Thá»‘ng kÃª theo giá»' data={hourlyChartData} />
+          <ActivityChart title='Thống kê theo ngày' data={dailyChartData} />
+          <ActivityChart title='Thống kê theo giờ' data={hourlyChartData} />
         </div>
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
@@ -332,24 +344,24 @@ const OverviewContent = () => {
 
       <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
         <div className='flex items-start justify-between gap-6'>
-          <h2 className='text-3xl font-extrabold'>Gáº§n Ä‘Ã¢y - bÃ i Ä‘Äƒng cáº§n xá»­ lÃ½</h2>
-          <p className='text-sm text-gray-500'>Æ¯u tiÃªn tin bá»‹ bÃ¡o cÃ¡o hoáº·c Ä‘ang chá» duyá»‡t.</p>
+          <h2 className='text-3xl font-extrabold'>Gần đây - bài đăng cần xử lý</h2>
+          <p className='text-sm text-gray-500'>Ưu tiên tin bị báo cáo hoặc đang chờ duyệt.</p>
         </div>
         <div className='mt-6 overflow-x-auto'>
           <table className='w-full min-w-[760px] text-left text-sm'>
             <thead>
               <tr className='text-sm font-extrabold text-[#181A20]'>
-                <th className='py-3'>NgÆ°á»i Ä‘Äƒng</th>
-                <th className='py-3'>Tráº¡ng thÃ¡i</th>
-                <th className='py-3'>BÃ i Ä‘Äƒng</th>
-                <th className='py-3'>BÃ¬nh luáº­n</th>
-                <th className='py-3 text-right'>Quyáº¿t Ä‘á»‹nh</th>
+                <th className='py-3'>Người đăng</th>
+                <th className='py-3'>Trạng thái</th>
+                <th className='py-3'>Bài đăng</th>
+                <th className='py-3'>Bình luận</th>
+                <th className='py-3 text-right'>Quyết định</th>
               </tr>
             </thead>
             <tbody>
               {(recentFlaggedPosts.length ? recentFlaggedPosts : posts.slice(0, 3)).map((post) => (
                 <tr key={post.id} className='border-t border-gray-100'>
-                  <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'NgÆ°á»i dÃ¹ng'}</td>
+                  <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'Người dùng'}</td>
                   <td className='py-4'>
                     <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClass(post.status)}`}>
                       {statusLabels[String(post.status)] || post.status}
@@ -359,7 +371,7 @@ const OverviewContent = () => {
                   <td className='py-4'>{post._count?.comments || 0}</td>
                   <td className='py-4 text-right'>
                     <Link to='/admin/posts' className='rounded-full bg-[#F8D977] px-5 py-2 text-xs font-extrabold'>
-                      Xá»­ lÃ½
+                      Xử lý
                     </Link>
                   </td>
                 </tr>
@@ -389,7 +401,7 @@ const AdminPostsContent = () => {
   }, [period, statusFilter])
 
   useEffect(() => {
-    void loadPosts().catch(() => setMessage('KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch bÃ i Ä‘Äƒng admin.'))
+    void loadPosts().catch(() => setMessage('Không tải được danh sách bài đăng admin.'))
   }, [loadPosts])
 
   const handleCensor = async (postId: string, status: PostStatus) => {
@@ -397,12 +409,12 @@ const AdminPostsContent = () => {
       setMessage('')
       await adminService.censorPost(postId, {
         status,
-        rejectionReason: status === 'REJECTED' ? 'KhÃ´ng phÃ¹ há»£p vá»›i quy Ä‘á»‹nh Ä‘Äƒng tin.' : undefined
+        rejectionReason: status === 'REJECTED' ? 'Không phù hợp với quy định đăng tin.' : undefined
       })
       await loadPosts()
-      setMessage(status === 'APPROVED' ? 'ÄÃ£ duyá»‡t bÃ i Ä‘Äƒng.' : 'ÄÃ£ Ä‘Ã¡nh dáº¥u vi pháº¡m.')
+      setMessage(status === 'APPROVED' ? 'Đã duyệt bài đăng.' : 'Đã đánh dấu vi phạm.')
     } catch {
-      setMessage('KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i bÃ i Ä‘Äƒng.')
+      setMessage('Không thể cập nhật trạng thái bài đăng.')
     }
   }
   const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
@@ -410,18 +422,20 @@ const AdminPostsContent = () => {
 
   return (
     <AdminShell activeTab='posts'>
-      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+      {message ? (
+        <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p>
+      ) : null}
 
       <section className='mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_360px]'>
         <div className='grid gap-8'>
-          <ActivityChart title='Thá»‘ng kÃª theo ngÃ y' data={dailyChartData} />
-          <ActivityChart title='Thá»‘ng kÃª theo giá»' data={hourlyChartData} />
+          <ActivityChart title='Thống kê theo ngày' data={dailyChartData} />
+          <ActivityChart title='Thống kê theo giờ' data={hourlyChartData} />
         </div>
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
           <DateFilterCard />
           <section className='rounded-2xl bg-white p-5 shadow-lg shadow-black/15'>
-            <p className='text-sm font-extrabold'>Lá»c tráº¡ng thÃ¡i</p>
+            <p className='text-sm font-extrabold'>Lọc trạng thái</p>
             <div className='mt-4 grid grid-cols-2 gap-3'>
               {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((status) => (
                 <button
@@ -432,7 +446,7 @@ const AdminPostsContent = () => {
                     statusFilter === status ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-600'
                   }`}
                 >
-                  {status === 'ALL' ? 'Táº¥t cáº£' : statusLabels[status]}
+                  {status === 'ALL' ? 'Tất cả' : statusLabels[status]}
                 </button>
               ))}
             </div>
@@ -443,46 +457,49 @@ const AdminPostsContent = () => {
       <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
         <div className='flex flex-wrap items-start justify-between gap-5'>
           <div>
-            <h2 className='text-3xl font-extrabold'>Gáº§n Ä‘Ã¢y - bÃ i Ä‘Äƒng vi pháº¡m</h2>
+            <h2 className='text-3xl font-extrabold'>Gần đây - bài đăng vi phạm</h2>
             <p className='mt-2 text-sm text-gray-500'>
-              Tá»•ng: {formatNumber(stats.totalPosts || posts.length)} | Chá» duyá»‡t: {getPostCountByStatus(stats, 'PENDING')}
+              Tổng: {formatNumber(stats.totalPosts || posts.length)} | Chờ duyệt:{' '}
+              {getPostCountByStatus(stats, 'PENDING')}
             </p>
           </div>
-          <p className='text-sm text-gray-500'>CÃ¡c quyáº¿t Ä‘á»‹nh xá»­ lÃ½ sáº½ Ä‘Æ°á»£c ghi nháº­n vÃ  gá»­i thÃ´ng bÃ¡o cho ngÆ°á»i Ä‘Äƒng.</p>
+          <p className='text-sm text-gray-500'>
+            Các quyết định xử lý sẽ được ghi nhận và gửi thông báo cho người đăng.
+          </p>
         </div>
         <div className='mt-6 overflow-x-auto'>
           <table className='w-full min-w-[980px] text-left text-sm'>
             <thead>
               <tr className='text-sm font-extrabold text-[#181A20]'>
-                <th className='py-3'>NgÆ°á»i dÃ¹ng</th>
-                <th className='py-3'>Tráº¡ng thÃ¡i</th>
-                <th className='py-3'>BÃ i Ä‘Äƒng</th>
-                <th className='py-3'>Khu vá»±c</th>
-                <th className='py-3'>BÃ¡o cÃ¡o</th>
-                <th className='py-3 text-right'>Quyáº¿t Ä‘á»‹nh</th>
+                <th className='py-3'>Người dùng</th>
+                <th className='py-3'>Trạng thái</th>
+                <th className='py-3'>Bài đăng</th>
+                <th className='py-3'>Khu vực</th>
+                <th className='py-3'>Báo cáo</th>
+                <th className='py-3 text-right'>Quyết định</th>
               </tr>
             </thead>
             <tbody>
               {posts.map((post) => (
                 <tr key={post.id} className='border-t border-gray-100'>
-                  <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'NgÆ°á»i dÃ¹ng'}</td>
+                  <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'Người dùng'}</td>
                   <td className='py-4'>
                     <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClass(post.status)}`}>
                       {statusLabels[String(post.status)] || post.status}
                     </span>
                   </td>
                   <td className='max-w-xs truncate py-4'>{post.title}</td>
-                  <td className='py-4'>{post.ward?.name || 'ChÆ°a rÃµ'}</td>
+                  <td className='py-4'>{post.ward?.name || 'Chưa rõ'}</td>
                   <td className='py-4'>{post._count?.comments || 0}</td>
                   <td className='py-4'>
                     <div className='flex justify-end gap-2'>
                       <Link
                         to={`/posts/${post.id}`}
-                        state={{ returnTo: '/admin/posts', returnLabel: 'Quay láº¡i trang quáº£n trá»‹' }}
+                        state={{ returnTo: '/admin/posts', returnLabel: 'Quay lại trang quản trị' }}
                         className='inline-flex items-center gap-2 rounded-full bg-[#001D3D] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#003566]'
                       >
                         <FaEye />
-                        Chi tiáº¿t
+                        Chi tiết
                       </Link>
                       <button
                         type='button'
@@ -490,7 +507,7 @@ const AdminPostsContent = () => {
                         className='inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-extrabold text-white'
                       >
                         <FaTimes />
-                        Vi pháº¡m
+                        Vi phạm
                       </button>
                       <button
                         type='button'
@@ -498,7 +515,7 @@ const AdminPostsContent = () => {
                         className='inline-flex items-center gap-2 rounded-full bg-green-500 px-4 py-2 text-xs font-extrabold text-white'
                       >
                         <FaCheck />
-                        Duyá»‡t
+                        Duyệt
                       </button>
                     </div>
                   </td>
@@ -522,7 +539,7 @@ const AdminUsersContent = () => {
   }
 
   useEffect(() => {
-    void loadUsers().catch(() => setMessage('KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch ngÆ°á»i dÃ¹ng admin.'))
+    void loadUsers().catch(() => setMessage('Không tải được danh sách người dùng admin.'))
   }, [])
 
   const handleToggleUser = async (user: AdminUser) => {
@@ -534,24 +551,26 @@ const AdminUsersContent = () => {
       }
       await loadUsers()
     } catch {
-      setMessage('KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i ngÆ°á»i dÃ¹ng.')
+      setMessage('Không thể cập nhật trạng thái người dùng.')
     }
   }
 
   return (
     <AdminShell activeTab='users'>
-      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+      {message ? (
+        <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p>
+      ) : null}
       <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
-        <h2 className='text-3xl font-extrabold'>NgÆ°á»i dÃ¹ng</h2>
+        <h2 className='text-3xl font-extrabold'>Người dùng</h2>
         <div className='mt-6 overflow-x-auto'>
           <table className='w-full min-w-[900px] text-left text-sm'>
             <thead>
               <tr className='text-sm font-extrabold text-[#181A20]'>
-                <th className='py-3'>TÃªn</th>
+                <th className='py-3'>Tên</th>
                 <th className='py-3'>Email</th>
-                <th className='py-3'>Vai trÃ²</th>
-                <th className='py-3'>Tráº¡ng thÃ¡i</th>
-                <th className='py-3 text-right'>Thao tÃ¡c</th>
+                <th className='py-3'>Vai trò</th>
+                <th className='py-3'>Trạng thái</th>
+                <th className='py-3 text-right'>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -573,7 +592,7 @@ const AdminUsersContent = () => {
                         user.status === 'BANNED' ? 'bg-green-500' : 'bg-red-600'
                       }`}
                     >
-                      {user.status === 'BANNED' ? 'Má»Ÿ khÃ³a' : 'KhÃ³a'}
+                      {user.status === 'BANNED' ? 'Mở khóa' : 'Khóa'}
                     </button>
                   </td>
                 </tr>
@@ -590,21 +609,26 @@ const AdminReportsContent = () => {
   const [reports, setReports] = useState<AdminReport[]>([])
   const [statusFilter, setStatusFilter] = useState<AdminReportStatus | 'ALL'>('PENDING')
   const [notesByReport, setNotesByReport] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalReports, setTotalReports] = useState(0)
   const [loading, setLoading] = useState(true)
   const [processingReportId, setProcessingReportId] = useState('')
   const [message, setMessage] = useState('')
 
   const loadReports = useCallback(async () => {
     setLoading(true)
-    const result = await adminService.getReports({ status: statusFilter, limit: 100 })
+    const result = await adminService.getReports({ status: statusFilter, page, limit: REPORTS_PER_PAGE })
     setReports(result.data)
+    setTotalPages(Math.max(1, result.meta?.totalPages || 1))
+    setTotalReports(result.meta?.total || result.data.length)
     setLoading(false)
-  }, [statusFilter])
+  }, [page, statusFilter])
 
   useEffect(() => {
     void loadReports().catch(() => {
       setLoading(false)
-      setMessage('KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch bÃ¡o cÃ¡o.')
+      setMessage('Không tải được danh sách báo cáo.')
     })
   }, [loadReports])
 
@@ -617,11 +641,11 @@ const AdminReportsContent = () => {
         status,
         adminNote: notesByReport[reportId]?.trim() || undefined
       })
-      setMessage(response.message || 'ÄÃ£ cáº­p nháº­t tráº¡ng thÃ¡i bÃ¡o cÃ¡o.')
+      setMessage(response.message || 'Đã cập nhật trạng thái báo cáo.')
       setNotesByReport((current) => ({ ...current, [reportId]: '' }))
       await loadReports()
     } catch {
-      setMessage('KhÃ´ng thá»ƒ xá»­ lÃ½ bÃ¡o cÃ¡o. Vui lÃ²ng kiá»ƒm tra quyá»n admin vÃ  tráº¡ng thÃ¡i bÃ¡o cÃ¡o.')
+      setMessage('Không thể xử lý báo cáo. Vui lòng kiểm tra quyền admin và trạng thái báo cáo.')
     } finally {
       setProcessingReportId('')
     }
@@ -629,7 +653,9 @@ const AdminReportsContent = () => {
 
   return (
     <AdminShell activeTab='reports'>
-      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+      {message ? (
+        <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p>
+      ) : null}
 
       <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
         <div className='flex flex-wrap items-start justify-between gap-5'>
@@ -638,43 +664,58 @@ const AdminReportsContent = () => {
               <FaClipboardList />
             </span>
             <div>
-              <h2 className='text-3xl font-extrabold'>Danh sÃ¡ch bÃ¡o cÃ¡o</h2>
+              <h2 className='text-3xl font-extrabold'>Danh sách báo cáo</h2>
               <p className='mt-1 text-sm font-semibold text-gray-500'>
-                Theo dÃµi bÃ¡o cÃ¡o tá»« ngÆ°á»i dÃ¹ng vÃ  xá»­ lÃ½ ná»™i dung vi pháº¡m.
+                Theo dõi báo cáo từ người dùng và xử lý nội dung vi phạm.
               </p>
             </div>
           </div>
 
-          <div className='flex flex-wrap gap-2'>
+          <div className='flex flex-wrap items-center gap-2'>
             {(['ALL', 'PENDING', 'RESOLVED', 'REJECTED'] as const).map((status) => (
               <button
                 key={status}
                 type='button'
-                onClick={() => setStatusFilter(status)}
+                onClick={() => {
+                  setPage(1)
+                  setStatusFilter(status)
+                }}
                 className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
                   statusFilter === status ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-600 hover:bg-[#FFF7D6]'
                 }`}
               >
-                {status === 'ALL' ? 'Táº¥t cáº£' : reportStatusLabels[status]}
+                {status === 'ALL' ? 'Tất cả' : reportStatusLabels[status]}
               </button>
             ))}
+            <button
+              type='button'
+              onClick={() => void loadReports()}
+              disabled={loading}
+              aria-label='Tải lại danh sách báo cáo'
+              title='Tải lại'
+              className='grid h-9 w-9 place-items-center rounded-full border border-[#003566] text-[#003566] transition hover:bg-[#003566] hover:text-white disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-300'
+            >
+              <FaSyncAlt className={loading ? 'animate-spin' : ''} />
+            </button>
           </div>
         </div>
 
         {loading ? (
-          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>Äang táº£i danh sÃ¡ch bÃ¡o cÃ¡o...</p>
+          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>
+            Đang tải danh sách báo cáo...
+          </p>
         ) : (
           <div className='mt-7 overflow-x-auto'>
             <table className='w-full min-w-[1120px] text-left text-sm'>
               <thead>
                 <tr className='text-sm font-extrabold text-[#181A20]'>
-                  <th className='py-3'>NgÆ°á»i bÃ¡o cÃ¡o</th>
-                  <th className='py-3'>NgÆ°á»i bá»‹ bÃ¡o cÃ¡o</th>
-                  <th className='py-3'>Ná»™i dung</th>
-                  <th className='py-3'>LÃ½ do</th>
-                  <th className='py-3'>Tráº¡ng thÃ¡i</th>
-                  <th className='py-3'>Ghi chÃº</th>
-                  <th className='py-3 text-right'>Xá»­ lÃ½</th>
+                  <th className='py-3'>Người báo cáo</th>
+                  <th className='py-3'>Người bị báo cáo</th>
+                  <th className='py-3'>Nội dung</th>
+                  <th className='py-3'>Lý do</th>
+                  <th className='py-3'>Trạng thái</th>
+                  <th className='py-3'>Ghi chú</th>
+                  <th className='py-3 text-right'>Xử lý</th>
                 </tr>
               </thead>
               <tbody>
@@ -685,18 +726,18 @@ const AdminReportsContent = () => {
                   return (
                     <tr key={report.id} className='border-t border-gray-100 align-top'>
                       <td className='py-4'>
-                        <p className='font-extrabold'>{report.user?.fullName || 'NgÆ°á»i dÃ¹ng'}</p>
+                        <p className='font-extrabold'>{report.user?.fullName || 'Người dùng'}</p>
                         <p className='mt-1 text-xs font-semibold text-gray-500'>{report.user?.email}</p>
                       </td>
                       <td className='py-4'>
-                        <p className='font-extrabold'>{report.reportedUser?.fullName || 'NgÆ°á»i dÃ¹ng'}</p>
+                        <p className='font-extrabold'>{report.reportedUser?.fullName || 'Người dùng'}</p>
                         <p className='mt-1 text-xs font-semibold text-gray-500'>{report.reportedUser?.email}</p>
                       </td>
                       <td className='max-w-xs py-4'>
                         {report.post ? (
                           <Link
                             to={relatedPostPath}
-                            state={{ returnTo: '/admin/reports', returnLabel: 'Quay láº¡i bÃ¡o cÃ¡o' }}
+                            state={{ returnTo: '/admin/reports', returnLabel: 'Quay lại báo cáo' }}
                             className='font-extrabold text-[#003566] hover:underline'
                           >
                             {report.post.title}
@@ -704,14 +745,16 @@ const AdminReportsContent = () => {
                         ) : report.comment ? (
                           <p className='line-clamp-3 font-semibold text-gray-700'>{report.comment.content}</p>
                         ) : (
-                          <span className='font-semibold text-gray-400'>KhÃ´ng cÃ³ ná»™i dung</span>
+                          <span className='font-semibold text-gray-400'>Không có nội dung</span>
                         )}
                       </td>
                       <td className='max-w-xs py-4'>
                         <p className='line-clamp-3 font-semibold text-gray-600'>{report.reason}</p>
                       </td>
                       <td className='py-4'>
-                        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClass(report.status)}`}>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-extrabold ${getStatusClass(report.status)}`}
+                        >
                           {reportStatusLabels[report.status] || report.status}
                         </span>
                       </td>
@@ -723,10 +766,12 @@ const AdminReportsContent = () => {
                               setNotesByReport((current) => ({ ...current, [report.id]: event.target.value }))
                             }
                             className='h-20 w-56 resize-none rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold outline-none focus:border-[#FFC300]'
-                            placeholder='Ghi chÃº xá»­ lÃ½'
+                            placeholder='Ghi chú xử lý'
                           />
                         ) : (
-                          <p className='max-w-[14rem] text-xs font-semibold text-gray-500'>{report.adminNote || 'KhÃ´ng cÃ³ ghi chÃº'}</p>
+                          <p className='max-w-[14rem] text-xs font-semibold text-gray-500'>
+                            {report.adminNote || 'Không có ghi chú'}
+                          </p>
                         )}
                       </td>
                       <td className='py-4 text-right'>
@@ -739,7 +784,7 @@ const AdminReportsContent = () => {
                               className='inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300'
                             >
                               <FaCheck />
-                              Xá»­ lÃ½
+                              Xử lý
                             </button>
                             <button
                               type='button'
@@ -748,11 +793,11 @@ const AdminReportsContent = () => {
                               className='inline-flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-300'
                             >
                               <FaTimes />
-                              Tá»« chá»‘i
+                              Từ chối
                             </button>
                           </div>
                         ) : (
-                          <span className='text-xs font-bold text-gray-400'>ÄÃ£ hoÃ n táº¥t</span>
+                          <span className='text-xs font-bold text-gray-400'>Đã hoàn tất</span>
                         )}
                       </td>
                     </tr>
@@ -761,7 +806,37 @@ const AdminReportsContent = () => {
               </tbody>
             </table>
             {reports.length === 0 ? (
-              <p className='rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>KhÃ´ng cÃ³ bÃ¡o cÃ¡o phÃ¹ há»£p.</p>
+              <p className='rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>
+                Không có báo cáo phù hợp.
+              </p>
+            ) : null}
+            {totalReports > 0 ? (
+              <div className='mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 pt-5'>
+                <p className='text-sm font-semibold text-gray-500'>
+                  Hiển thị {formatNumber(reports.length)} / {formatNumber(totalReports)} báo cáo
+                </p>
+                <div className='flex items-center gap-2'>
+                  <button
+                    type='button'
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page <= 1 || loading}
+                    className='rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-300'
+                  >
+                    Trước
+                  </button>
+                  <span className='rounded-full bg-[#FFF7D6] px-4 py-2 text-xs font-extrabold text-[#001D3D]'>
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    type='button'
+                    onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                    disabled={page >= totalPages || loading}
+                    className='rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-300'
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
             ) : null}
           </div>
         )}
@@ -782,9 +857,11 @@ const HostVerificationCard = ({
   <article className='rounded-2xl border border-gray-100 bg-white p-6 shadow-lg shadow-black/10'>
     <div className='flex items-start justify-between gap-5'>
       <div className='min-w-0'>
-        <h3 className='truncate text-xl font-extrabold'>{candidate.user?.fullName || 'Chá»§ trá»'}</h3>
-        <p className='mt-1 truncate text-sm font-semibold text-gray-500'>{candidate.user?.email || 'ChÆ°a cÃ³ email'}</p>
-        <p className='mt-1 text-sm font-semibold text-gray-500'>{candidate.user?.phone || 'ChÆ°a cáº­p nháº­t sá»‘ Ä‘iá»‡n thoáº¡i'}</p>
+        <h3 className='truncate text-xl font-extrabold'>{candidate.user?.fullName || 'Chủ trọ'}</h3>
+        <p className='mt-1 truncate text-sm font-semibold text-gray-500'>{candidate.user?.email || 'Chưa có email'}</p>
+        <p className='mt-1 text-sm font-semibold text-gray-500'>
+          {candidate.user?.phone || 'Chưa cập nhật số điện thoại'}
+        </p>
       </div>
       <span className='grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFF7D6] text-[#001D3D]'>
         <FaShieldAlt />
@@ -794,15 +871,15 @@ const HostVerificationCard = ({
     <div className='mt-5 grid grid-cols-3 gap-3 text-center text-sm'>
       <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
         <p className='font-black text-[#001D3D]'>{candidate.totalPost || 0}</p>
-        <p className='mt-1 text-xs font-bold text-gray-500'>BÃ i Ä‘Äƒng</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Bài đăng</p>
       </div>
       <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
         <p className='font-black text-[#001D3D]'>{candidate.avgStar ?? '0'}</p>
-        <p className='mt-1 text-xs font-bold text-gray-500'>ÄÃ¡nh giÃ¡</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Đánh giá</p>
       </div>
       <div className='rounded-xl bg-[#F5F7FA] px-3 py-3'>
-        <p className='font-black text-[#001D3D]'>{candidate.isVerified ? 'CÃ³' : 'ChÆ°a'}</p>
-        <p className='mt-1 text-xs font-bold text-gray-500'>XÃ¡c minh</p>
+        <p className='font-black text-[#001D3D]'>{candidate.isVerified ? 'Có' : 'Chưa'}</p>
+        <p className='mt-1 text-xs font-bold text-gray-500'>Xác minh</p>
       </div>
     </div>
 
@@ -812,7 +889,7 @@ const HostVerificationCard = ({
       disabled={loading || candidate.isVerified}
       className='mt-5 w-full rounded-full bg-[#FFC300] px-5 py-3 text-sm font-extrabold text-[#001D3D] transition hover:bg-[#FFD60A] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500'
     >
-      {candidate.isVerified ? 'ÄÃ£ xÃ¡c minh' : 'XÃ¡c minh chá»§ trá»'}
+      {candidate.isVerified ? 'Đã xác minh' : 'Xác minh chủ trọ'}
     </button>
   </article>
 )
@@ -833,7 +910,7 @@ const AdminHostsContent = () => {
   useEffect(() => {
     void loadCandidates().catch(() => {
       setLoading(false)
-      setMessage('KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch chá»§ trá» Ä‘á»§ Ä‘iá»u kiá»‡n xÃ¡c minh.')
+      setMessage('Không tải được danh sách chủ trọ đủ điều kiện xác minh.')
     })
   }, [])
 
@@ -843,10 +920,10 @@ const AdminHostsContent = () => {
 
     try {
       const response = await adminService.verifyHost(hostId)
-      setMessage(response.message || 'ÄÃ£ xÃ¡c minh chá»§ trá».')
+      setMessage(response.message || 'Đã xác minh chủ trọ.')
       await loadCandidates()
     } catch {
-      setMessage('KhÃ´ng thá»ƒ xÃ¡c minh chá»§ trá». HÃ£y kiá»ƒm tra Ä‘iá»u kiá»‡n Ä‘Ã¡nh giÃ¡ vÃ  quyá»n admin.')
+      setMessage('Không thể xác minh chủ trọ. Hãy kiểm tra điều kiện đánh giá và quyền admin.')
     } finally {
       setVerifyingHostId('')
     }
@@ -854,27 +931,34 @@ const AdminHostsContent = () => {
 
   return (
     <AdminShell activeTab='hosts'>
-      {message ? <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p> : null}
+      {message ? (
+        <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>{message}</p>
+      ) : null}
 
       <section className='mt-10 rounded-2xl bg-white p-7 shadow-lg shadow-black/15'>
         <div className='flex flex-wrap items-center justify-between gap-4'>
           <div>
-            <h2 className='text-3xl font-extrabold'>XÃ¡c minh chá»§ trá»</h2>
+            <h2 className='text-3xl font-extrabold'>Xác minh chủ trọ</h2>
             <p className='mt-2 text-sm font-semibold text-gray-500'>
-              Duyá»‡t cÃ¡c chá»§ trá» Ä‘á»§ Ä‘iá»u kiá»‡n Ä‘á»ƒ hiá»ƒn thá»‹ tráº¡ng thÃ¡i Ä‘Ã£ xÃ¡c minh.
+              Duyệt các chủ trọ đủ điều kiện để hiển thị trạng thái đã xác minh.
             </p>
           </div>
           <button
             type='button'
             onClick={() => void loadCandidates()}
-            className='rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+            disabled={loading}
+            aria-label='Tải lại danh sách xác minh'
+            title='Tải lại'
+            className='grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-[#003566] transition hover:bg-[#003566] hover:text-white disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-300'
           >
-            Táº£i láº¡i
+            <FaSyncAlt className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {loading ? (
-          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>Äang táº£i danh sÃ¡ch xÃ¡c minh...</p>
+          <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>
+            Đang tải danh sách xác minh...
+          </p>
         ) : candidates.length > 0 ? (
           <div className='mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
             {candidates.map((candidate) => (
@@ -888,7 +972,7 @@ const AdminHostsContent = () => {
           </div>
         ) : (
           <p className='mt-8 rounded-xl bg-gray-50 px-5 py-4 text-sm font-bold text-gray-500'>
-            ChÆ°a cÃ³ chá»§ trá» nÃ o Ä‘á»§ Ä‘iá»u kiá»‡n xÃ¡c minh.
+            Chưa có chủ trọ nào đủ điều kiện xác minh.
           </p>
         )}
       </section>
