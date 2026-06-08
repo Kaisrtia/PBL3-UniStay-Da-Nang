@@ -13,6 +13,8 @@ import {
   comment_status
 } from '@prisma/client';
 
+const RECOMMENDATION_SCORE_THRESHOLD = 0.6;
+
 export interface PostFilters {
   purpose?: post_purpose;
   status?: post_status; // Used for admin-level filtering
@@ -270,6 +272,7 @@ export const getRecommendedPosts = async (
   const demand = await prismaClient.student_demand.findUnique({
     where: { studentId: currentUser.id },
     include: {
+      university: true,
       student: {
         include: {
           demandAmenities: {
@@ -305,7 +308,7 @@ export const getRecommendedPosts = async (
       ...post,
       score: calculateScore(post, demand)
     }))
-    .filter((post: any) => post.score > 0);
+    .filter((post: any) => post.score >= RECOMMENDATION_SCORE_THRESHOLD);
 
   // Sort by score descending
   scoredPosts.sort((a: any, b: any) => b.score - a.score);

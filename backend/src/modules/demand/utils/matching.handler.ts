@@ -9,6 +9,8 @@ type MatchablePost = {
   price: unknown;
   wardId: number;
   area: unknown;
+  latitude: unknown;
+  longitude: unknown;
   postPurpose: string;
   roomType: string;
   postAmenities?: AmenityRef[] | null;
@@ -17,72 +19,219 @@ type MatchablePost = {
 type MatchableDemand = {
   minPrice: unknown;
   maxPrice: unknown;
-  wardId: number;
+  minArea?: unknown;
+  maxArea?: unknown;
+  wardId?: number | null;
+  locationRadiusMeters?: unknown;
   isLookingForRoommate: boolean;
   roomType: string;
+  pricePriority?: string | null;
+  locationPriority?: string | null;
+  areaPriority?: string | null;
+  roommatePriority?: string | null;
+  roomTypePriority?: string | null;
+  amenityPriority?: string | null;
   demandAmenities?: AmenityRef[] | null;
   student?: {
     demandAmenities?: AmenityRef[] | null;
   } | null;
+  university?: {
+    latitude?: unknown;
+    longitude?: unknown;
+  } | null;
 };
 
-export const calculateScore = (post: MatchablePost, demand: MatchableDemand) => {
-  let score = 0;
+const PRIORITY_COEFFICIENTS: Record<string, number> = {
+  LOW: 0.2,
+  MEDIUM: 0.5,
+  HIGH: 0.8
+};
 
-  // 1. Price (0.35 weight)
+const getPriorityCoefficient = (priority?: string | null) => {
+  if (!priority) return PRIORITY_COEFFICIENTS.MEDIUM;
+  return PRIORITY_COEFFICIENTS[priority] ?? PRIORITY_COEFFICIENTS.MEDIUM;
+};
+
+const calculateRangeScore = (
+  value: number,
+  minValue?: number,
+  maxValue?: number
+) => {
+  if (!Number.isFinite(value)) return 0;
+
+  const hasMinValue = minValue !== undefined && Number.isFinite(minValue);
+  const hasMaxValue = maxValue !== undefined && Number.isFinite(maxValue);
+
+  if (!hasMinValue && !hasMaxValue) return undefined;
+
+  if (hasMinValue && value < minValue) {
+    return minValue > 0 && value >= minValue * 0.8
+      ? 10 * (1 - (minValue - value) / (minValue * 0.2))
+      : 0;
+  }
+
+  if (hasMaxValue && value > maxValue) {
+    return maxValue > 0 && value <= maxValue * 1.2
+      ? 10 * (1 - (value - maxValue) / (maxValue * 0.2))
+      : 0;
+  }
+
+  return 10;
+};
+
+const toRadians = (degree: number) => (degree * Math.PI) / 180;
+
+const calculateDistanceMeters = (
+  firstLatitude: number,
+  firstLongitude: number,
+  secondLatitude: number,
+  secondLongitude: number
+) => {
+  const earthRadiusMeters = 6371000;
+  const latitudeDelta = toRadians(secondLatitude - firstLatitude);
+  const longitudeDelta = toRadians(secondLongitude - firstLongitude);
+  const firstLatitudeRadians = toRadians(firstLatitude);
+  const secondLatitudeRadians = toRadians(secondLatitude);
+
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitudeRadians) *
+      Math.cos(secondLatitudeRadians) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    earthRadiusMeters *
+    2 *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+};
+
+const calculateLocationScore = (
+  post: MatchablePost,
+  demand: MatchableDemand
+) => {
+  const postLatitude = Number(post.latitude);
+  const postLongitude = Number(post.longitude);
+  const universityLatitude = Number(demand.university?.latitude);
+  const universityLongitude = Number(demand.university?.longitude);
+  const locationRadiusMeters = Number(demand.locationRadiusMeters);
+
+  if (
+    !Number.isFinite(postLatitude) ||
+    !Number.isFinite(postLongitude) ||
+    !Number.isFinite(universityLatitude) ||
+    !Number.isFinite(universityLongitude) ||
+    !Number.isFinite(locationRadiusMeters) ||
+    locationRadiusMeters <= 0
+  ) {
+    return 0;
+  }
+
+  const distanceMeters = calculateDistanceMeters(
+    postLatitude,
+    postLongitude,
+    universityLatitude,
+    universityLongitude
+  );
+
+  return distanceMeters <= locationRadiusMeters ? 10 : 0;
+};
+
+export const calculateScore = (
+  post: MatchablePost,
+  demand: MatchableDemand
+) => {
+  const criteria: Array<{ score: number; coefficient: number }> = [];
+
+  // 1. Price. Keep the previous matching rule, but convert it to a 0-10 score.
   const postPrice = Number(post.price);
   const minPrice = Number(demand.minPrice);
   const maxPrice = Number(demand.maxPrice);
-  
-  if (postPrice >= minPrice && postPrice <= maxPrice) {
-    score += 0.35;
-  } else if (postPrice > maxPrice && postPrice <= maxPrice * 1.2) {
-    score += 0.35 * (1 - (postPrice - maxPrice) / (maxPrice * 0.2));
-  } else if (postPrice < minPrice && postPrice >= minPrice * 0.8) {
-    score += 0.35 * (1 - (minPrice - postPrice) / (minPrice * 0.2));
-  }
+  const priceScore = calculateRangeScore(postPrice, minPrice, maxPrice) ?? 0;
 
-  // 2. Near University (0.25 weight)
-  if (post.wardId === demand.wardId) {
-    score += 0.25;
-  }
+  criteria.push({
+    score: Math.max(0, Math.min(priceScore, 10)),
+    coefficient: getPriorityCoefficient(demand.pricePriority)
+  });
 
-  // 3. Area (0.2 weight)
-  // Since demand has no area preference, assume larger is better up to a point, or flat score.
-  if (Number(post.area) > 15) {
-    score += 0.2;
-  } else if (Number(post.area) > 10) {
-    score += 0.1;
-  }
+  // 2. Location. Posts inside the selected university radius receive max score.
+  criteria.push({
+    score: calculateLocationScore(post, demand),
+    coefficient: getPriorityCoefficient(demand.locationPriority)
+  });
 
-  // 4. Roommate Gender (0.15 weight)
-  // Assuming post.postPurpose identifies roommate search
-  if (demand.isLookingForRoommate && post.postPurpose === 'FIND_ROOMMATE') {
-    score += 0.15;
-  } else if (!demand.isLookingForRoommate && post.postPurpose !== 'FIND_ROOMMATE') {
-    score += 0.15;
-  }
+  // 3. Area. Use demand range when available, otherwise keep the legacy rule.
+  const postArea = Number(post.area);
+  const minArea = demand.minArea === null ? undefined : Number(demand.minArea);
+  const maxArea = demand.maxArea === null ? undefined : Number(demand.maxArea);
+  let areaScore = 0;
+  const areaRangeScore = calculateRangeScore(postArea, minArea, maxArea);
 
-  // 5. Room Type (0.05 weight)
-  if (post.roomType === demand.roomType) {
-    score += 0.05;
+  if (areaRangeScore !== undefined) {
+    areaScore = areaRangeScore;
+  } else if (postArea > 15) {
+    areaScore = 10;
+  } else if (postArea > 10) {
+    areaScore = 5;
   }
+  criteria.push({
+    score: areaScore,
+    coefficient: getPriorityCoefficient(demand.areaPriority)
+  });
 
+  // 4. Roommate purpose. The current rule matches roommate intent only.
+  const roommateScore =
+    (demand.isLookingForRoommate && post.postPurpose === 'FIND_ROOMMATE') ||
+    (!demand.isLookingForRoommate && post.postPurpose !== 'FIND_ROOMMATE')
+      ? 10
+      : 0;
+  criteria.push({
+    score: roommateScore,
+    coefficient: getPriorityCoefficient(demand.roommatePriority)
+  });
+
+  // 5. Room type.
+  criteria.push({
+    score: post.roomType === demand.roomType ? 10 : 0,
+    coefficient: getPriorityCoefficient(demand.roomTypePriority)
+  });
+
+  // 6. Amenities.
   const postAmenityIds = new Set(
     (post.postAmenities ?? [])
       .map((item) => Number(item.amenityId ?? item.amenity?.id))
       .filter((item: number) => Number.isInteger(item))
   );
-  const demandAmenityIds = (demand.student?.demandAmenities ?? demand.demandAmenities ?? [])
+  const demandAmenityIds = (
+    demand.student?.demandAmenities ??
+    demand.demandAmenities ??
+    []
+  )
     .map((item) => Number(item.amenityId ?? item.amenity?.id))
     .filter((item: number) => Number.isInteger(item));
 
+  let amenityScore = 0;
   if (postAmenityIds.size > 0 && demandAmenityIds.length > 0) {
     const matchedAmenities = demandAmenityIds.filter((amenityId: number) =>
       postAmenityIds.has(amenityId)
     ).length;
-    score += Math.min(0.1, (matchedAmenities / demandAmenityIds.length) * 0.1);
+    amenityScore = (matchedAmenities / demandAmenityIds.length) * 10;
   }
+  criteria.push({
+    score: Math.max(0, Math.min(amenityScore, 10)),
+    coefficient: getPriorityCoefficient(demand.amenityPriority)
+  });
 
-  return Math.min(score, 1);
+  const weightedScore = criteria.reduce(
+    (total, criterion) => total + criterion.score * criterion.coefficient,
+    0
+  );
+  const maxScore = criteria.reduce(
+    (total, criterion) => total + 10 * criterion.coefficient,
+    0
+  );
+
+  if (maxScore === 0) return 0;
+
+  return Math.min(weightedScore / maxScore, 1);
 };

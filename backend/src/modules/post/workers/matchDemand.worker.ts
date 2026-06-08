@@ -5,6 +5,8 @@ import { calculateScore } from '../../demand/utils/matching.handler';
 import { notification_type } from '@prisma/client';
 import { pushNotificationIfOnline } from '../../notification/utils/pushNotification';
 
+const MIN_SCORE_THRESHOLD = 0.6;
+
 export const matchDemandWorker = new Worker(
   'matchDemandQueue',
   async (job) => {
@@ -13,8 +15,11 @@ export const matchDemandWorker = new Worker(
       console.log(`Running matchDemandWorker for post: ${postId}`);
 
       // 1. Get post data
-      const post = await prismaClient.post.findUnique({
-        where: { id: postId },
+      const post = await prismaClient.post.findFirst({
+        where: {
+          id: postId,
+          status: 'APPROVED'
+        },
         include: {
           ward: true,
           postAmenities: true
@@ -22,7 +27,7 @@ export const matchDemandWorker = new Worker(
       });
 
       if (!post) {
-        console.log(`Post ${postId} not found.`);
+        console.log(`Approved post ${postId} not found.`);
         return;
       }
 
@@ -37,10 +42,9 @@ export const matchDemandWorker = new Worker(
 
       const demands = JSON.parse(cachedDemandsJson);
 
-      // 3. Match score for each demand (e.g. threshold > 0.5)
+      // 3. Match score for each demand. Recommended posts must reach 60%.
       for (const demand of demands) {
         const score = calculateScore(post, demand);
-        const MIN_SCORE_THRESHOLD = 0.4;
 
         if (score >= MIN_SCORE_THRESHOLD) {
           console.log(
