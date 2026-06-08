@@ -1,5 +1,5 @@
 import prismaClient from '../../../core/config/prisma';
-import { account_status, user } from '@prisma/client';
+import { account_status } from '@prisma/client';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 
@@ -14,10 +14,24 @@ export const banUser = async (userId: string) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'User is already banned');
   }
 
-  await prismaClient.user.update({
-    where: { id: userId },
-    data: { status: account_status.BANNED }
-  });
+  await prismaClient.$transaction([
+    prismaClient.user.update({
+      where: { id: userId },
+      data: { status: account_status.BANNED }
+    }),
+    prismaClient.session.deleteMany({
+      where: { userId }
+    })
+  ]);
+};
+
+const getUnbannedStatus = async (userId: string) => {
+  const [student, host] = await Promise.all([
+    prismaClient.student.findUnique({ where: { studentId: userId } }),
+    prismaClient.host.findUnique({ where: { hostId: userId } })
+  ]);
+
+  return student || host ? account_status.ACTIVE : account_status.SET_UP;
 };
 
 export const unbanUser = async (userId: string) => {
@@ -31,9 +45,11 @@ export const unbanUser = async (userId: string) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'User is not banned');
   }
 
+  const restoredStatus = await getUnbannedStatus(userId);
+
   await prismaClient.user.update({
     where: { id: userId },
-    data: { status: account_status.ACTIVE }
+    data: { status: restoredStatus }
   });
 };
 
