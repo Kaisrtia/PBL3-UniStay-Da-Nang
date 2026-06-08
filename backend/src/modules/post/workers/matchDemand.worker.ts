@@ -50,9 +50,19 @@ export const matchDemandWorker = new Worker(
           const notificationContent = `Gợi ý: ${post.title} (Độ phù hợp: ${(score * 100).toFixed(0)}%)`;
 
           // 4. Save notification to DB
-          const newNotif = await prismaClient.notification.create({
-            data: {
+          const dedupeKey = `match-demand:${demand.studentId}:${post.id}`;
+          const newNotif = await prismaClient.notification.upsert({
+            where: { dedupeKey },
+            update: {
+              title: notificationTitle,
+              content: notificationContent,
+              isRead: false,
+              updatedAt: new Date(),
+              metaData: { postId: post.id, score }
+            },
+            create: {
               userId: demand.studentId, // Ensure it points to the user.id representing the student
+              dedupeKey,
               title: notificationTitle,
               content: notificationContent,
               type: notification_type.SYSTEM,

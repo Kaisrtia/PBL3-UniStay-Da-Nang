@@ -1,4 +1,4 @@
-import { notification_type, post, post_status } from '@prisma/client';
+import { notification_type, post_status } from '@prisma/client';
 import prismaClient from '../../../core/config/prisma';
 import { AppError } from '../../../core/exceptions/AppError';
 import HttpStatus from 'http-status';
@@ -40,21 +40,29 @@ export const markNotificationAsRead = async (
   userId: string,
   notificationId: number
 ) => {
-  const notification = await prismaClient.notification.findFirst({
-    where: { id: notificationId, userId }
+  const notification = await prismaClient.$transaction(async (tx) => {
+    const result = await tx.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: {
+        isRead: true,
+        updatedAt: new Date()
+      }
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return tx.notification.findFirst({
+      where: { id: notificationId, userId }
+    });
   });
 
   if (!notification) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Không tìm thấy thông báo.');
   }
 
-  return prismaClient.notification.update({
-    where: { id: notificationId },
-    data: {
-      isRead: true,
-      updatedAt: new Date()
-    }
-  });
+  return notification;
 };
 
 export const markAllNotificationsAsRead = async (userId: string) => {
@@ -105,48 +113,27 @@ export const createPostCensorNotification = async (
   const content = status === post_status.REJECTED
     ? `Bài đăng "${post.title}" chưa được duyệt. Lý do: ${rejectionReason}.`
     : `Bài đăng "${post.title}" đã được duyệt và hiển thị trên hệ thống.`;
+  const dedupeKey = `censor-post:${userId}:${postId}`;
+  const metaData = { postId };
 
-  const existingNotifs = await prismaClient.notification.findMany({
-    where: {
-      type: notification_type.CENSOR_POST,
-      userId: userId,
-      metaData: {
-        path: ['postId'],
-        equals: postId
-      }
+  return await prismaClient.notification.upsert({
+    where: { dedupeKey },
+    update: {
+      title,
+      content,
+      isRead: false,
+      updatedAt: new Date(),
+      metaData
     },
-    orderBy: { createdAt: 'desc' },
-    take: 1
-  });
-  const existingNoti = existingNotifs[0];
-
-  if (existingNoti) {
-    return await prismaClient.notification.update({
-      where: { id: existingNoti.id },
-      data: {
-        title,
-        content,
-        isRead: false,
-        updatedAt: new Date(),
-        metaData: {
-          ...((existingNoti.metaData as any) || {}),
-          postId
-        }
-      }
-    });
-  }
-
-  return await prismaClient.notification.create({
-    data: {
+    create: {
+      dedupeKey,
       title,
       content,
       type: notification_type.CENSOR_POST,
       isRead: false,
       createdAt: new Date(),
       updatedAt: new Date(),
-      metaData: {
-        postId
-      },
+      metaData,
       user: {
         connect: { id: userId }
       }
@@ -182,53 +169,31 @@ export const createRequestSharedAccommodationNotification = async (
   const title = count === 1
     ? 'Có 1 yêu cầu thuê mới'
     : `Có ${count} yêu cầu thuê mới`;
+  const dedupeKey = `accommodation-request:${postOwnerId}:${postId}`;
+  const metaData = {
+    postId,
+    requestCount: count,
+    requesterIds: requests.map(r => r.userId)
+  };
 
-  // 3. Find existing notification
-  const existingNotifs = await prismaClient.notification.findMany({
-    where: {
-      type: notification_type.ACCOMODATION_REQUEST,
-      userId: postOwnerId,
-      metaData: {
-        path: ['postId'],
-        equals: postId
-      }
+  return await prismaClient.notification.upsert({
+    where: { dedupeKey },
+    update: {
+      title,
+      content,
+      isRead: false,
+      updatedAt: new Date(),
+      metaData
     },
-    orderBy: { createdAt: 'desc' },
-    take: 1
-  });
-  const existingNoti = existingNotifs[0];
-
-  if (existingNoti) {
-    return await prismaClient.notification.update({
-      where: { id: existingNoti.id },
-      data: {
-        title,
-        content,
-        isRead: false,
-        updatedAt: new Date(),
-        metaData: {
-          ...((existingNoti.metaData as any) || {}),
-          postId,
-          requestCount: count,
-          requesterIds: requests.map(r => r.userId)
-        }
-      }
-    });
-  }
-
-  return await prismaClient.notification.create({
-    data: {
+    create: {
+      dedupeKey,
       title,
       content,
       type: notification_type.ACCOMODATION_REQUEST,
       isRead: false,
       createdAt: new Date(),
       updatedAt: new Date(),
-      metaData: {
-        postId,
-        requestCount: count,
-        requesterIds: requests.map(r => r.userId)
-      },
+      metaData,
       user: {
         connect: { id: postOwnerId }
       }
@@ -307,64 +272,34 @@ export const createCommentNotification = async (
       content = `${namesString} vừa bình luận trong bài đăng của bạn.`;
     }
   }
+  const dedupeKey = isReply
+    ? `comment-reply:${targetUserId}:${currentComment.parentId}`
+    : `comment-root:${targetUserId}:${currentComment.postId}`;
+  const metaData = {
+    commentId,
+    postId: currentComment.postId,
+    ...(isReply ? { parentId: currentComment.parentId } : {}),
+    notificationLevel: isReply ? 'REPLY' : 'ROOT'
+  };
 
-  // Check for existing notification
-  const existingNotifs = await prismaClient.notification.findMany({
-    where: {
-      type: notification_type.COMMENT,
-      userId: targetUserId,
-      metaData: {
-        path: isReply ? ['parentId'] : ['postId'],
-        equals: isReply ? currentComment.parentId! : currentComment.postId
-      }
+  return await prismaClient.notification.upsert({
+    where: { dedupeKey },
+    update: {
+      title,
+      content,
+      isRead: false,
+      updatedAt: new Date(),
+      metaData
     },
-    orderBy: { createdAt: 'desc' },
-    take: 10
-  });
-
-  // Filter exactly to make sure it's the right level
-  const existingNoti = existingNotifs.find(n => {
-     const meta = n.metaData as any;
-     if (isReply) {
-       return meta?.notificationLevel === 'REPLY' && meta?.parentId === currentComment.parentId;
-     } else {
-       return meta?.notificationLevel === 'ROOT' && meta?.postId === currentComment.postId;
-     }
-  });
-
-  if (existingNoti) {
-    return await prismaClient.notification.update({
-      where: { id: existingNoti.id },
-      data: {
-        title,
-        content,
-        isRead: false,
-        updatedAt: new Date(),
-        metaData: {
-          ...((existingNoti.metaData as any) || {}),
-          commentId,
-          postId: currentComment.postId,
-          ...(isReply ? { parentId: currentComment.parentId } : {}),
-          notificationLevel: isReply ? 'REPLY' : 'ROOT'
-        }
-      }
-    });
-  }
-
-  return await prismaClient.notification.create({
-    data: {
+    create: {
+      dedupeKey,
       title,
       content,
       type: notification_type.COMMENT,
       isRead: false,
       createdAt: new Date(),
       updatedAt: new Date(),
-      metaData: {
-        commentId,
-        postId: currentComment.postId,
-        ...(isReply ? { parentId: currentComment.parentId } : {}),
-        notificationLevel: isReply ? 'REPLY' : 'ROOT'
-      },
+      metaData,
       user: {
         connect: { id: targetUserId }
       }
