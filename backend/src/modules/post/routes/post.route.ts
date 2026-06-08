@@ -3,7 +3,10 @@ import * as postController from '../controllers/post.controller';
 import * as favouriteController from '../controllers/favourite.controller';
 import * as accommodationReqController from '../controllers/accommodationReq.controller';
 import { asyncHandler } from '../../../core/middlewares/async.handler';
-import { verifyToken } from '../../../core/middlewares/auth.middleware';
+import {
+  optionalVerifyToken,
+  verifyToken
+} from '../../../core/middlewares/auth.middleware';
 import { authorize } from '../../../core/middlewares/role.middleware';
 import { validate } from '../../../core/middlewares/validate.middleware';
 import {
@@ -17,7 +20,11 @@ const postRouter = Router();
 // -- Post Listing --
 
 // List posts with optional filters (public — only APPROVED posts are returned)
-postRouter.get('/', asyncHandler(postController.handleGetPosts));
+postRouter.get(
+  '/',
+  optionalVerifyToken,
+  asyncHandler(postController.handleGetPosts)
+);
 
 // Recommend posts for a student based on their demand and preferences (Student only)
 postRouter.get(
@@ -72,7 +79,9 @@ postRouter.get(
   '/accommodation-requests/received',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
-  asyncHandler(accommodationReqController.handleGetReceivedAccommodationRequests)
+  asyncHandler(
+    accommodationReqController.handleGetReceivedAccommodationRequests
+  )
 );
 
 // List requests submitted by the current student
@@ -97,6 +106,7 @@ postRouter.post(
 // Get detail post
 postRouter.get(
   '/:postId',
+  optionalVerifyToken,
   asyncHandler(postController.handleGetPostDetail)
 );
 

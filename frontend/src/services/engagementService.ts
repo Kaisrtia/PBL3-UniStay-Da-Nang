@@ -32,6 +32,17 @@ export type PostComment = {
 }
 
 export const engagementService = {
+  getReportReasons: async () => {
+    const response = await api.get<ApiResponse<string[] | { reasons?: string[] }>>('/reports/reasons')
+    const data = response.data.data
+
+    if (Array.isArray(data)) {
+      return data
+    }
+
+    return data?.reasons || []
+  },
+
   getFavouritePosts: async (params?: { page?: number; limit?: number }) => {
     const search = new URLSearchParams()
     if (params?.page) search.set('page', String(params.page))

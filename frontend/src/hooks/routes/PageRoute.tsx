@@ -6,6 +6,7 @@ import {
   AdminHostsPage,
   AdminPostsPage,
   AdminUsersPage,
+  BlockedUsersPage,
   ChangePasswordPage,
   ContactRequestsPage,
   CreatePostPage,
@@ -43,6 +44,7 @@ const AppRoutes = () => {
       <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
       <Route path='/account/profile' element={<ProfilePage />}></Route>
       <Route path='/account/password' element={<ChangePasswordPage />}></Route>
+      <Route path='/account/blocked-users' element={<BlockedUsersPage />}></Route>
       <Route path='/demands' element={<DemandPage />}></Route>
       <Route path='/admin' element={<Navigate to='/admin/overview' replace />} />
       <Route path='/admin/overview' element={<AdminOverviewPage />}></Route>

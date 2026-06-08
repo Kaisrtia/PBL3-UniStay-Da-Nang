@@ -57,6 +57,11 @@ export type ChangePasswordPayload = {
   newPassword: string
 }
 
+export type BlockedUserItem = {
+  blockedUser: UserProfile
+  createdAt: string
+}
+
 export const userService = {
   getMyProfile: async () => {
     const response = await api.get<ApiResponse<UserProfile>>('/users/me')
@@ -75,6 +80,21 @@ export const userService = {
 
   changePassword: async (payload: ChangePasswordPayload) => {
     const response = await api.patch<ApiResponse<null>>('/users/password', payload)
+    return response.data
+  },
+
+  getBlockedUsers: async () => {
+    const response = await api.get<ApiResponse<BlockedUserItem[]>>('/users/blocks')
+    return response.data.data || []
+  },
+
+  blockUser: async (blockedId: string) => {
+    const response = await api.post<ApiResponse>('/users/blocks', { blockedId })
+    return response.data
+  },
+
+  unblockUser: async (blockedId: string) => {
+    const response = await api.delete<ApiResponse>(`/users/blocks/${blockedId}`)
     return response.data
   }
 }

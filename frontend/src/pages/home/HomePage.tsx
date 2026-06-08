@@ -69,6 +69,21 @@ const amenities = [
   { icon: FaBolt, label: 'Giờ giấc tự do' }
 ]
 
+const getStoredRoles = () => {
+  const rawUser = localStorage.getItem('authUser')
+
+  if (!rawUser) {
+    return []
+  }
+
+  try {
+    const user = JSON.parse(rawUser) as { roles?: string[]; role?: string }
+    return user.roles || (user.role ? [user.role] : [])
+  } catch {
+    return []
+  }
+}
+
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
   currency: 'VND',
@@ -92,11 +107,13 @@ const mapPostToListing = (post: Post, index: number): Listing => ({
   title: post.title,
   location: post.ward?.name || post.detailAddress,
   price: getPriceLabel(post.price),
-  meta: [`${post.area}m²`, roomTypeLabel[String(post.roomType)] || String(post.roomType || 'Phòng'), post.postPurpose === 'FIND_ROOMMATE' ? 'Ở ghép' : 'Cho thuê'],
+  meta: [
+    `${post.area}m²`,
+    roomTypeLabel[String(post.roomType)] || String(post.roomType || 'Phòng'),
+    post.postPurpose === 'FIND_ROOMMATE' ? 'Ở ghép' : 'Cho thuê'
+  ],
   purpose: post.purpose === 'FIND_ROOMMATE' ? 'Ở ghép' : 'Cho thuê',
-  accent: ['from-[#0D63C2] to-[#003566]', 'from-[#003566] to-[#001D3D]', 'from-[#FFD60A] to-[#FFC300]'][
-    index % 3
-  ]
+  accent: ['from-[#0D63C2] to-[#003566]', 'from-[#003566] to-[#001D3D]', 'from-[#FFD60A] to-[#FFC300]'][index % 3]
 })
 
 const ListingCard = ({ listing }: { listing: Listing }) => (
@@ -106,7 +123,11 @@ const ListingCard = ({ listing }: { listing: Listing }) => (
   >
     <div className={`relative h-48 overflow-hidden bg-gradient-to-br ${listing.accent}`}>
       {listing.image ? (
-        <img src={listing.image} alt={listing.title} className='h-full w-full object-cover transition duration-300 hover:scale-105' />
+        <img
+          src={listing.image}
+          alt={listing.title}
+          className='h-full w-full object-cover transition duration-300 hover:scale-105'
+        />
       ) : (
         <div className='absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(255,255,255,0.18),transparent_34%)]' />
       )}
@@ -144,6 +165,7 @@ const ListingCard = ({ listing }: { listing: Listing }) => (
 const HomePage = () => {
   const [featuredListings, setFeaturedListings] = useState<Listing[]>(fallbackListings)
   const [searchAreas, setSearchAreas] = useState<Area[]>(areas)
+  const [roles, setRoles] = useState<string[]>(() => getStoredRoles())
   const [overviewStats, setOverviewStats] = useState({
     approvedPosts: 0,
     wards: 0,
@@ -151,6 +173,10 @@ const HomePage = () => {
   })
 
   useEffect(() => {
+    const syncRoles = () => setRoles(getStoredRoles())
+    window.addEventListener('auth-user-updated', syncRoles)
+    window.addEventListener('storage', syncRoles)
+
     const loadFeaturedPosts = async () => {
       try {
         const [postResult, wardResult] = await Promise.all([
@@ -188,7 +214,13 @@ const HomePage = () => {
     }
 
     void loadFeaturedPosts()
+    return () => {
+      window.removeEventListener('auth-user-updated', syncRoles)
+      window.removeEventListener('storage', syncRoles)
+    }
   }, [])
+
+  const isAdmin = roles.includes('ADMIN')
 
   return (
     <div className='min-h-screen bg-[#F5F7FA] text-[#181A20]'>
@@ -209,12 +241,21 @@ const HomePage = () => {
                 vực, ngân sách và tiện ích.
               </p>
               <div className='mt-8 flex flex-wrap gap-4'>
-                <Link to='/posts/search' className='rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20'>
+                <Link
+                  to='/posts/search'
+                  className='rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20'
+                >
                   Tìm phòng ngay
                 </Link>
-                <Link to='/posts/create' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>
-                  Đăng tin mới
-                </Link>
+                {isAdmin ? (
+                  <Link to='/admin/overview' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>
+                    Trang quản trị
+                  </Link>
+                ) : (
+                  <Link to='/posts/create' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>
+                    Đăng tin mới
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -243,7 +284,9 @@ const HomePage = () => {
           <div className='flex items-end justify-between gap-6'>
             <div>
               <h2 className='text-4xl font-extrabold text-[#181A20]'>Bài đăng nổi bật</h2>
-              <p className='mt-3 text-gray-500'>Các phòng đã được duyệt, có hình ảnh rõ ràng và thông tin giá minh bạch.</p>
+              <p className='mt-3 text-gray-500'>
+                Các phòng đã được duyệt, có hình ảnh rõ ràng và thông tin giá minh bạch.
+              </p>
             </div>
             <Link to='/posts/search' className='rounded-full bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white'>
               Xem tất cả
@@ -266,7 +309,11 @@ const HomePage = () => {
             {searchAreas.map((area) => (
               <Link
                 key={area.name}
-                to={area.wardId ? `/posts/search?wardId=${area.wardId}` : `/posts/search?keyword=${encodeURIComponent(area.name)}`}
+                to={
+                  area.wardId
+                    ? `/posts/search?wardId=${area.wardId}`
+                    : `/posts/search?keyword=${encodeURIComponent(area.name)}`
+                }
                 className='rounded-2xl border border-[#E6EAF0] bg-white p-6 shadow-lg shadow-[#001D3D]/5 transition hover:-translate-y-0.5 hover:border-[#FFC300]'
               >
                 <div className='h-1.5 w-16 rounded-full' style={{ backgroundColor: area.color }} />
@@ -284,10 +331,13 @@ const HomePage = () => {
                 Tạo nhu cầu thuê trọ để nhận gợi ý phù hợp hơn
               </h2>
               <p className='mt-5 max-w-2xl text-blue-100'>
-                Lưu ngân sách, khu vực, trường học và tiêu chí bạn cùng phòng. UniStay sẽ ưu tiên những bài đăng phù
-                hợp nhất.
+                Lưu ngân sách, khu vực, trường học và tiêu chí bạn cùng phòng. UniStay sẽ ưu tiên những bài đăng phù hợp
+                nhất.
               </p>
-              <Link to='/posts/search' className='mt-8 inline-block rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D]'>
+              <Link
+                to='/posts/search'
+                className='mt-8 inline-block rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D]'
+              >
                 Xem gợi ý
               </Link>
             </div>

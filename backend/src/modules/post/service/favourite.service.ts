@@ -3,6 +3,7 @@ import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 import { Prisma, user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
+import * as blockService from '../../user/service/block.service';
 
 export const getFavouritePosts = async (
   currentUser: user,
@@ -11,7 +12,17 @@ export const getFavouritePosts = async (
 ) => {
   const skip = (page - 1) * limit;
 
-  const where = { studentId: currentUser.id };
+  const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
+  const where = {
+    studentId: currentUser.id,
+    ...(blockedUserIds.length > 0 && {
+      post: {
+        userId: {
+          notIn: blockedUserIds
+        }
+      }
+    })
+  };
 
   const [favourites, totalCount] = await Promise.all([
     prismaClient.student_favorite_post.findMany({
@@ -58,7 +69,14 @@ export const getFavouritePosts = async (
 };
 
 export const addFavouritePost = async (currentUser: user, postId: string) => {
-  await requirePost(postId);
+  const post = await requirePost(postId);
+
+  if (await blockService.areUsersBlocked(currentUser.id, post.userId)) {
+    throw new AppError(
+      HttpStatus.FORBIDDEN,
+      'You cannot save this post because one of you has blocked the other user'
+    );
+  }
 
   const existing = await prismaClient.student_favorite_post.findUnique({
     where: { studentId_postId: { studentId: currentUser.id, postId } }

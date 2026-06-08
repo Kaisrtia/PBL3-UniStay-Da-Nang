@@ -47,3 +47,38 @@ export const verifyToken = async (
       .json({ message: 'Token expired or invalid!' });
   }
 };
+
+export const optionalVerifyToken = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret) as jwt.JwtPayload;
+    const user = await prismaClient.user.findUnique({
+      where: {
+        id: decoded.id
+      }
+    });
+
+    if (
+      user &&
+      user.status !== account_status.BANNED &&
+      user.status !== account_status.LOCKED &&
+      user.status !== account_status.HIDDEN
+    ) {
+      req.user = user;
+    }
+  } catch {
+    // Public endpoints should continue to work when an optional token is missing or stale.
+  }
+
+  next();
+};

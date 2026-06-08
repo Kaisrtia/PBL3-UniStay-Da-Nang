@@ -4,6 +4,7 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { Prisma, user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
 import { addRequestSharedAccommodationNotificationJob } from '../../notification/queues/notification.queue';
+import * as blockService from '../../user/service/block.service';
 
 export const createAccommodationRequest = async (
   currentUser: user,
@@ -15,6 +16,13 @@ export const createAccommodationRequest = async (
     throw new AppError(
       HttpStatus.BAD_REQUEST,
       'You cannot request your own post'
+    );
+  }
+
+  if (await blockService.areUsersBlocked(currentUser.id, post.userId)) {
+    throw new AppError(
+      HttpStatus.FORBIDDEN,
+      'You cannot send a request because one of you has blocked the other user'
     );
   }
 
@@ -47,9 +55,14 @@ export const createAccommodationRequest = async (
     throw error;
   }
 
-  addRequestSharedAccommodationNotificationJob(postId, post.userId).catch(err => {
-    console.error('Error enqueueing accommodation request notification job:', err);
-  });
+  addRequestSharedAccommodationNotificationJob(postId, post.userId).catch(
+    (err) => {
+      console.error(
+        'Error enqueueing accommodation request notification job:',
+        err
+      );
+    }
+  );
 
   return request;
 };
@@ -62,10 +75,16 @@ export const getReceivedAccommodationRequests = async (
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(Math.max(1, limit), 60);
   const skip = (safePage - 1) * safeLimit;
+  const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
   const where = {
     post: {
       userId: currentUser.id
-    }
+    },
+    ...(blockedUserIds.length > 0 && {
+      userId: {
+        notIn: blockedUserIds
+      }
+    })
   };
 
   const [requests, total] = await Promise.all([
@@ -127,8 +146,16 @@ export const getSentAccommodationRequests = async (
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(Math.max(1, limit), 60);
   const skip = (safePage - 1) * safeLimit;
+  const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
   const where = {
-    userId: currentUser.id
+    userId: currentUser.id,
+    ...(blockedUserIds.length > 0 && {
+      post: {
+        userId: {
+          notIn: blockedUserIds
+        }
+      }
+    })
   };
 
   const [requests, total] = await Promise.all([
