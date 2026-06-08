@@ -90,19 +90,31 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     filters.sortOrder = sortOrder as 'asc' | 'desc';
   }
 
-  const result = await postQueryService.getPosts(filters);
+  const result = await postQueryService.getPosts(filters, req.user?.id);
 
   sendSuccess(res, HttpStatus.OK, result, 'Posts fetched successfully');
 };
 
-export const handleGetRecommendedPosts = async (req: Request, res: Response) => {
+export const handleGetRecommendedPosts = async (
+  req: Request,
+  res: Response
+) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 
-  const result = await postQueryService.getRecommendedPosts(req.user!, page, limit);
+  const result = await postQueryService.getRecommendedPosts(
+    req.user!,
+    page,
+    limit
+  );
 
-  sendSuccess(res, HttpStatus.OK, result, 'Recommended posts fetched successfully');
-}
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    result,
+    'Recommended posts fetched successfully'
+  );
+};
 
 export const handleGetMyPosts = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
@@ -239,7 +251,7 @@ export const handleGetPostDetail = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const post = await postQueryService.getPostDetail(postId);
+  const post = await postQueryService.getPostDetail(postId, req.user?.id);
 
   sendSuccess(res, HttpStatus.OK, post, 'Post detail fetched successfully');
 };

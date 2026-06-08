@@ -3,6 +3,7 @@ import HttpStatus from 'http-status';
 import { AppError } from '../../../../core/exceptions/AppError';
 import { calculateScore } from '../../../demand/utils/matching.handler';
 import { connection } from '../../../../core/config/redis.connection';
+import * as blockService from '../../../user/service/block.service';
 import {
   user,
   room_type,
@@ -31,7 +32,10 @@ export interface PostFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
-export const getPosts = async (filters: PostFilters) => {
+export const getPosts = async (
+  filters: PostFilters,
+  currentUserId?: string
+) => {
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 10;
   const skip = (page - 1) * limit;
@@ -42,6 +46,11 @@ export const getPosts = async (filters: PostFilters) => {
   const where: Prisma.postWhereInput = {
     status: 'APPROVED'
   };
+  const blockedPostFilter =
+    await blockService.getBlockedUserFilter(currentUserId);
+  if (Object.keys(blockedPostFilter).length > 0) {
+    where.AND = [blockedPostFilter];
+  }
 
   // Purpose
   if (filters.purpose) {
@@ -170,6 +179,13 @@ export const getRecommendedPosts = async (
   }
 
   let cachedPosts = JSON.parse(cachedPostsJson);
+  const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
+
+  if (blockedUserIds.length > 0) {
+    cachedPosts = cachedPosts.filter(
+      (post: any) => !blockedUserIds.includes(post.userId || post.user?.id)
+    );
+  }
 
   // Filter and score posts
   const scoredPosts = cachedPosts
@@ -329,7 +345,9 @@ export const getPostsCountByWard = async () => {
   return result;
 };
 
-export const getPostDetail = async (postId: string) => {
+export const getPostDetail = async (postId: string, currentUserId?: string) => {
+  const blockedCommentUserFilter =
+    await blockService.getBlockedCommentUserFilter(currentUserId);
   const post = await prismaClient.post.findUnique({
     where: { id: postId },
     include: {
@@ -341,7 +359,8 @@ export const getPostDetail = async (postId: string) => {
       comments: {
         where: {
           status: comment_status.DISPLAYED,
-          parentId: null
+          parentId: null,
+          ...blockedCommentUserFilter
         },
         orderBy: { createdAt: 'desc' },
         include: {
@@ -354,7 +373,10 @@ export const getPostDetail = async (postId: string) => {
             }
           },
           replies: {
-            where: { status: comment_status.DISPLAYED },
+            where: {
+              status: comment_status.DISPLAYED,
+              ...blockedCommentUserFilter
+            },
             orderBy: { createdAt: 'asc' },
             include: {
               user: {
@@ -368,8 +390,7 @@ export const getPostDetail = async (postId: string) => {
             }
           }
         }
-      }
-      ,
+      },
       user: {
         select: {
           id: true,
@@ -389,7 +410,23 @@ export const getPostDetail = async (postId: string) => {
     throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
   }
 
-  return post;
+  if (
+    currentUserId &&
+    post.userId !== currentUserId &&
+    (await blockService.areUsersBlocked(currentUserId, post.userId))
+  ) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  const isBlockedByCurrentUser = await blockService.isBlockedByCurrentUser(
+    currentUserId,
+    post.userId
+  );
+
+  return {
+    ...post,
+    isBlockedByCurrentUser
+  };
 };
 
 export const getMyPosts = async (

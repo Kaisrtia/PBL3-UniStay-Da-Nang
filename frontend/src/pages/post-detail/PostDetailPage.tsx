@@ -1,8 +1,18 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import axios from 'axios'
-import { FaArrowLeft, FaCheckCircle, FaEllipsisV, FaFlag, FaHeart, FaPhoneAlt, FaRegHeart, FaUserCircle } from 'react-icons/fa'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import {
+  FaArrowLeft,
+  FaBan,
+  FaCheckCircle,
+  FaEllipsisV,
+  FaFlag,
+  FaHeart,
+  FaPhoneAlt,
+  FaRegHeart,
+  FaUserCircle
+} from 'react-icons/fa'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
@@ -10,6 +20,7 @@ import adminService from '@/services/adminService'
 import { API_BASE_URL } from '@/services/api'
 import contactService from '@/services/contactService'
 import engagementService, { type PostComment } from '@/services/engagementService'
+import userService from '@/services/userService'
 
 type PostImage = {
   id: number
@@ -61,6 +72,7 @@ type PostDetail = {
   postImages?: PostImage[]
   postAmenities?: PostAmenity[]
   comments?: PostComment[]
+  isBlockedByCurrentUser?: boolean
 }
 
 type ApiResponse<T> = {
@@ -118,7 +130,7 @@ const toNumber = (value: string | number) => Number(value)
 
 const formatPhoneNumber = (value?: string | null) => value || 'Chưa cập nhật'
 
-const reportReasonOptions = [
+const defaultReportReasonOptions = [
   'Thông tin giá thuê không chính xác',
   'Địa chỉ hoặc vị trí không đúng',
   'Hình ảnh hoặc mô tả không phù hợp',
@@ -179,13 +191,19 @@ const CommentItem = ({
     <article className={`${isReply ? 'ml-8 border-l border-gray-100 pl-4' : ''}`}>
       <div className='flex gap-3'>
         <div className='grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#001D3D] text-xs font-black text-[#FFC300]'>
-          {avatarUrl ? <img src={avatarUrl} alt={authorName} className='h-full w-full object-cover' /> : getInitials(authorName)}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={authorName} className='h-full w-full object-cover' />
+          ) : (
+            getInitials(authorName)
+          )}
         </div>
         <div className='min-w-0 flex-1 rounded-2xl bg-gray-50 px-4 py-3'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <p className='font-extrabold text-gray-950'>{authorName}</p>
             <span className='flex items-center gap-2'>
-              {item.createdAt ? <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p> : null}
+              {item.createdAt ? (
+                <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p>
+              ) : null}
               <button
                 type='button'
                 disabled={isSubmitting}
@@ -224,6 +242,7 @@ const CommentItem = ({
 const PostDetailPage = () => {
   const { postId } = useParams<{ postId: string }>()
   const location = useLocation()
+  const navigate = useNavigate()
   const [post, setPost] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -237,13 +256,15 @@ const PostDetailPage = () => {
   const [isAccommodationRequested, setIsAccommodationRequested] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
-  const [selectedReportReason, setSelectedReportReason] = useState(reportReasonOptions[0])
+  const [reportReasonOptions, setReportReasonOptions] = useState(defaultReportReasonOptions)
+  const [selectedReportReason, setSelectedReportReason] = useState(defaultReportReasonOptions[0])
   const [customReportReason, setCustomReportReason] = useState('')
   const [submittingCommentReportId, setSubmittingCommentReportId] = useState<string>()
   const [commentReportMessages, setCommentReportMessages] = useState<Record<string, string>>({})
   const [commentReportErrors, setCommentReportErrors] = useState<Record<string, string>>({})
   const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
   const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
+  const isHost = Boolean(storedUser?.roles?.includes('HOST'))
   const needsStudentSetup = Boolean(storedUser?.status === 'SET_UP' || (storedUser && !isStudent && !isAdmin))
   const routeState = location.state as { returnTo?: string; returnLabel?: string } | null
   const backTo = routeState?.returnTo || '/home'
@@ -310,6 +331,33 @@ const PostDetailPage = () => {
     return () => abortController.abort()
   }, [loadPostDetail])
 
+  useEffect(() => {
+    let isMounted = true
+
+    void engagementService
+      .getReportReasons()
+      .then((reasons) => {
+        const nextReasons = reasons.map((reason) => reason.trim()).filter(Boolean)
+
+        if (isMounted && nextReasons.length > 0) {
+          setReportReasonOptions(nextReasons)
+          setSelectedReportReason((current) => (nextReasons.includes(current) ? current : nextReasons[0]))
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setReportReasonOptions(defaultReportReasonOptions)
+          setSelectedReportReason((current) =>
+            defaultReportReasonOptions.includes(current) ? current : defaultReportReasonOptions[0]
+          )
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const postImages = useMemo(() => post?.postImages?.filter((image) => Boolean(image.imageUrl)) ?? [], [post])
   const heroImage = postImages[selectedImageIndex]?.imageUrl
   const comments = useMemo(() => post?.comments ?? [], [post?.comments])
@@ -322,7 +370,14 @@ const PostDetailPage = () => {
 
     return [
       { label: 'Loại phòng', value: roomTypeLabel[String(post.roomType)] || post.roomType },
-      { label: 'Nhu cầu', value: postPurposeLabel[String(post.postPurpose)] || postPurposeLabel[String(post.purpose)] || post.postPurpose || post.purpose },
+      {
+        label: 'Nhu cầu',
+        value:
+          postPurposeLabel[String(post.postPurpose)] ||
+          postPurposeLabel[String(post.purpose)] ||
+          post.postPurpose ||
+          post.purpose
+      },
       { label: 'Khu vực', value: post.ward?.name }
     ].filter((item): item is { label: string; value: string } => Boolean(item.value))
   }, [post])
@@ -331,13 +386,13 @@ const PostDetailPage = () => {
   const ownerPhone = formatPhoneNumber(owner?.phone)
   const ownerVerified = Boolean(owner?.hosts?.some((host) => host.isVerified))
   const ownerRating = owner?.hosts?.find((host) => host.avgStar !== undefined)?.avgStar
+  const isOwnerSelf = Boolean(storedUser?.id && owner?.id === storedUser.id)
   const addressLines = useMemo(() => {
     if (!post) return []
 
-    return [
-      post.exactAddress || post.detailAddress,
-      [post.ward?.name, post.city].filter(Boolean).join(', ')
-    ].filter(Boolean)
+    return [post.exactAddress || post.detailAddress, [post.ward?.name, post.city].filter(Boolean).join(', ')].filter(
+      Boolean
+    )
   }, [post])
 
   useEffect(() => {
@@ -365,6 +420,7 @@ const PostDetailPage = () => {
 
   const handleAddFavourite = () => {
     if (!post) return
+    if (isHost) return
 
     if (needsStudentSetup) {
       setActionMessage('')
@@ -424,9 +480,7 @@ const PostDetailPage = () => {
             ''
           : ''
         const hasAlreadyRequested =
-          axios.isAxiosError(error) &&
-          error.response?.status === 409 &&
-          message.toLowerCase().includes('already')
+          axios.isAxiosError(error) && error.response?.status === 409 && message.toLowerCase().includes('already')
 
         if (hasAlreadyRequested) {
           setIsAccommodationRequested(true)
@@ -444,9 +498,31 @@ const PostDetailPage = () => {
   const handleReport = () => {
     if (!post) return
     setIsActionMenuOpen(false)
-    setSelectedReportReason(reportReasonOptions[0])
+    setSelectedReportReason(reportReasonOptions[0] || defaultReportReasonOptions[0])
     setCustomReportReason('')
     setIsReportModalOpen(true)
+  }
+
+  const handleBlockOwner = () => {
+    if (!post?.user?.id) {
+      setActionError('Không tìm thấy người dùng cần chặn.')
+      return
+    }
+
+    if (!getAccessToken()) {
+      setActionError('Vui lòng đăng nhập để chặn người dùng.')
+      return
+    }
+
+    if (!window.confirm(`Bạn có chắc chắn muốn chặn ${ownerName}?`)) {
+      return
+    }
+
+    void runPostAction(async () => {
+      await userService.blockUser(post.user!.id)
+      navigate('/home', { replace: true })
+      return { message: 'Đã chặn người dùng.' }
+    }, 'Đã chặn người dùng.')
   }
 
   const handleSubmitReport = (event: FormEvent<HTMLFormElement>) => {
@@ -606,296 +682,327 @@ const PostDetailPage = () => {
       <main className='px-4 py-10'>
         <article className='mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_420px]'>
           <section className='rounded-lg bg-white p-6 shadow-sm'>
-          <Link
-            to={backTo}
-            aria-label={backLabel}
-            title={backLabel}
-            className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
-          >
-            <FaArrowLeft />
-          </Link>
+            <Link
+              to={backTo}
+              aria-label={backLabel}
+              title={backLabel}
+              className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+            >
+              <FaArrowLeft />
+            </Link>
 
-          {heroImage ? (
-            <div className='mt-5'>
-              <div className='relative overflow-hidden rounded-lg bg-gray-100'>
-                <img src={heroImage} alt={post.title} className='h-80 w-full object-cover' />
+            {heroImage ? (
+              <div className='mt-5'>
+                <div className='relative overflow-hidden rounded-lg bg-gray-100'>
+                  <img src={heroImage} alt={post.title} className='h-80 w-full object-cover' />
+                  {postImages.length > 1 ? (
+                    <span className='absolute bottom-4 right-4 rounded-full bg-black/65 px-3 py-1 text-xs font-bold text-white'>
+                      {selectedImageIndex + 1}/{postImages.length}
+                    </span>
+                  ) : null}
+                </div>
+
                 {postImages.length > 1 ? (
-                  <span className='absolute bottom-4 right-4 rounded-full bg-black/65 px-3 py-1 text-xs font-bold text-white'>
-                    {selectedImageIndex + 1}/{postImages.length}
-                  </span>
+                  <div className='mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5'>
+                    {postImages.map((image, index) => (
+                      <button
+                        key={image.id || `${image.imageUrl}-${index}`}
+                        type='button'
+                        onClick={() => setSelectedImageIndex(index)}
+                        className={`h-20 overflow-hidden rounded-lg border-2 bg-gray-100 transition ${
+                          selectedImageIndex === index
+                            ? 'border-[#FFC300] shadow-md shadow-[#001D3D]/15'
+                            : 'border-transparent hover:border-[#F6D983]'
+                        }`}
+                      >
+                        <img
+                          src={image.imageUrl}
+                          alt={`${post.title} ${index + 1}`}
+                          className='h-full w-full object-cover'
+                        />
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
               </div>
-
-              {postImages.length > 1 ? (
-                <div className='mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5'>
-                  {postImages.map((image, index) => (
-                    <button
-                      key={image.id || `${image.imageUrl}-${index}`}
-                      type='button'
-                      onClick={() => setSelectedImageIndex(index)}
-                      className={`h-20 overflow-hidden rounded-lg border-2 bg-gray-100 transition ${
-                        selectedImageIndex === index
-                          ? 'border-[#FFC300] shadow-md shadow-[#001D3D]/15'
-                          : 'border-transparent hover:border-[#F6D983]'
-                      }`}
-                    >
-                      <img src={image.imageUrl} alt={`${post.title} ${index + 1}`} className='h-full w-full object-cover' />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className='mt-5 flex h-80 w-full items-center justify-center rounded-lg bg-gray-100 text-gray-500'>
-              Chưa có hình ảnh
-            </div>
-          )}
-
-          <div className='mt-6'>
-            <div className='flex flex-wrap items-start justify-between gap-4'>
-              <div className='min-w-0 flex-1'>
-                <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>
-                  {roomTypeLabel[String(post.roomType)] || post.roomType}
-                </p>
-                <h1 className='mt-2 text-3xl font-black text-gray-950'>{post.title}</h1>
+            ) : (
+              <div className='mt-5 flex h-80 w-full items-center justify-center rounded-lg bg-gray-100 text-gray-500'>
+                Chưa có hình ảnh
               </div>
-              {!isAdmin ? (
-                <div className='relative flex shrink-0 items-center gap-2'>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction}
-                    onClick={handleAddFavourite}
-                    className={`grid h-11 w-11 place-items-center rounded-full border text-lg transition ${
-                      isFavourite
-                        ? 'border-[#FFC300] bg-[#FFF2B8] text-[#D79A00]'
-                        : 'border-gray-200 bg-white text-gray-800 hover:border-[#FFC300] hover:text-[#D79A00]'
-                    } disabled:cursor-not-allowed disabled:opacity-70`}
-                    aria-label={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
-                    title={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
-                  >
-                    {isFavourite ? <FaHeart /> : <FaRegHeart />}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setIsActionMenuOpen((current) => !current)}
-                    className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
-                    aria-expanded={isActionMenuOpen}
-                    aria-label='Mở menu thao tác'
-                    title='Thao tác'
-                  >
-                    <FaEllipsisV />
-                  </button>
-                  {isActionMenuOpen ? (
-                    <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+            )}
+
+            <div className='mt-6'>
+              <div className='flex flex-wrap items-start justify-between gap-4'>
+                <div className='min-w-0 flex-1'>
+                  <p className='text-sm font-semibold uppercase tracking-wide text-yellow-600'>
+                    {roomTypeLabel[String(post.roomType)] || post.roomType}
+                  </p>
+                  <h1 className='mt-2 text-3xl font-black text-gray-950'>{post.title}</h1>
+                </div>
+                {!isAdmin ? (
+                  <div className='relative flex shrink-0 items-center gap-2'>
+                    {!isHost ? (
                       <button
                         type='button'
                         disabled={isSubmittingAction}
-                        onClick={handleReport}
-                        className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                        onClick={handleAddFavourite}
+                        className={`grid h-11 w-11 place-items-center rounded-full border text-lg transition ${
+                          isFavourite
+                            ? 'border-[#FFC300] bg-[#FFF2B8] text-[#D79A00]'
+                            : 'border-gray-200 bg-white text-gray-800 hover:border-[#FFC300] hover:text-[#D79A00]'
+                        } disabled:cursor-not-allowed disabled:opacity-70`}
+                        aria-label={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
+                        title={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
                       >
-                        <FaFlag />
-                        Report Post
+                        {isFavourite ? <FaHeart /> : <FaRegHeart />}
                       </button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                    <button
+                      type='button'
+                      onClick={() => setIsActionMenuOpen((current) => !current)}
+                      className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                      aria-expanded={isActionMenuOpen}
+                      aria-label='Mở menu thao tác'
+                      title='Thao tác'
+                    >
+                      <FaEllipsisV />
+                    </button>
+                    {isActionMenuOpen ? (
+                      <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                        <button
+                          type='button'
+                          disabled={isSubmittingAction}
+                          onClick={handleReport}
+                          className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                        >
+                          <FaFlag />
+                          Report Post
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div className='mt-4 grid gap-1 text-sm font-semibold text-gray-600'>
+                {addressLines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+              <p className='mt-5 text-4xl font-black leading-tight text-[#FF5A3D] drop-shadow-sm'>
+                {currencyFormatter.format(toNumber(post.price))}
+                <span className='ml-2 text-xl font-extrabold text-[#FF5A3D]'>/tháng</span>
+              </p>
+            </div>
+
+            <div className='mt-6 grid gap-3 sm:grid-cols-2'>
+              <div className='rounded-lg bg-gray-50 p-4'>
+                <p className='text-sm text-gray-500'>Diện tích</p>
+                <p className='mt-1 font-bold text-gray-950'>{areaFormatter.format(toNumber(post.area))} m²</p>
+              </div>
+              <div className='rounded-lg bg-gray-50 p-4'>
+                <p className='text-sm text-gray-500'>Tiền cọc</p>
+                <p className='mt-1 font-bold text-gray-950'>{currencyFormatter.format(toNumber(post.deposit))}</p>
+              </div>
+            </div>
+
+            <section className='mt-8'>
+              <h2 className='text-xl font-bold text-gray-950'>Mô tả</h2>
+              <p className='mt-3 whitespace-pre-line leading-7 text-gray-700'>{post.description}</p>
+            </section>
+
+            <section className='mt-8 grid gap-5 border-t border-gray-100 pt-6'>
+              {listingCriteria.length > 0 ? (
+                <div>
+                  <h2 className='text-xl font-bold text-gray-950'>Tiêu chí bài đăng</h2>
+                  <div className='mt-4 grid gap-3 sm:grid-cols-3'>
+                    {listingCriteria.map((item) => (
+                      <div key={item.label} className='rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3'>
+                        <p className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>{item.label}</p>
+                        <p className='mt-1 font-bold text-[#001D3D]'>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
-            </div>
-            <div className='mt-4 grid gap-1 text-sm font-semibold text-gray-600'>
-              {addressLines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-            <p className='mt-5 text-4xl font-black leading-tight text-[#FF5A3D] drop-shadow-sm'>
-              {currencyFormatter.format(toNumber(post.price))}
-              <span className='ml-2 text-xl font-extrabold text-[#FF5A3D]'>/tháng</span>
-            </p>
-          </div>
 
-          <div className='mt-6 grid gap-3 sm:grid-cols-2'>
-            <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Diện tích</p>
-              <p className='mt-1 font-bold text-gray-950'>{areaFormatter.format(toNumber(post.area))} m²</p>
-            </div>
-            <div className='rounded-lg bg-gray-50 p-4'>
-              <p className='text-sm text-gray-500'>Tiền cọc</p>
-              <p className='mt-1 font-bold text-gray-950'>{currencyFormatter.format(toNumber(post.deposit))}</p>
-            </div>
-          </div>
-
-          <section className='mt-8'>
-            <h2 className='text-xl font-bold text-gray-950'>Mô tả</h2>
-            <p className='mt-3 whitespace-pre-line leading-7 text-gray-700'>{post.description}</p>
-          </section>
-
-          <section className='mt-8 grid gap-5 border-t border-gray-100 pt-6'>
-            {listingCriteria.length > 0 ? (
               <div>
-                <h2 className='text-xl font-bold text-gray-950'>Tiêu chí bài đăng</h2>
-                <div className='mt-4 grid gap-3 sm:grid-cols-3'>
-                  {listingCriteria.map((item) => (
-                    <div key={item.label} className='rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3'>
-                      <p className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>{item.label}</p>
-                      <p className='mt-1 font-bold text-[#001D3D]'>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
+                <h2 className='text-xl font-bold text-gray-950'>Tiện ích</h2>
+                {postAmenities.length > 0 ? (
+                  <div className='mt-4 flex flex-wrap gap-3'>
+                    {postAmenities.map((item) => {
+                      const condition = item.currentCondition
+                        ? amenityConditionLabel[String(item.currentCondition)]
+                        : ''
+
+                      return (
+                        <div
+                          key={`${item.amenityId}-${item.amenity?.name || ''}`}
+                          className='rounded-full border border-[#F1C232] bg-[#FFF7D6] px-4 py-2 text-sm font-extrabold text-[#001D3D]'
+                        >
+                          {item.amenity?.name || `Tiện ích #${item.amenityId}`}
+                          {condition ? (
+                            <span className='ml-2 text-xs font-bold text-gray-500'>({condition})</span>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className='mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                    Chủ bài đăng chưa cập nhật tiện ích cho phòng này.
+                  </p>
+                )}
               </div>
-            ) : null}
-
-            <div>
-              <h2 className='text-xl font-bold text-gray-950'>Tiện ích</h2>
-              {postAmenities.length > 0 ? (
-                <div className='mt-4 flex flex-wrap gap-3'>
-                  {postAmenities.map((item) => {
-                    const condition = item.currentCondition ? amenityConditionLabel[String(item.currentCondition)] : ''
-
-                    return (
-                      <div
-                        key={`${item.amenityId}-${item.amenity?.name || ''}`}
-                        className='rounded-full border border-[#F1C232] bg-[#FFF7D6] px-4 py-2 text-sm font-extrabold text-[#001D3D]'
-                      >
-                        {item.amenity?.name || `Tiện ích #${item.amenityId}`}
-                        {condition ? <span className='ml-2 text-xs font-bold text-gray-500'>({condition})</span> : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className='mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
-                  Chủ bài đăng chưa cập nhật tiện ích cho phòng này.
-                </p>
-              )}
-            </div>
-          </section>
+            </section>
           </section>
 
           <aside className='space-y-4'>
-          <section className='rounded-xl bg-[#FFF0C7] p-5 shadow-sm shadow-[#001D3D]/10'>
-            <div className='flex items-center gap-3'>
-              <div className='grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#001D3D]/20 bg-white text-2xl text-[#001D3D]'>
-                {owner?.avatarUrl ? <img src={owner.avatarUrl} alt={ownerName} className='h-full w-full object-cover' /> : <FaUserCircle />}
-              </div>
-              <div className='min-w-0'>
-                <div className='flex items-center gap-2'>
-                  <h2 className='truncate text-lg font-black text-gray-950'>{ownerName}</h2>
-                  {ownerVerified ? <FaCheckCircle className='shrink-0 text-green-500' aria-label='Đã xác minh' /> : null}
+            <section className='rounded-xl bg-[#FFF0C7] p-5 shadow-sm shadow-[#001D3D]/10'>
+              <div className='flex items-center gap-3'>
+                <div className='grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#001D3D]/20 bg-white text-2xl text-[#001D3D]'>
+                  {owner?.avatarUrl ? (
+                    <img src={owner.avatarUrl} alt={ownerName} className='h-full w-full object-cover' />
+                  ) : (
+                    <FaUserCircle />
+                  )}
                 </div>
-                <p className='mt-1 text-xs font-semibold text-gray-600'>
-                  {ownerRating && Number(ownerRating) >= 0 ? `Đánh giá ${Number(ownerRating).toFixed(1)} sao` : 'Chủ bài đăng UniStay'}
-                </p>
+                <div className='min-w-0'>
+                  <div className='flex items-center gap-2'>
+                    <h2 className='truncate text-lg font-black text-gray-950'>{ownerName}</h2>
+                    {ownerVerified ? (
+                      <FaCheckCircle className='shrink-0 text-green-500' aria-label='Đã xác minh' />
+                    ) : null}
+                  </div>
+                  <p className='mt-1 text-xs font-semibold text-gray-600'>
+                    {ownerRating && Number(ownerRating) >= 0
+                      ? `Đánh giá ${Number(ownerRating).toFixed(1)} sao`
+                      : 'Chủ bài đăng UniStay'}
+                  </p>
+                </div>
               </div>
-            </div>
-            <a
-              href={owner?.phone ? `tel:${owner.phone}` : undefined}
-              className='mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#C7A643] px-4 py-3 text-sm font-black text-[#001D3D] shadow-md shadow-[#001D3D]/10 transition hover:bg-[#B9972E]'
-            >
-              <FaPhoneAlt />
-              <span>{ownerPhone}</span>
-            </a>
-          </section>
-
-          <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Thao tác</h2>
-            <div className='mt-4 grid gap-3'>
-              {isAdmin ? (
-                <>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction}
-                    onClick={handleBanPostOwner}
-                    className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    Chặn người dùng
-                  </button>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction}
-                    onClick={handleRemovePost}
-                    className='rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    Xóa bài viết
-                  </button>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction}
-                    onClick={handleBanOwnerAndRemovePost}
-                    className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    Chặn và xóa bài
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type='button'
-                    disabled={isSubmittingAction || isAccommodationRequested}
-                    onClick={handleAccommodationRequest}
-                    className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
-                  >
-                    {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
-                  </button>
-                </>
-              )}
-            </div>
-            {actionMessage ? <p className='mt-3 text-sm font-semibold text-green-600'>{actionMessage}</p> : null}
-            {actionError ? <p className='mt-3 text-sm font-semibold text-red-600'>{actionError}</p> : null}
-          </section>
-
-          <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Vị trí bài đăng</h2>
-            <p className='mt-1 text-sm text-gray-500'>Bản đồ hiển thị đúng tọa độ chủ bài đăng đã cung cấp.</p>
-            <PostLocationMap
-              latitude={post.latitude}
-              longitude={post.longitude}
-              title={post.title}
-              address={post.detailAddress}
-              className='mt-4'
-              height={360}
-            />
-          </section>
-
-          {!isAdmin ? (
-          <section className='rounded-lg bg-white p-5 shadow-sm'>
-            <h2 className='text-lg font-bold text-gray-950'>Bình luận</h2>
-            <form onSubmit={handleCreateComment} className='mt-4 grid gap-3'>
-              <textarea
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-                placeholder='Nhập bình luận của bạn'
-                className='min-h-28 resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200'
-              />
-              <button
-                type='submit'
-                disabled={isSubmittingAction || !comment.trim()}
-                className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
+              <a
+                href={owner?.phone ? `tel:${owner.phone}` : undefined}
+                className='mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#C7A643] px-4 py-3 text-sm font-black text-[#001D3D] shadow-md shadow-[#001D3D]/10 transition hover:bg-[#B9972E]'
               >
-                Gửi bình luận
-              </button>
-            </form>
+                <FaPhoneAlt />
+                <span>{ownerPhone}</span>
+              </a>
+            </section>
 
-            <div className='mt-6 border-t border-gray-100 pt-5'>
-              {comments.length > 0 ? (
-                <div className='grid gap-4'>
-                  {comments.map((item) => (
-                    <CommentItem
-                      key={item.id}
-                      comment={item}
-                      submittingCommentId={submittingCommentReportId}
-                      messagesByCommentId={commentReportMessages}
-                      errorsByCommentId={commentReportErrors}
-                      onReport={handleReportComment}
-                    />
-                  ))}
+            <section className='rounded-lg bg-white p-5 shadow-sm'>
+              <h2 className='text-lg font-bold text-gray-950'>Thao tác</h2>
+              <div className='mt-4 grid gap-3'>
+                {isAdmin ? (
+                  <>
+                    <button
+                      type='button'
+                      disabled={isSubmittingAction}
+                      onClick={handleBanPostOwner}
+                      className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                    >
+                      Chặn người dùng
+                    </button>
+                    <button
+                      type='button'
+                      disabled={isSubmittingAction}
+                      onClick={handleRemovePost}
+                      className='rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70'
+                    >
+                      Xóa bài viết
+                    </button>
+                    <button
+                      type='button'
+                      disabled={isSubmittingAction}
+                      onClick={handleBanOwnerAndRemovePost}
+                      className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                    >
+                      Chặn và xóa bài
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {!isOwnerSelf ? (
+                      <button
+                        type='button'
+                        disabled={isSubmittingAction}
+                        onClick={handleBlockOwner}
+                        className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                      >
+                        <span className='inline-flex items-center justify-center gap-2'>
+                          <FaBan />
+                          Chặn người dùng
+                        </span>
+                      </button>
+                    ) : null}
+                    <button
+                      type='button'
+                      disabled={isSubmittingAction || isAccommodationRequested}
+                      onClick={handleAccommodationRequest}
+                      className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                    >
+                      {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
+                    </button>
+                  </>
+                )}
+              </div>
+              {actionMessage ? <p className='mt-3 text-sm font-semibold text-green-600'>{actionMessage}</p> : null}
+              {actionError ? <p className='mt-3 text-sm font-semibold text-red-600'>{actionError}</p> : null}
+            </section>
+
+            <section className='rounded-lg bg-white p-5 shadow-sm'>
+              <h2 className='text-lg font-bold text-gray-950'>Vị trí bài đăng</h2>
+              <p className='mt-1 text-sm text-gray-500'>Bản đồ hiển thị đúng tọa độ chủ bài đăng đã cung cấp.</p>
+              <PostLocationMap
+                latitude={post.latitude}
+                longitude={post.longitude}
+                title={post.title}
+                address={post.detailAddress}
+                className='mt-4'
+                height={360}
+              />
+            </section>
+
+            {!isAdmin ? (
+              <section className='rounded-lg bg-white p-5 shadow-sm'>
+                <h2 className='text-lg font-bold text-gray-950'>Bình luận</h2>
+                <form onSubmit={handleCreateComment} className='mt-4 grid gap-3'>
+                  <textarea
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                    placeholder='Nhập bình luận của bạn'
+                    className='min-h-28 resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200'
+                  />
+                  <button
+                    type='submit'
+                    disabled={isSubmittingAction || !comment.trim()}
+                    className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Gửi bình luận
+                  </button>
+                </form>
+
+                <div className='mt-6 border-t border-gray-100 pt-5'>
+                  {comments.length > 0 ? (
+                    <div className='grid gap-4'>
+                      {comments.map((item) => (
+                        <CommentItem
+                          key={item.id}
+                          comment={item}
+                          submittingCommentId={submittingCommentReportId}
+                          messagesByCommentId={commentReportMessages}
+                          errorsByCommentId={commentReportErrors}
+                          onReport={handleReportComment}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                      Chưa có bình luận nào cho bài đăng này.
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
-                  Chưa có bình luận nào cho bài đăng này.
-                </p>
-              )}
-            </div>
-          </section>
-          ) : null}
+              </section>
+            ) : null}
           </aside>
         </article>
       </main>
@@ -905,7 +1012,9 @@ const PostDetailPage = () => {
             <div className='flex items-start justify-between gap-4'>
               <div>
                 <h2 className='text-2xl font-black text-gray-950'>Báo cáo bài đăng</h2>
-                <p className='mt-1 text-sm font-semibold text-gray-500'>Chọn lý do hoặc nhập thêm mô tả để quản trị viên xử lý nhanh hơn.</p>
+                <p className='mt-1 text-sm font-semibold text-gray-500'>
+                  Chọn lý do hoặc nhập thêm mô tả để quản trị viên xử lý nhanh hơn.
+                </p>
               </div>
               <button
                 type='button'
@@ -971,6 +1080,7 @@ const PostDetailPage = () => {
 }
 
 type StoredUser = {
+  id?: string
   roles?: string[]
   status?: string | null
 }

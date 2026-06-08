@@ -47,6 +47,29 @@ userRouter.patch(
   asyncHandler(userController.handleChangePassword)
 );
 
+// -- Block Users --
+
+userRouter.get(
+  '/blocks',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  asyncHandler(userController.handleGetBlockedUsers)
+);
+
+userRouter.post(
+  '/blocks',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  asyncHandler(userController.handleBlockUser)
+);
+
+userRouter.delete(
+  '/blocks/:blockedId',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  asyncHandler(userController.handleUnblockUser)
+);
+
 // -- User Management --
 
 // Ban user
@@ -83,10 +106,6 @@ userRouter.get(
 // -- Public User Read --
 
 // Get public profile (MUST be at bottom to prevent overriding static routes like /me or /setup)
-userRouter.get(
-  '/:id',
-  asyncHandler(userController.handleGetUserProfile)
-);
+userRouter.get('/:id', asyncHandler(userController.handleGetUserProfile));
 
 export default userRouter;
-

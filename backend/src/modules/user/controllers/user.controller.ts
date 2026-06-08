@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
 import * as userInfoService from '../service/userInfo.service';
 import * as adminService from '../service/admin.service';
+import * as blockService from '../service/block.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { toUserResponseDto } from '../dto/user-response.dto';
 import { AppError } from '../../../core/exceptions/AppError';
@@ -36,12 +37,12 @@ export const handleSetupProfile = async (req: Request, res: Response) => {
     universityId
   });
 
-
   sendSuccess(res, HttpStatus.OK, toUserResponseDto(result));
 };
 
 export const handleUpdateProfile = async (req: Request, res: Response) => {
-  const { full_name, fullName, phone, dob, gender, avatarUrl, universityId } = req.body;
+  const { full_name, fullName, phone, dob, gender, avatarUrl, universityId } =
+    req.body;
 
   const result = await userInfoService.updateProfile(req.user!, {
     fullName: full_name || fullName,
@@ -52,7 +53,12 @@ export const handleUpdateProfile = async (req: Request, res: Response) => {
     universityId
   });
 
-  sendSuccess(res, HttpStatus.OK, toUserResponseDto(result), 'Đã cập nhật thông tin cá nhân.');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    toUserResponseDto(result),
+    'Đã cập nhật thông tin cá nhân.'
+  );
 };
 
 export const handleChangePassword = async (req: Request, res: Response) => {
@@ -61,6 +67,40 @@ export const handleChangePassword = async (req: Request, res: Response) => {
   await userInfoService.changePassword(req.user!, currentPassword, newPassword);
 
   sendSuccess(res, HttpStatus.OK, null, 'Password changed successfully');
+};
+
+// -- Block Users --
+
+export const handleGetBlockedUsers = async (req: Request, res: Response) => {
+  const blockedUsers = await blockService.listBlockedUsers(req.user!);
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    blockedUsers,
+    'Blocked users fetched successfully'
+  );
+};
+
+export const handleBlockUser = async (req: Request, res: Response) => {
+  const { blockedId } = req.body;
+
+  if (typeof blockedId !== 'string') {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'blockedId is required');
+  }
+
+  const block = await blockService.blockUser(req.user!, blockedId);
+  sendSuccess(res, HttpStatus.CREATED, block, 'User blocked successfully');
+};
+
+export const handleUnblockUser = async (req: Request, res: Response) => {
+  const { blockedId } = req.params;
+
+  if (!blockedId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'blockedId is required');
+  }
+
+  await blockService.unblockUser(req.user!, blockedId);
+  sendSuccess(res, HttpStatus.OK, null, 'User unblocked successfully');
 };
 
 // -- User Management --
@@ -92,10 +132,18 @@ export const handleVerifyHost = async (req: Request, res: Response) => {
 
   const verifiedHost = await adminService.verifyHost(hostId);
 
-  sendSuccess(res, HttpStatus.OK, verifiedHost, 'Host verified successfully (Blue Tick granted)');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    verifiedHost,
+    'Host verified successfully (Blue Tick granted)'
+  );
 };
 
-export const handleGetVerificationCandidates = async (req: Request, res: Response) => {
+export const handleGetVerificationCandidates = async (
+  req: Request,
+  res: Response
+) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
 

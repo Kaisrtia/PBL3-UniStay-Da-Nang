@@ -21,12 +21,23 @@ const currencyFormatter = new Intl.NumberFormat('vi-VN', {
   maximumFractionDigits: 0
 })
 
+const moneyInputFormatter = new Intl.NumberFormat('vi-VN')
+
+const parseMoneyInput = (value: string) => Number(value.replace(/\D/g, ''))
+
+const formatMoneyInput = (value: string | number) => {
+  const numericValue = typeof value === 'number' ? value : parseMoneyInput(value)
+  return numericValue > 0 ? moneyInputFormatter.format(numericValue) : ''
+}
+
 const DemandPage = () => {
   const [wards, setWards] = useState<Ward[]>([])
   const [amenities, setAmenities] = useState<Amenity[]>(fallbackAmenities)
   const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
   const [recommendedPosts, setRecommendedPosts] = useState<Post[]>([])
+  const [minPriceDisplay, setMinPriceDisplay] = useState(formatMoneyInput(1500000))
+  const [maxPriceDisplay, setMaxPriceDisplay] = useState(formatMoneyInput(3500000))
   const [message, setMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -58,6 +69,10 @@ const DemandPage = () => {
     )
   }
 
+  const handleMoneyInputChange = (value: string, setter: (nextValue: string) => void) => {
+    setter(formatMoneyInput(value))
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setMessage('')
@@ -72,8 +87,8 @@ const DemandPage = () => {
     try {
       await demandService.createOrUpdateDemand({
         wardId: Number(formData.get('wardId')),
-        minPrice: Number(formData.get('minPrice')),
-        maxPrice: Number(formData.get('maxPrice')),
+        minPrice: parseMoneyInput(minPriceDisplay),
+        maxPrice: parseMoneyInput(maxPriceDisplay),
         roomType: String(formData.get('roomType')) as RoomType,
         isLookingForRoommate: formData.get('isLookingForRoommate') === 'on',
         roommateGender: String(formData.get('roommateGender') || 'ANY'),
@@ -114,7 +129,11 @@ const DemandPage = () => {
             <div className='grid gap-5'>
               <label className='grid gap-2 text-sm font-bold'>
                 Khu vực theo ward
-                <select name='wardId' required className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'>
+                <select
+                  name='wardId'
+                  required
+                  className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                >
                   <option value=''>Chọn ward</option>
                   {wards.map((ward) => (
                     <option key={ward.id} value={ward.id}>
@@ -127,17 +146,36 @@ const DemandPage = () => {
               <div className='grid gap-4 sm:grid-cols-2'>
                 <label className='grid gap-2 text-sm font-bold'>
                   Giá tối thiểu
-                  <input name='minPrice' type='number' defaultValue={1500000} className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]' />
+                  <input
+                    name='minPrice'
+                    type='text'
+                    inputMode='numeric'
+                    value={minPriceDisplay}
+                    onChange={(event) => handleMoneyInputChange(event.target.value, setMinPriceDisplay)}
+                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                    placeholder='1.500.000'
+                  />
                 </label>
                 <label className='grid gap-2 text-sm font-bold'>
                   Giá tối đa
-                  <input name='maxPrice' type='number' defaultValue={3500000} className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]' />
+                  <input
+                    name='maxPrice'
+                    type='text'
+                    inputMode='numeric'
+                    value={maxPriceDisplay}
+                    onChange={(event) => handleMoneyInputChange(event.target.value, setMaxPriceDisplay)}
+                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                    placeholder='3.500.000'
+                  />
                 </label>
               </div>
 
               <label className='grid gap-2 text-sm font-bold'>
                 Loại phòng
-                <select name='roomType' className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'>
+                <select
+                  name='roomType'
+                  className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                >
                   <option value='ROOM'>Phòng trọ</option>
                   <option value='APARTMENT'>Căn hộ</option>
                   <option value='HOUSE'>Nhà nguyên căn</option>
@@ -153,7 +191,10 @@ const DemandPage = () => {
                 <h2 className='text-sm font-bold'>Tiện ích mong muốn</h2>
                 <div className='grid gap-2 sm:grid-cols-2'>
                   {amenities.map((amenity) => (
-                    <label key={amenity.id} className='flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-sm font-bold'>
+                    <label
+                      key={amenity.id}
+                      className='flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-sm font-bold'
+                    >
                       <input
                         type='checkbox'
                         checked={selectedAmenityIds.includes(amenity.id)}
@@ -170,7 +211,10 @@ const DemandPage = () => {
                 <h2 className='text-sm font-bold'>Lợi ích ưu tiên</h2>
                 <div className='grid gap-2 sm:grid-cols-2'>
                   {defaultBenefitNames.map((benefit) => (
-                    <label key={benefit} className='flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-sm font-bold'>
+                    <label
+                      key={benefit}
+                      className='flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-sm font-bold'
+                    >
                       <input
                         type='checkbox'
                         checked={selectedBenefits.includes(benefit)}

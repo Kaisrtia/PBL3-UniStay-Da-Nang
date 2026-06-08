@@ -25,14 +25,15 @@ const LandingPage = () => {
   }
 
   return (
-    <div className='min-h-screen relative'>
-      <img src={background} alt='Background' className='absolute inset-0 w-cover h-cover object-cover -z-10' />
-      <header className='whitespace-nowrap flex items-center justify-between px-8 py-6 bg-transparent'>
+    <div className='relative min-h-screen overflow-x-hidden'>
+      <img src={background} alt='Background' className='absolute inset-0 -z-10 h-full w-full object-cover' />
+      <div className='absolute inset-0 -z-10 bg-[#000814]/45' />
+      <header className='flex flex-wrap items-center justify-between gap-4 bg-transparent px-5 py-5 md:px-8 md:py-6'>
         <div className='flex items-center gap-2'>
           <img src={logo} alt='Unistay Logo' className='h-16 w-28 object-contain' />
           <span className='text-white font-bold text-xl font-serif'>UNISTAY</span>
         </div>
-        <nav className='flex gap-6 text-white text-sm'>
+        <nav className='flex flex-wrap items-center gap-3 text-sm text-white md:gap-6'>
           <a href='#info-section' className='hover:text-yellow-400 px-4 py-2'>
             Giới thiệu
           </a>
@@ -51,21 +52,25 @@ const LandingPage = () => {
         </nav>
       </header>
 
-      <section className='flex flex-col items-center justify-center text-center pt-20 pb-32'>
+      <section className='flex flex-col items-center justify-center px-4 pb-24 pt-16 text-center md:pb-32 md:pt-20'>
         <h2 className='text-white text-lg tracking-widest mb-2 font-brand font-semibold'>
           TÌM KIẾM NHÀ TRỌ VÀ KẾT NỐI SINH VIÊN
         </h2>
         <h1 className='text-5xl font-bold text-yellow-400 mb-2 font-serif'>UNISTAY</h1>
         <h3 className='text-white text-xl mb-8 font-brand font-semibold'>TẠI ĐÀ NẴNG</h3>
-        <div className='bg-white rounded-lg shadow-lg flex items-center w-full max-w-2xl mx-auto p-2'>
-          <div className='flex gap-2 mr-4'>
+        <div className='mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-lg bg-white p-2 shadow-lg sm:flex-row sm:items-center'>
+          <div className='flex shrink-0 gap-2 sm:mr-2'>
             <button type='button' onClick={() => setSearchMode('all')} className={getModeClass('all')}>
               Tất cả
             </button>
             <button type='button' onClick={() => setSearchMode('RENT')} className={getModeClass('RENT')}>
               Môi giới
             </button>
-            <button type='button' onClick={() => setSearchMode('FIND_ROOMMATE')} className={getModeClass('FIND_ROOMMATE')}>
+            <button
+              type='button'
+              onClick={() => setSearchMode('FIND_ROOMMATE')}
+              className={getModeClass('FIND_ROOMMATE')}
+            >
               Sinh viên
             </button>
           </div>
@@ -75,14 +80,18 @@ const LandingPage = () => {
             onKeyDown={(event) => {
               if (event.key === 'Enter') handleSearch()
             }}
-            className='flex-1 px-4 py-2 outline-none text-sm'
+            className='min-w-0 flex-1 px-4 py-2 text-sm outline-none'
             placeholder='Nhập vào từ khoá tìm kiếm'
           />
-          <button type='button' onClick={() => navigate('/posts/search')} className='flex items-center gap-1 px-3 py-2 bg-gray-100 rounded text-xs font-semibold mr-2'>
+          <button
+            type='button'
+            onClick={() => navigate('/posts/search')}
+            className='flex shrink-0 items-center justify-center gap-1 rounded bg-gray-100 px-3 py-2 text-xs font-semibold sm:mr-2'
+          >
             <FaSearch className='text-gray-500' />
             Nâng cao
           </button>
-          <button type='button' onClick={handleSearch} className='bg-yellow-400 p-2 rounded text-white'>
+          <button type='button' onClick={handleSearch} className='rounded bg-yellow-400 p-2 text-white'>
             <FaSearch />
           </button>
         </div>

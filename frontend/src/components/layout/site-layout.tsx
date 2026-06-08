@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type React
 
 import {
   FaBars,
+  FaBan,
   FaBell,
   FaChevronDown,
   FaHeart,
@@ -176,7 +177,13 @@ const HeaderAvatar = ({
   </span>
 )
 
-const FilterSelect = ({ label, options = [{ label: 'Tất cả', value: '' }], value, onChange, disabled }: FilterSelectProps) => {
+const FilterSelect = ({
+  label,
+  options = [{ label: 'Tất cả', value: '' }],
+  value,
+  onChange,
+  disabled
+}: FilterSelectProps) => {
   const normalizedOptions = options.map((option) =>
     typeof option === 'string' ? { label: option, value: option === 'Tất cả' ? '' : option } : option
   )
@@ -292,9 +299,7 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => {
     getSelectedLabel(listingTypeOptions, filters.purpose),
     selectedPriceLabel,
     filters.minArea ? `Từ ${filters.minArea}m²` : '',
-    ...amenityOptions
-      .filter((amenity) => filters.amenityIds.includes(amenity.id))
-      .map((amenity) => amenity.name),
+    ...amenityOptions.filter((amenity) => filters.amenityIds.includes(amenity.id)).map((amenity) => amenity.name),
     ...filters.benefits,
     filters.keyword.trim() ? `"${filters.keyword.trim()}"` : ''
   ].filter(Boolean)
@@ -319,169 +324,179 @@ const AdvancedFilterPanel = ({ onClose }: { onClose: () => void }) => {
   }
 
   return (
-  <div className='absolute left-1/2 top-16 z-50 w-[min(92vw,760px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
-    <div className='flex h-14 items-center justify-between border-b border-gray-100 px-5'>
-      <button type='button' onClick={onClose} className='grid h-9 w-9 place-items-center rounded-full hover:bg-gray-100'>
-        <FaTimes className='text-sm' />
-      </button>
-      <h2 className='text-lg font-extrabold'>Bộ lọc</h2>
-      <span className='h-9 w-9' />
-    </div>
+    <div className='absolute left-1/2 top-16 z-50 w-[min(92vw,760px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+      <div className='flex h-14 items-center justify-between border-b border-gray-100 px-5'>
+        <button
+          type='button'
+          onClick={onClose}
+          className='grid h-9 w-9 place-items-center rounded-full hover:bg-gray-100'
+        >
+          <FaTimes className='text-sm' />
+        </button>
+        <h2 className='text-lg font-extrabold'>Bộ lọc</h2>
+        <span className='h-9 w-9' />
+      </div>
 
-    <div className='max-h-[72vh] overflow-y-auto px-6 py-5'>
-      <section>
-        <p className='text-sm font-extrabold'>Đã chọn</p>
-        <div className='mt-3 flex flex-wrap gap-2'>
-          {selectedChips.length > 0 ? (
-            selectedChips.map((chip) => (
-              <FilterChip key={chip} selected>
-                {chip}
+      <div className='max-h-[72vh] overflow-y-auto px-6 py-5'>
+        <section>
+          <p className='text-sm font-extrabold'>Đã chọn</p>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            {selectedChips.length > 0 ? (
+              selectedChips.map((chip) => (
+                <FilterChip key={chip} selected>
+                  {chip}
+                </FilterChip>
+              ))
+            ) : (
+              <span className='text-sm font-semibold text-gray-500'>Chưa chọn bộ lọc nào.</span>
+            )}
+          </div>
+        </section>
+
+        <section className='mt-6 border-t border-gray-100 pt-6'>
+          <h3 className='text-base font-extrabold'>Khu vực</h3>
+          <div className='mt-4 grid gap-4 md:grid-cols-2'>
+            <FilterSelect
+              label='Tỉnh / Thành'
+              options={[{ label: 'Đà Nẵng', value: 'da-nang' }]}
+              value='da-nang'
+              disabled
+            />
+            <FilterSelect
+              label='Phường / Xã'
+              options={wardOptions}
+              value={filters.wardId}
+              onChange={(event) => updateFilter('wardId', event.target.value)}
+            />
+          </div>
+        </section>
+
+        <section className='mt-6 border-t border-gray-100 pt-6'>
+          <h3 className='text-base font-extrabold'>Loại tin</h3>
+          <div className='mt-4 grid gap-4 md:grid-cols-3'>
+            <FilterSelect
+              label='Loại phòng'
+              options={roomTypeOptions}
+              value={filters.roomType}
+              onChange={(event) => updateFilter('roomType', event.target.value as AdvancedFilterState['roomType'])}
+            />
+            <FilterSelect
+              label='Loại tin'
+              options={listingTypeOptions}
+              value={filters.purpose}
+              onChange={(event) => updateFilter('purpose', event.target.value as AdvancedFilterState['purpose'])}
+            />
+          </div>
+        </section>
+
+        <section className='mt-6 border-t border-gray-100 pt-6'>
+          <h3 className='text-base font-extrabold'>Giá thuê và đặc điểm</h3>
+          <div className='mt-4 grid gap-4 md:grid-cols-2'>
+            <label className='block'>
+              <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối thiểu</span>
+              <input
+                type='number'
+                min='0'
+                value={filters.minPrice}
+                onChange={(event) => updateFilter('minPrice', event.target.value)}
+                className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+                placeholder='0đ'
+              />
+            </label>
+            <label className='block'>
+              <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối đa</span>
+              <input
+                type='number'
+                min='0'
+                value={filters.maxPrice}
+                onChange={(event) => updateFilter('maxPrice', event.target.value)}
+                className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+                placeholder='Không giới hạn'
+              />
+            </label>
+            <label className='block'>
+              <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Diện tích từ</span>
+              <input
+                type='number'
+                min='0'
+                value={filters.minArea}
+                onChange={(event) => updateFilter('minArea', event.target.value)}
+                className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+                placeholder='m²'
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className='mt-6 border-t border-gray-100 pt-6'>
+          <h3 className='text-base font-extrabold'>Tiện ích</h3>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            {amenityOptions.map((item) => (
+              <FilterChip
+                key={item.id}
+                selected={filters.amenityIds.includes(item.id)}
+                onClick={() => toggleAmenity(item.id)}
+              >
+                {item.name}
               </FilterChip>
-            ))
-          ) : (
-            <span className='text-sm font-semibold text-gray-500'>Chưa chọn bộ lọc nào.</span>
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+          <h3 className='mt-5 text-base font-extrabold'>Lợi ích</h3>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            {benefits.map((item) => (
+              <FilterChip key={item} selected={filters.benefits.includes(item)} onClick={() => toggleBenefit(item)}>
+                {item}
+              </FilterChip>
+            ))}
+          </div>
+        </section>
 
-      <section className='mt-6 border-t border-gray-100 pt-6'>
-        <h3 className='text-base font-extrabold'>Khu vực</h3>
-        <div className='mt-4 grid gap-4 md:grid-cols-2'>
-          <FilterSelect label='Tỉnh / Thành' options={[{ label: 'Đà Nẵng', value: 'da-nang' }]} value='da-nang' disabled />
-          <FilterSelect
-            label='Phường / Xã'
-            options={wardOptions}
-            value={filters.wardId}
-            onChange={(event) => updateFilter('wardId', event.target.value)}
-          />
-        </div>
-      </section>
-
-      <section className='mt-6 border-t border-gray-100 pt-6'>
-        <h3 className='text-base font-extrabold'>Loại tin</h3>
-        <div className='mt-4 grid gap-4 md:grid-cols-3'>
-          <FilterSelect
-            label='Loại phòng'
-            options={roomTypeOptions}
-            value={filters.roomType}
-            onChange={(event) => updateFilter('roomType', event.target.value as AdvancedFilterState['roomType'])}
-          />
-          <FilterSelect
-            label='Loại tin'
-            options={listingTypeOptions}
-            value={filters.purpose}
-            onChange={(event) => updateFilter('purpose', event.target.value as AdvancedFilterState['purpose'])}
-          />
-        </div>
-      </section>
-
-      <section className='mt-6 border-t border-gray-100 pt-6'>
-        <h3 className='text-base font-extrabold'>Giá thuê và đặc điểm</h3>
-        <div className='mt-4 grid gap-4 md:grid-cols-2'>
-          <label className='block'>
-            <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối thiểu</span>
+        <section className='mt-6 border-t border-gray-100 pt-6'>
+          <h3 className='text-base font-extrabold'>Tìm theo từ khóa</h3>
+          <div className='relative mt-3'>
+            <FaSearch className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400' />
             <input
-              type='number'
-              min='0'
-              value={filters.minPrice}
-              onChange={(event) => updateFilter('minPrice', event.target.value)}
-              className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
-              placeholder='0đ'
+              value={filters.keyword}
+              onChange={(event) => updateFilter('keyword', event.target.value)}
+              className='h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
+              placeholder='Nhập từ khóa tìm kiếm...'
             />
-          </label>
-          <label className='block'>
-            <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Tối đa</span>
-            <input
-              type='number'
-              min='0'
-              value={filters.maxPrice}
-              onChange={(event) => updateFilter('maxPrice', event.target.value)}
-              className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
-              placeholder='Không giới hạn'
+          </div>
+          <div className='mt-4 grid gap-4 md:grid-cols-2'>
+            <FilterSelect
+              label='Sắp xếp'
+              options={sortOptions}
+              value={filters.sort}
+              onChange={(event) => updateFilter('sort', event.target.value)}
             />
-          </label>
-          <label className='block'>
-            <span className='text-xs font-extrabold uppercase tracking-wide text-gray-500'>Diện tích từ</span>
-            <input
-              type='number'
-              min='0'
-              value={filters.minArea}
-              onChange={(event) => updateFilter('minArea', event.target.value)}
-              className='mt-2 h-12 w-full rounded-xl border border-gray-200 px-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
-              placeholder='m²'
-            />
-          </label>
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
 
-      <section className='mt-6 border-t border-gray-100 pt-6'>
-        <h3 className='text-base font-extrabold'>Tiện ích</h3>
-        <div className='mt-3 flex flex-wrap gap-2'>
-          {amenityOptions.map((item) => (
-            <FilterChip
-              key={item.id}
-              selected={filters.amenityIds.includes(item.id)}
-              onClick={() => toggleAmenity(item.id)}
-            >
-              {item.name}
-            </FilterChip>
-          ))}
-        </div>
-        <h3 className='mt-5 text-base font-extrabold'>Lợi ích</h3>
-        <div className='mt-3 flex flex-wrap gap-2'>
-          {benefits.map((item) => (
-            <FilterChip key={item} selected={filters.benefits.includes(item)} onClick={() => toggleBenefit(item)}>
-              {item}
-            </FilterChip>
-          ))}
-        </div>
-      </section>
-
-      <section className='mt-6 border-t border-gray-100 pt-6'>
-        <h3 className='text-base font-extrabold'>Tìm theo từ khóa</h3>
-        <div className='relative mt-3'>
-          <FaSearch className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400' />
-          <input
-            value={filters.keyword}
-            onChange={(event) => updateFilter('keyword', event.target.value)}
-            className='h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
-            placeholder='Nhập từ khóa tìm kiếm...'
-          />
-        </div>
-        <div className='mt-4 grid gap-4 md:grid-cols-2'>
-          <FilterSelect
-            label='Sắp xếp'
-            options={sortOptions}
-            value={filters.sort}
-            onChange={(event) => updateFilter('sort', event.target.value)}
-          />
-        </div>
-      </section>
+      <div className='sticky bottom-0 mt-6 flex items-center justify-between border-t border-gray-100 bg-white px-6 py-4'>
+        <button
+          type='button'
+          onClick={() => setFilters(defaultAdvancedFilters)}
+          className='text-sm font-extrabold text-[#181A20] underline underline-offset-4'
+        >
+          Xóa tất cả
+        </button>
+        <button
+          type='button'
+          onClick={handleSearch}
+          className='flex items-center gap-2 rounded-xl bg-[#181A20] px-7 py-3 text-sm font-extrabold text-white shadow-lg shadow-[#181A20]/20'
+        >
+          <FaSearch />
+          Tìm kiếm
+        </button>
+      </div>
     </div>
-
-    <div className='sticky bottom-0 mt-6 flex items-center justify-between border-t border-gray-100 bg-white px-6 py-4'>
-      <button
-        type='button'
-        onClick={() => setFilters(defaultAdvancedFilters)}
-        className='text-sm font-extrabold text-[#181A20] underline underline-offset-4'
-      >
-        Xóa tất cả
-      </button>
-      <button
-        type='button'
-        onClick={handleSearch}
-        className='flex items-center gap-2 rounded-xl bg-[#181A20] px-7 py-3 text-sm font-extrabold text-white shadow-lg shadow-[#181A20]/20'
-      >
-        <FaSearch />
-        Tìm kiếm
-      </button>
-    </div>
-  </div>
   )
 }
 
 export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isShortcutOpen, setIsShortcutOpen] = useState(false)
   const [isAccountOpen, setIsAccountOpen] = useState(false)
   const [isFavoriteOpen, setIsFavoriteOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
@@ -586,6 +601,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
   }
 
   const closeHeaderMenus = () => {
+    setIsShortcutOpen(false)
     setIsAccountOpen(false)
     setIsFavoriteOpen(false)
     setIsNotificationOpen(false)
@@ -608,13 +624,94 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
   return (
     <header className='sticky top-0 z-30 bg-gradient-to-r from-[#000814] via-[#001D3D] to-[#003566] shadow-lg shadow-[#001D3D]/20'>
       <div className='mx-auto flex h-32 max-w-[1440px] items-center px-8'>
-        <Link to='/home' className='mr-8 flex w-80 items-center'>
-          <img src={logo} alt='UniStay' className='h-32 w-60 object-contain' />
+        <Link to='/home' className='mr-8 flex w-96 items-center'>
+          <img src={logo} alt='UniStay' className='h-36 w-72 object-contain' />
         </Link>
 
-        <button className='mr-5 grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-[#001D3D] shadow-md'>
-          <FaBars />
-        </button>
+        <div className='relative mr-5'>
+          <button
+            type='button'
+            onClick={() => {
+              setIsShortcutOpen((current) => !current)
+              setIsFilterOpen(false)
+              setIsFavoriteOpen(false)
+              setIsNotificationOpen(false)
+              setIsAccountOpen(false)
+            }}
+            className='grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-[#001D3D] shadow-md transition hover:bg-[#FFD60A]'
+            aria-label='Mở menu lối tắt'
+            aria-expanded={isShortcutOpen}
+          >
+            <FaBars />
+          </button>
+
+          {isShortcutOpen ? (
+            <div className='absolute left-0 top-14 z-50 w-72 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+              <div className='border-b border-gray-100 px-5 py-4'>
+                <p className='text-sm font-extrabold'>Lối tắt</p>
+                <p className='mt-1 text-xs font-medium text-gray-500'>Truy cập nhanh các thao tác thường dùng.</p>
+              </div>
+              <div className='grid p-3'>
+                <Link
+                  to='/home'
+                  onClick={() => setIsShortcutOpen(false)}
+                  className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                >
+                  <FaHome className='text-[#003566]' />
+                  Trang chủ
+                </Link>
+                <Link
+                  to='/posts/search'
+                  onClick={() => setIsShortcutOpen(false)}
+                  className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                >
+                  <FaSearch className='text-[#003566]' />
+                  Tìm bài đăng
+                </Link>
+                {!isAdmin ? (
+                  <Link
+                    to={isAuthenticated ? '/posts/create' : '/login'}
+                    onClick={() => setIsShortcutOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaPlusCircle className='text-[#FFC300]' />
+                    Đăng tin mới
+                  </Link>
+                ) : null}
+                {isAuthenticated && !isAdmin ? (
+                  <Link
+                    to='/contacts'
+                    onClick={() => setIsShortcutOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaUsers className='text-[#003566]' />
+                    Yêu cầu liên hệ
+                  </Link>
+                ) : null}
+                {isStudent ? (
+                  <Link
+                    to='/demands'
+                    onClick={() => setIsShortcutOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaSlidersH className='text-[#003566]' />
+                    Nhu cầu ở ghép
+                  </Link>
+                ) : null}
+                {isAdmin ? (
+                  <Link
+                    to='/admin/overview'
+                    onClick={() => setIsShortcutOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaUsers className='text-[#FFC300]' />
+                    Trang quản trị
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div className='relative flex h-12 flex-1 max-w-[560px] items-center rounded-full border border-[#FFD60A]/20 bg-white px-5 shadow-sm'>
           <FaHome className='mr-3 text-[#001D3D]' />
@@ -631,7 +728,13 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
           />
           <button
             type='button'
-            onClick={() => setIsFilterOpen((current) => !current)}
+            onClick={() => {
+              setIsFilterOpen((current) => !current)
+              setIsShortcutOpen(false)
+              setIsFavoriteOpen(false)
+              setIsNotificationOpen(false)
+              setIsAccountOpen(false)
+            }}
             className='ml-4 flex items-center gap-2 text-sm font-bold text-[#181A20]'
           >
             <FaSlidersH className='text-[#001D3D]' />
@@ -646,42 +749,44 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
 
         <div className='ml-5 flex items-center gap-4'>
           {isStudent ? (
-          <div className='relative'>
-            <button
-              type='button'
-              onClick={() => {
-                setIsFavoriteOpen((current) => !current)
-                setIsNotificationOpen(false)
-                setIsAccountOpen(false)
-              }}
-              className='grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-white shadow-md'
-              aria-label='Mở danh sách yêu thích'
-            >
-              <FaHeart />
-            </button>
+            <div className='relative'>
+              <button
+                type='button'
+                onClick={() => {
+                  setIsFavoriteOpen((current) => !current)
+                  setIsShortcutOpen(false)
+                  setIsFilterOpen(false)
+                  setIsNotificationOpen(false)
+                  setIsAccountOpen(false)
+                }}
+                className='grid h-11 w-11 place-items-center rounded-full bg-[#FFC300] text-white shadow-md'
+                aria-label='Mở danh sách yêu thích'
+              >
+                <FaHeart />
+              </button>
 
-            {isFavoriteOpen && (
-              <div className='absolute right-0 top-14 z-50 w-72 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
-                <div className='border-b border-gray-100 px-5 py-4'>
-                  <p className='text-sm font-extrabold'>Bài đăng yêu thích</p>
-                  <p className='mt-1 text-xs font-medium text-gray-500'>
-                    {isAuthenticated
-                      ? 'Các phòng đã lưu sẽ được đồng bộ với tài khoản của bạn.'
-                      : 'Đăng nhập để lưu và quản lý phòng yêu thích.'}
-                  </p>
+              {isFavoriteOpen && (
+                <div className='absolute right-0 top-14 z-50 w-72 overflow-hidden rounded-2xl border border-white/10 bg-white text-[#181A20] shadow-2xl shadow-[#000814]/25'>
+                  <div className='border-b border-gray-100 px-5 py-4'>
+                    <p className='text-sm font-extrabold'>Bài đăng yêu thích</p>
+                    <p className='mt-1 text-xs font-medium text-gray-500'>
+                      {isAuthenticated
+                        ? 'Các phòng đã lưu sẽ được đồng bộ với tài khoản của bạn.'
+                        : 'Đăng nhập để lưu và quản lý phòng yêu thích.'}
+                    </p>
+                  </div>
+                  <div className='p-3'>
+                    <Link
+                      to={isAuthenticated ? '/posts/favourites' : '/login'}
+                      onClick={() => setIsFavoriteOpen(false)}
+                      className='block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                    >
+                      {isAuthenticated ? 'Xem danh sách yêu thích' : 'Đăng nhập để xem'}
+                    </Link>
+                  </div>
                 </div>
-                <div className='p-3'>
-                  <Link
-                    to={isAuthenticated ? '/posts/favourites' : '/login'}
-                    onClick={() => setIsFavoriteOpen(false)}
-                    className='block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
-                  >
-                    {isAuthenticated ? 'Xem danh sách yêu thích' : 'Đăng nhập để xem'}
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           ) : null}
 
           <div className='relative'>
@@ -689,6 +794,8 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
               type='button'
               onClick={() => {
                 setIsNotificationOpen((current) => !current)
+                setIsShortcutOpen(false)
+                setIsFilterOpen(false)
                 setIsFavoriteOpen(false)
                 setIsAccountOpen(false)
                 void loadNotifications()
@@ -751,9 +858,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                             type='button'
                             onClick={() => void handleNotificationClick(notification)}
                             className={`w-full rounded-xl border px-4 py-3 text-left transition hover:border-[#FFC300] hover:bg-[#FFF7D6] ${
-                              notification.isRead
-                                ? 'border-gray-100 bg-white'
-                                : 'border-[#FFC300]/50 bg-[#FFF7D6]'
+                              notification.isRead ? 'border-gray-100 bg-white' : 'border-[#FFC300]/50 bg-[#FFF7D6]'
                             }`}
                           >
                             <span className='flex items-start justify-between gap-3'>
@@ -791,6 +896,8 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                 type='button'
                 onClick={() => {
                   setIsAccountOpen((current) => !current)
+                  setIsShortcutOpen(false)
+                  setIsFilterOpen(false)
                   setIsFavoriteOpen(false)
                   setIsNotificationOpen(false)
                 }}
@@ -853,6 +960,14 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   >
                     <FaKey className='text-[#003566]' />
                     Đổi mật khẩu
+                  </Link>
+                  <Link
+                    to='/account/blocked-users'
+                    onClick={() => setIsAccountOpen(false)}
+                    className='flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]'
+                  >
+                    <FaBan className='text-red-500' />
+                    Danh sách đã chặn
                   </Link>
                   <Link
                     to='/posts/create'
@@ -944,10 +1059,18 @@ export const SiteFooter = () => (
       <div>
         <h4 className='mb-4 text-lg font-bold text-[#FFD60A]'>Điều hướng</h4>
         <div className='grid gap-2 text-sm text-blue-100'>
-          <Link to='/home'>Trang chủ</Link>
-          <Link to='/home'>Bài đăng</Link>
-          <Link to='/home'>Tìm bạn ở ghép</Link>
-          <Link to='/home'>Hỗ trợ</Link>
+          <Link to='/home' className='transition hover:text-[#FFD60A]'>
+            Trang chủ
+          </Link>
+          <Link to='/posts/search' className='transition hover:text-[#FFD60A]'>
+            Bài đăng
+          </Link>
+          <Link to='/posts/search?purpose=FIND_ROOMMATE' className='transition hover:text-[#FFD60A]'>
+            Tìm bạn ở ghép
+          </Link>
+          <Link to='/contacts' className='transition hover:text-[#FFD60A]'>
+            Hỗ trợ liên hệ
+          </Link>
         </div>
       </div>
     </div>

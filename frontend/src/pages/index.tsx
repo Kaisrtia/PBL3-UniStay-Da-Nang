@@ -6,6 +6,7 @@ import {
   AdminUsersPage
 } from '@/pages/admin/AdminDashboardPage'
 import ChangePasswordPage from '@/pages/account/ChangePasswordPage'
+import BlockedUsersPage from '@/pages/account/BlockedUsersPage'
 import ProfilePage from '@/pages/account/ProfilePage'
 import ContactRequestsPage from '@/pages/contacts/ContactRequestsPage'
 import DemandPage from '@/pages/demand/DemandPage'
@@ -29,6 +30,7 @@ export {
   AdminReportsPage,
   AdminUsersPage,
   ChangePasswordPage,
+  BlockedUsersPage,
   ContactRequestsPage,
   CreatePostPage,
   DemandPage,

@@ -4,6 +4,7 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { user, comment_status, post_status } from '@prisma/client';
 import { generateHybridId } from '../../../core/utils/generateId';
 import { addCommentNotificationJob } from '../../notification/queues/notification.queue';
+import * as blockService from '../../user/service/block.service';
 
 export const createComment = async (
   currentUser: user,
@@ -32,6 +33,16 @@ export const createComment = async (
       );
     }
 
+    if (
+      post.userId !== currentUser.id &&
+      (await blockService.areUsersBlocked(currentUser.id, post.userId))
+    ) {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'You cannot comment because one of you has blocked the other user'
+      );
+    }
+
     if (data.parentId) {
       const parentComment = await tx.comment.findUnique({
         where: { id: data.parentId }
@@ -42,13 +53,29 @@ export const createComment = async (
       }
 
       if (parentComment.postId !== data.postId) {
-        throw new AppError(HttpStatus.BAD_REQUEST, 'Parent comment belongs to a different post');
+        throw new AppError(
+          HttpStatus.BAD_REQUEST,
+          'Parent comment belongs to a different post'
+        );
       }
 
       if (parentComment.status !== comment_status.DISPLAYED) {
         throw new AppError(
           HttpStatus.BAD_REQUEST,
           'Cannot reply to a hidden comment'
+        );
+      }
+
+      if (
+        parentComment.userId !== currentUser.id &&
+        (await blockService.areUsersBlocked(
+          currentUser.id,
+          parentComment.userId
+        ))
+      ) {
+        throw new AppError(
+          HttpStatus.FORBIDDEN,
+          'You cannot reply because one of you has blocked the other user'
         );
       }
     }
@@ -64,7 +91,7 @@ export const createComment = async (
     });
   });
 
-  addCommentNotificationJob(newComment.id).catch(err => {
+  addCommentNotificationJob(newComment.id).catch((err) => {
     console.error('Error enqueueing comment notification job:', err);
   });
 
@@ -92,7 +119,10 @@ export const updateComment = async (
     }
 
     if (existingComment.userId !== currentUser.id) {
-      throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to update this comment');
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'You do not have permission to update this comment'
+      );
     }
 
     const result = await tx.comment.updateMany({
@@ -123,10 +153,7 @@ export const updateComment = async (
   return comment;
 };
 
-export const hideComment = async (
-  currentUser: user,
-  commentId: string
-) => {
+export const hideComment = async (currentUser: user, commentId: string) => {
   const comment = await prismaClient.$transaction(async (tx) => {
     const existingComment = await tx.comment.findUnique({
       where: { id: commentId }
@@ -137,7 +164,10 @@ export const hideComment = async (
     }
 
     if (existingComment.userId !== currentUser.id) {
-      throw new AppError(HttpStatus.FORBIDDEN, 'You do not have permission to hide this comment');
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'You do not have permission to hide this comment'
+      );
     }
 
     const result = await tx.comment.updateMany({

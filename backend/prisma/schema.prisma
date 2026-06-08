@@ -121,11 +121,25 @@ model user {
   comments             comment[]
   accomodationRequests accomodation_request[]
   notifications        notification[]
+  blockedUsers         user_block[]           @relation("blocked_by_user")
+  blockedByUsers       user_block[]           @relation("blocked_user")
 
   userReports    report[] @relation("report")
   wasReported    report[] @relation("was reported")
   reportHandlers report[] @relation("handle")
   moderatedPosts post[]   @relation("moderator")
+}
+
+model user_block {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker user @relation("blocked_by_user", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked user @relation("blocked_user", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
 }
 
 
