@@ -64,6 +64,13 @@ postRouter.get(
   asyncHandler(postController.handleGetPostsCountByWard)
 );
 
+// Find approved posts around a selected map point
+postRouter.get(
+  '/nearby',
+  optionalVerifyToken,
+  asyncHandler(postController.handleGetNearbyPosts)
+);
+
 // -- Favourite Posts --
 
 // List favourite posts (Student only)

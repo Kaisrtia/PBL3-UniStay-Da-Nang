@@ -17,6 +17,7 @@ import {
   LandingPage,
   LoginPage,
   MyPostsPage,
+  NearbyPostsPage,
   PostDetailPage,
   ProfilePage,
   RegisterPage,
@@ -41,6 +42,7 @@ const AppRoutes = () => {
       <Route path='/posts/me' element={<MyPostsPage />}></Route>
       <Route path='/contacts' element={<ContactRequestsPage />}></Route>
       <Route path='/posts/search' element={<SearchResultsPage />}></Route>
+      <Route path='/posts/nearby' element={<NearbyPostsPage />}></Route>
       <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
       <Route path='/account/profile' element={<ProfilePage />}></Route>
       <Route path='/account/password' element={<ChangePasswordPage />}></Route>

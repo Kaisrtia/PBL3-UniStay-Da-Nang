@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { FaBolt, FaMapMarkerAlt, FaParking, FaRegHeart, FaShieldAlt, FaStar, FaWifi } from 'react-icons/fa'
+import { FaBolt, FaMapMarkerAlt, FaParking, FaRegHeart, FaRoute, FaShieldAlt, FaStar, FaWifi } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -246,6 +246,13 @@ const HomePage = () => {
                   className='rounded-full bg-[#FFC300] px-7 py-3 font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20'
                 >
                   Tìm phòng ngay
+                </Link>
+                <Link
+                  to='/posts/nearby'
+                  className='inline-flex items-center gap-2 rounded-full border border-white/30 bg-[#0D63C2] px-7 py-3 font-extrabold text-white shadow-lg shadow-[#0D63C2]/20 transition hover:bg-[#003566]'
+                >
+                  <FaRoute />
+                  Tìm phòng gần nhất
                 </Link>
                 {isAdmin ? (
                   <Link to='/admin/overview' className='rounded-full bg-white px-7 py-3 font-extrabold text-[#003566]'>

@@ -158,6 +158,8 @@ model university {
   wardId         Int
   streetName     String           @db.VarChar(255)
   houseNumber    String           @db.VarChar(50)
+  latitude        Decimal?         @db.Decimal(9, 6)
+  longitude       Decimal?         @db.Decimal(9, 6)
   ward           ward             @relation(fields: [wardId], references: [id])
   students       student[]
   studentDemands student_demand[]

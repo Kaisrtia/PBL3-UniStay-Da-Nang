@@ -36,112 +36,144 @@ const universities = [
     name: 'Trường Đại học Bách khoa',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Nguyễn Lương Bằng',
-    houseNumber: '54'
+    houseNumber: '54',
+    latitude: 16.074893,
+    longitude: 108.153204
   },
   {
     id: 'DUE',
     name: 'Trường Đại học Kinh tế',
     wardName: 'Phường Phước Mỹ',
     streetName: 'Ngũ Hành Sơn',
-    houseNumber: '71'
+    houseNumber: '71',
+    latitude: 16.043679,
+    longitude: 108.241880
   },
   {
     id: 'UFL',
     name: 'Trường Đại học Ngoại ngữ',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Lương Nhữ Hộc',
-    houseNumber: '131'
+    houseNumber: '131',
+    latitude: 16.030999,
+    longitude: 108.214426
   },
   {
     id: 'UED',
     name: 'Trường Đại học Sư phạm',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Tôn Đức Thắng',
-    houseNumber: '459'
+    houseNumber: '459',
+    latitude: 16.060425,
+    longitude: 108.157417
   },
   {
     id: 'UTE',
     name: 'Trường Đại học Sư phạm Kỹ thuật',
     wardName: 'Phường Thanh Bình',
     streetName: 'Nguyễn Lương Bằng',
-    houseNumber: '48'
+    houseNumber: '48',
+    latitude: 16.073994,
+    longitude: 108.215239
   },
   {
     id: 'VKU',
     name: 'Trường Đại học Công nghệ thông tin và Truyền thông Việt - Hàn',
     wardName: 'Phường Hòa Cường Nam',
     streetName: 'Nam Kỳ Khởi Nghĩa',
-    houseNumber: '470'
+    houseNumber: '470',
+    latitude: 15.975313,
+    longitude: 108.253188
   },
   {
     id: 'VNUK',
     name: 'Viện Nghiên cứu và Đào tạo Việt - Anh',
     wardName: 'Phường Bình Thuận',
     streetName: 'Lê Lợi',
-    houseNumber: '158A'
+    houseNumber: '158A',
+    latitude: 16.070822,
+    longitude: 108.219816
   },
   {
     id: 'SMP',
     name: 'Trường Y Dược, Đại học Đà Nẵng',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Nam Kỳ Khởi Nghĩa',
-    houseNumber: '99'
+    houseNumber: '99',
+    latitude: 15.982900,
+    longitude: 108.253400
   },
   {
     id: 'YDN',
     name: 'Trường Đại học Kỹ thuật Y Dược Đà Nẵng',
     wardName: 'Phường Hòa Thuận Tây',
     streetName: 'Hải Phòng',
-    houseNumber: '99'
+    houseNumber: '99',
+    latitude: 16.068541,
+    longitude: 108.219512
   },
   {
     id: 'DSU',
     name: 'Trường Đại học Thể dục Thể thao Đà Nẵng',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Nguyễn Lương Bằng',
-    houseNumber: '44'
+    houseNumber: '44',
+    latitude: 16.067607,
+    longitude: 108.198785
   },
   {
     id: 'DAU',
     name: 'Trường Đại học Kiến trúc Đà Nẵng',
     wardName: 'Phường Hòa Cường Nam',
     streetName: 'Đô Đốc Lân',
-    houseNumber: '566'
+    houseNumber: '566',
+    latitude: 16.033512,
+    longitude: 108.218736
   },
   {
     id: 'UDA',
     name: 'Trường Đại học Đông Á',
     wardName: 'Phường Hòa Cường Bắc',
     streetName: 'Xô Viết Nghệ Tĩnh',
-    houseNumber: '33'
+    houseNumber: '33',
+    latitude: 16.033940,
+    longitude: 108.222900
   },
   {
     id: 'PCTU',
     name: 'Trường Đại học Phan Châu Trinh',
     wardName: 'Phường Hòa Khánh Bắc',
     streetName: 'Nguyễn Lương Bằng',
-    houseNumber: '09'
+    houseNumber: '09',
+    latitude: 15.939900,
+    longitude: 108.250900
   },
   {
     id: 'FPT',
     name: 'Trường Đại học FPT tại Đà Nẵng',
     wardName: 'Phường Hòa Cường Nam',
     streetName: 'Nam Kỳ Khởi Nghĩa',
-    houseNumber: 'Khu đô thị FPT City'
+    houseNumber: 'Khu đô thị FPT City',
+    latitude: 15.982300,
+    longitude: 108.254200
   },
   {
     id: 'GWU',
     name: 'Đại học Greenwich',
     wardName: 'Phường Hòa Cường Bắc',
     streetName: 'Nguyễn Hữu Thọ',
-    houseNumber: '658'
+    houseNumber: '658',
+    latitude: 16.072485,
+    longitude: 108.235192
   },
   {
     id: 'DTU',
     name: 'Đại học Duy Tân',
     wardName: 'Phường Thanh Khê Tây',
     streetName: 'Nguyễn Văn Linh',
-    houseNumber: '254'
+    houseNumber: '254',
+    latitude: 16.060192,
+    longitude: 108.214343
   }
 ];
 
@@ -343,14 +375,18 @@ const main = async () => {
         name: university.name,
         wardId: ward.id,
         streetName: university.streetName,
-        houseNumber: university.houseNumber
+        houseNumber: university.houseNumber,
+        latitude: university.latitude,
+        longitude: university.longitude
       },
       create: {
         id: university.id,
         name: university.name,
         wardId: ward.id,
         streetName: university.streetName,
-        houseNumber: university.houseNumber
+        houseNumber: university.houseNumber,
+        latitude: university.latitude,
+        longitude: university.longitude
       }
     });
   }
