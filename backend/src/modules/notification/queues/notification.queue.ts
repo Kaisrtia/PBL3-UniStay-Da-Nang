@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq';
 import { connection } from '../../../core/config/redis.connection';
+import { post_status } from '@prisma/client';
 
 // Notification queues for post censoring results (automated and manual)
 const censorAutomaticalNotificationQueue = new Queue(
@@ -16,7 +17,25 @@ const censorManualNotificationQueue = new Queue(
   }
 );
 
-export const addCensorPostNotificationJob = async (name: string, data: any) => {
+type CensorPostNotificationJob =
+  | {
+      name: 'automated_censoring';
+      data: { notificationId: number };
+    }
+  | {
+      name: 'manual_censoring';
+      data: {
+        postId: string;
+        userId: string;
+        status: post_status;
+        rejectionReason?: string;
+      };
+    };
+
+export const addCensorPostNotificationJob = async (
+  name: CensorPostNotificationJob['name'],
+  data: CensorPostNotificationJob['data']
+) => {
   if (name === 'automated_censoring') {
     return await censorAutomaticalNotificationQueue.add(name, data, {
       attempts: 3,
@@ -34,6 +53,8 @@ export const addCensorPostNotificationJob = async (name: string, data: any) => {
       }
     });
   }
+
+  throw new Error(`Unsupported censor post notification job: ${name}`);
 };
 
 // Request notification queue for accommodation requests
