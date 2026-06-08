@@ -1,5 +1,5 @@
 import prismaClient from '../../../core/config/prisma';
-import { account_status, provider } from '@prisma/client';
+import { account_status, provider, type user as User } from '@prisma/client';
 import HttpStatus from 'http-status';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -7,7 +7,7 @@ import crypto, { randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
-const generateAccessToken = (user: any) => {
+const generateAccessToken = (user: Pick<User, 'id' | 'roles'>) => {
   return jwt.sign(
     { id: user.id, roles: user.roles },
     config.jwt.secret,
@@ -15,7 +15,7 @@ const generateAccessToken = (user: any) => {
   );
 };
 
-const generateAuthTokens = async (user: any) => {
+const generateAuthTokens = async (user: Pick<User, 'id' | 'roles'>) => {
   const accessToken = generateAccessToken(user);
   const refreshToken = crypto.randomBytes(64).toString('hex');
 
@@ -100,23 +100,20 @@ export const login = async (email?: string, password?: string) => {
     );
   }
 
+  if (user.status === account_status.BANNED) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'User is banned');
+  }
+
+  if (
+    user.status !== account_status.ACTIVE &&
+    user.status !== account_status.SET_UP
+  ) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Account is not active');
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.hashedPassword!);
   if (!isPasswordValid) {
-    if (user.status?.includes('BANNED')) {
-      throw new AppError(HttpStatus.UNAUTHORIZED, 'User is banned');
-    } else {
-      if (email) {
-        throw new AppError(
-          HttpStatus.UNAUTHORIZED,
-          'Invalid email or password'
-        );
-      } else {
-        throw new AppError(
-          HttpStatus.UNAUTHORIZED,
-          'Invalid phone or password'
-        );
-      }
-    }
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
   }
 
   const tokens = await generateAuthTokens(user);
@@ -139,7 +136,26 @@ export const googleLogin = async (
       email
     }
   });
-  if (!user) {
+  if (user) {
+    if (user.provider !== provider.GOOGLE) {
+      throw new AppError(
+        HttpStatus.CONFLICT,
+        'Email is already registered with password login'
+      );
+    }
+
+    if (user.status === account_status.BANNED) {
+      throw new AppError(HttpStatus.UNAUTHORIZED, 'User is banned');
+    }
+
+    if (
+      !user.emailVerified ||
+      (user.status !== account_status.ACTIVE &&
+        user.status !== account_status.SET_UP)
+    ) {
+      throw new AppError(HttpStatus.UNAUTHORIZED, 'Account is not active');
+    }
+  } else {
     user = await prismaClient.user.create({
       data: {
         id: randomUUID(),
@@ -158,15 +174,7 @@ export const googleLogin = async (
 };
 
 export const logout = async (refreshToken: string) => {
-  const session = await prismaClient.session.findUnique({
-    where: {
-      token: refreshToken
-    }
-  });
-  if (!session) {
-    return;
-  }
-  await prismaClient.session.delete({
+  await prismaClient.session.deleteMany({
     where: {
       token: refreshToken
     }
