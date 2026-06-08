@@ -7,7 +7,7 @@ import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import { defaultAmenityNames, defaultBenefitNames } from '@/constants/rentalFeatures'
 import amenityService, { type Amenity } from '@/services/amenityService'
 import demandService from '@/services/demandService'
-import locationService, { type Ward } from '@/services/locationService'
+import locationService, { type University } from '@/services/locationService'
 import postService, { type Post, type RoomType } from '@/services/postService'
 
 const fallbackAmenities: Amenity[] = defaultAmenityNames.map((name, index) => ({
@@ -30,8 +30,16 @@ const formatMoneyInput = (value: string | number) => {
   return numericValue > 0 ? moneyInputFormatter.format(numericValue) : ''
 }
 
+const parseOptionalNumberInput = (value: FormDataEntryValue | null) => {
+  const normalizedValue = String(value || '').trim().replace(',', '.')
+  if (!normalizedValue) return undefined
+
+  const parsedValue = Number(normalizedValue)
+  return Number.isFinite(parsedValue) ? parsedValue : undefined
+}
+
 const DemandPage = () => {
-  const [wards, setWards] = useState<Ward[]>([])
+  const [universities, setUniversities] = useState<University[]>([])
   const [amenities, setAmenities] = useState<Amenity[]>(fallbackAmenities)
   const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
@@ -43,13 +51,13 @@ const DemandPage = () => {
 
   useEffect(() => {
     const loadInitialData = async () => {
-      const [wardResult, amenityResult, recommendationResult] = await Promise.allSettled([
-        locationService.getWards(),
+      const [universityResult, amenityResult, recommendationResult] = await Promise.allSettled([
+        locationService.getUniversities(),
         amenityService.getAmenities(),
         postService.getRecommendedPosts({ limit: 4 })
       ])
 
-      if (wardResult.status === 'fulfilled') setWards(wardResult.value)
+      if (universityResult.status === 'fulfilled') setUniversities(universityResult.value)
       if (amenityResult.status === 'fulfilled' && amenityResult.value.length > 0) setAmenities(amenityResult.value)
       if (recommendationResult.status === 'fulfilled') setRecommendedPosts(recommendationResult.value.data)
     }
@@ -83,12 +91,35 @@ const DemandPage = () => {
       .filter((amenity) => selectedAmenityIds.includes(amenity.id))
       .map((amenity) => amenity.name)
     const criteria = [...selectedAmenityNames, ...selectedBenefits].join(', ')
+    const universityId = String(formData.get('universityId') || '')
+    const locationRadiusKm = parseOptionalNumberInput(formData.get('locationRadiusKm')) ?? 3
+    const locationRadiusMeters = Math.round(locationRadiusKm * 1000)
+    const minArea = parseOptionalNumberInput(formData.get('minArea'))
+    const maxArea = parseOptionalNumberInput(formData.get('maxArea'))
+
+    if (!universityId) {
+      setErrorMessage('Hãy chọn trường đại học muốn ở gần.')
+      return
+    }
+
+    if (locationRadiusMeters <= 0) {
+      setErrorMessage('Bán kính quanh trường phải lớn hơn 0.')
+      return
+    }
+
+    if (minArea !== undefined && maxArea !== undefined && minArea > maxArea) {
+      setErrorMessage('Diện tích tối thiểu không được lớn hơn diện tích tối đa.')
+      return
+    }
 
     try {
       await demandService.createOrUpdateDemand({
-        wardId: Number(formData.get('wardId')),
+        universityId,
+        locationRadiusMeters,
         minPrice: parseMoneyInput(minPriceDisplay),
         maxPrice: parseMoneyInput(maxPriceDisplay),
+        minArea,
+        maxArea,
         roomType: String(formData.get('roomType')) as RoomType,
         isLookingForRoommate: formData.get('isLookingForRoommate') === 'on',
         roommateGender: String(formData.get('roommateGender') || 'ANY'),
@@ -120,7 +151,7 @@ const DemandPage = () => {
           <p className='text-sm font-extrabold uppercase tracking-[0.24em] text-[#FFC300]'>UNISTAY</p>
           <h1 className='mt-3 text-4xl font-black'>Nhu cầu thuê phòng</h1>
           <p className='mt-3 max-w-2xl text-gray-500'>
-            Lưu ngân sách, khu vực, loại phòng và tiện ích mong muốn để hệ thống ưu tiên bài đăng phù hợp nhất.
+            Lưu ngân sách, trường muốn ở gần, bán kính tìm kiếm, diện tích và tiện ích để hệ thống ưu tiên bài đăng phù hợp nhất.
           </p>
         </div>
 
@@ -128,19 +159,33 @@ const DemandPage = () => {
           <form onSubmit={handleSubmit} className='rounded-2xl bg-white p-7 shadow-lg shadow-[#001D3D]/5'>
             <div className='grid gap-5'>
               <label className='grid gap-2 text-sm font-bold'>
-                Khu vực theo ward
+                Gần trường đại học
                 <select
-                  name='wardId'
+                  name='universityId'
                   required
                   className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
                 >
-                  <option value=''>Chọn ward</option>
-                  {wards.map((ward) => (
-                    <option key={ward.id} value={ward.id}>
-                      {ward.name}
+                  <option value=''>Chọn trường</option>
+                  {universities.map((university) => (
+                    <option key={university.id} value={university.id}>
+                      {university.name}
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className='grid gap-2 text-sm font-bold'>
+                Bán kính quanh trường (km)
+                <input
+                  name='locationRadiusKm'
+                  type='number'
+                  min='0.5'
+                  step='0.5'
+                  defaultValue='3'
+                  required
+                  className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                  placeholder='3'
+                />
               </label>
 
               <div className='grid gap-4 sm:grid-cols-2'>
@@ -166,6 +211,33 @@ const DemandPage = () => {
                     onChange={(event) => handleMoneyInputChange(event.target.value, setMaxPriceDisplay)}
                     className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
                     placeholder='3.500.000'
+                  />
+                </label>
+              </div>
+
+              <div className='grid gap-4 sm:grid-cols-2'>
+                <label className='grid gap-2 text-sm font-bold'>
+                  Diện tích tối thiểu (m²)
+                  <input
+                    name='minArea'
+                    type='number'
+                    inputMode='decimal'
+                    min='1'
+                    step='0.5'
+                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                    placeholder='18'
+                  />
+                </label>
+                <label className='grid gap-2 text-sm font-bold'>
+                  Diện tích tối đa (m²)
+                  <input
+                    name='maxArea'
+                    type='number'
+                    inputMode='decimal'
+                    min='1'
+                    step='0.5'
+                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                    placeholder='35'
                   />
                 </label>
               </div>
