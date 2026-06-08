@@ -9,21 +9,28 @@ export const createSystemFeedback = async (
     description: string;
   }
 ) => {
-  if (data.numberStar < 1 || data.numberStar > 5) {
+  if (
+    !Number.isInteger(data.numberStar) ||
+    data.numberStar < 1 ||
+    data.numberStar > 5
+  ) {
     throw new AppError(
       HttpStatus.BAD_REQUEST,
-      'Star rating must be between 1 and 5'
+      'Star rating must be an integer between 1 and 5'
     );
   }
 
-  // Create system feedback
-  const feedback = await prismaClient.system_feedback.create({
+  const description = data.description.trim();
+
+  if (!description) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Description is required');
+  }
+
+  return prismaClient.system_feedback.create({
     data: {
       userId,
       numberStar: data.numberStar,
-      description: data.description
+      description
     }
   });
-
-  return feedback;
 };

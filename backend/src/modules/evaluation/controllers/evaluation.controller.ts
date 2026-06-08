@@ -12,16 +12,25 @@ export const handleCreateSystemFeedback = async (
 ) => {
   const { numberStar, description } = req.body;
 
-  if (!numberStar || !description) {
+  if (numberStar === undefined || description === undefined) {
     throw new AppError(
       HttpStatus.BAD_REQUEST,
       'numberStar and description are required'
     );
   }
 
+  const parsedNumberStar = Number(numberStar);
+
+  if (!Number.isInteger(parsedNumberStar)) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Star rating must be an integer between 1 and 5'
+    );
+  }
+
   const feedback = await evaluationService.createSystemFeedback(req.user!.id, {
-    numberStar: Number(numberStar),
-    description
+    numberStar: parsedNumberStar,
+    description: String(description)
   });
 
   sendSuccess(
