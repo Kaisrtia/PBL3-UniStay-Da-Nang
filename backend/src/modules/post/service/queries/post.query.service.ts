@@ -39,6 +39,24 @@ export interface NearbyPostFilters {
   limit?: number;
 }
 
+export interface RoutePathInput {
+  fromLatitude: number;
+  fromLongitude: number;
+  toLatitude: number;
+  toLongitude: number;
+}
+
+interface OsrmRouteResponse {
+  code?: string;
+  routes?: {
+    distance?: number;
+    duration?: number;
+    geometry?: {
+      coordinates?: [number, number][];
+    };
+  }[];
+}
+
 const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
 const calculateDistanceKm = (
@@ -260,6 +278,63 @@ export const getNearbyPosts = async (
       }
     }
   };
+};
+
+export const getRoutePath = async (input: RoutePathInput) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const url = new URL(
+    `https://router.project-osrm.org/route/v1/driving/${input.fromLongitude},${input.fromLatitude};${input.toLongitude},${input.toLatitude}`
+  );
+  url.searchParams.set('overview', 'full');
+  url.searchParams.set('geometries', 'geojson');
+  url.searchParams.set('steps', 'false');
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) {
+      throw new AppError(
+        HttpStatus.BAD_GATEWAY,
+        'Routing service is currently unavailable'
+      );
+    }
+
+    const result = (await response.json()) as OsrmRouteResponse;
+    const route = result.routes?.[0];
+    const coordinates = route?.geometry?.coordinates;
+
+    if (
+      result.code !== 'Ok' ||
+      !route ||
+      route.distance === undefined ||
+      route.duration === undefined ||
+      !coordinates ||
+      coordinates.length === 0
+    ) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Route path not found');
+    }
+
+    return {
+      distanceKm: Number((route.distance / 1000).toFixed(2)),
+      durationMinutes: Math.max(1, Math.round(route.duration / 60)),
+      geometry: coordinates.map(([longitude, latitude]) => [
+        latitude,
+        longitude
+      ])
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      HttpStatus.BAD_GATEWAY,
+      'Could not calculate route path'
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 export const getRecommendedPosts = async (
