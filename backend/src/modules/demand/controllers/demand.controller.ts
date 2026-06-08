@@ -27,11 +27,24 @@ export const handleCreateStudentDemand = async (req: Request, res: Response) => 
     );
   }
 
+  const parsedWardId = Number(wardId);
+  const parsedMinPrice = Number(minPrice);
+  const parsedMaxPrice = Number(maxPrice);
+
+  if (
+    !Number.isInteger(parsedWardId) ||
+    parsedWardId <= 0 ||
+    !Number.isFinite(parsedMinPrice) ||
+    !Number.isFinite(parsedMaxPrice)
+  ) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid demand numeric values');
+  }
+
   const demand = await demandService.createStudentDemand(req.user!.id, {
-    wardId: Number(wardId),
+    wardId: parsedWardId,
     universityId: universityId ? String(universityId) : undefined,
-    minPrice: Number(minPrice),
-    maxPrice: Number(maxPrice),
+    minPrice: parsedMinPrice,
+    maxPrice: parsedMaxPrice,
     roomType,
     isLookingForRoommate: isLookingForRoommate === true || isLookingForRoommate === 'true',
     roommateGender,
@@ -48,12 +61,15 @@ const normalizeAmenityIds = (value: unknown): number[] => {
   }
 
   const rawValues = Array.isArray(value) ? value : String(value).split(',');
+  const parsedValues = rawValues.map((item) => Number(item));
+
+  if (!parsedValues.every((item) => Number.isInteger(item) && item > 0)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid amenity IDs');
+  }
 
   return Array.from(
     new Set(
-      rawValues
-        .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item) && item > 0)
+      parsedValues
     )
   );
 };
