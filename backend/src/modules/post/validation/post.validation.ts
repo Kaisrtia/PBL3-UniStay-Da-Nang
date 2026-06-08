@@ -2,7 +2,6 @@ import Joi from 'joi';
 import {
   room_type,
   post_purpose,
-  post_status,
   amenity_condition
 } from '@prisma/client';
 
@@ -31,7 +30,7 @@ export const createPostSchema = {
     postAmenities: Joi.array()
       .items(
         Joi.object({
-          amenityId: Joi.number().integer().required(),
+          amenityId: Joi.number().integer().positive().required(),
           currentCondition: Joi.string()
             .valid(...Object.values(amenity_condition))
             .optional()
@@ -69,7 +68,7 @@ export const updatePostSchema = {
     postAmenities: Joi.array()
       .items(
         Joi.object({
-          amenityId: Joi.number().integer().required(),
+          amenityId: Joi.number().integer().positive().required(),
           currentCondition: Joi.string()
             .valid(...Object.values(amenity_condition))
             .optional()
