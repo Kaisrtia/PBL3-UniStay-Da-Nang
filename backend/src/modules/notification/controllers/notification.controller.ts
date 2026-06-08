@@ -2,10 +2,22 @@ import { Request, Response } from 'express';
 import HttpStatus from 'http-status';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import * as notificationService from '../services/notification.service';
+import { AppError } from '../../../core/exceptions/AppError';
 
 export const handleGetNotifications = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 20);
+
+  if (!Number.isInteger(page) || page < 1) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'page must be a positive integer');
+  }
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'limit must be an integer between 1 and 50'
+    );
+  }
 
   const notifications = await notificationService.getUserNotifications(
     req.user!.id,
@@ -21,6 +33,14 @@ export const handleMarkNotificationAsRead = async (
   res: Response
 ) => {
   const notificationId = Number(req.params.id);
+
+  if (!Number.isInteger(notificationId) || notificationId <= 0) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Notification ID must be a positive integer'
+    );
+  }
+
   const notification = await notificationService.markNotificationAsRead(
     req.user!.id,
     notificationId
