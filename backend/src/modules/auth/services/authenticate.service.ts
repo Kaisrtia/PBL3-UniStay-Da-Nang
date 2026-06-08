@@ -7,15 +7,17 @@ import crypto, { randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
-const generateAccessToken = (user: Pick<User, 'id' | 'roles'>) => {
+const getUserRoles = (user: Pick<User, 'role'>) => [user.role];
+
+const generateAccessToken = (user: Pick<User, 'id' | 'role'>) => {
   return jwt.sign(
-    { id: user.id, roles: user.roles },
+    { id: user.id, roles: getUserRoles(user) },
     config.jwt.secret,
     { expiresIn: Number(config.jwt.access_token_ttl) }
   );
 };
 
-const generateAuthTokens = async (user: Pick<User, 'id' | 'roles'>) => {
+const generateAuthTokens = async (user: Pick<User, 'id' | 'role'>) => {
   const accessToken = generateAccessToken(user);
   const refreshToken = crypto.randomBytes(64).toString('hex');
 
@@ -117,7 +119,7 @@ export const login = async (email?: string, password?: string) => {
   }
 
   const tokens = await generateAuthTokens(user);
-  return { ...tokens, user };
+  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
 };
 
 export const googleLogin = async (
@@ -170,7 +172,7 @@ export const googleLogin = async (
   }
 
   const tokens = await generateAuthTokens(user);
-  return { ...tokens, user };
+  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
 };
 
 export const logout = async (refreshToken: string) => {

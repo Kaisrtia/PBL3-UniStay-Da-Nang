@@ -21,5 +21,5 @@ export const toUserResponseDto = (user: user): UserResponseDto => ({
   dob: user.dob,
   gender: user.gender,
   status: user.status,
-  roles: user.roles
+  roles: [user.role]
 });

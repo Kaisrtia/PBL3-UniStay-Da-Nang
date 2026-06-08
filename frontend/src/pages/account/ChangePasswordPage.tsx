@@ -10,32 +10,35 @@ import userService from '@/services/userService'
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.'
+    return data?.error?.message || data?.message || 'KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u. Vui lÃ²ng thá»­ láº¡i.'
   }
 
-  return 'Không thể đổi mật khẩu. Vui lòng thử lại.'
+  return 'KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u. Vui lÃ²ng thá»­ láº¡i.'
 }
+
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
+const passwordPolicyMessage = 'Máº­t kháº©u pháº£i cÃ³ Ã­t nháº¥t 8 kÃ½ tá»±, gá»“m chá»¯ hoa, chá»¯ thÆ°á»ng, sá»‘ vÃ  kÃ½ tá»± Ä‘áº·c biá»‡t.'
 
 const ChangePasswordPage = () => {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [form, setForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+
+  const newPasswordError = form.newPassword && !strongPasswordRegex.test(form.newPassword) ? passwordPolicyMessage : ''
+  const confirmPasswordError =
+    form.confirmPassword && form.newPassword !== form.confirmPassword ? 'Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p.' : ''
+  const isSubmitDisabled =
+    loading || !form.currentPassword || !form.newPassword || !form.confirmPassword || Boolean(newPasswordError || confirmPasswordError)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (loading) {
-      return
-    }
-
-    const formData = new FormData(event.currentTarget)
-    const currentPassword = String(formData.get('currentPassword') || '')
-    const newPassword = String(formData.get('newPassword') || '')
-    const confirmPassword = String(formData.get('confirmPassword') || '')
-
-    if (newPassword !== confirmPassword) {
-      setError('Mật khẩu mới và mật khẩu xác nhận không khớp.')
-      setMessage('')
+    if (isSubmitDisabled) {
       return
     }
 
@@ -44,9 +47,12 @@ const ChangePasswordPage = () => {
     setError('')
 
     try {
-      const response = await userService.changePassword({ currentPassword, newPassword })
-      setMessage(response.message || 'Đã cập nhật mật khẩu.')
-      event.currentTarget.reset()
+      const response = await userService.changePassword({
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword
+      })
+      setMessage(response.message || 'ÄÃ£ cáº­p nháº­t máº­t kháº©u.')
+      setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (changePasswordError) {
       setError(getErrorMessage(changePasswordError))
     } finally {
@@ -62,7 +68,7 @@ const ChangePasswordPage = () => {
           to='/account/profile'
           className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
         >
-          Quay lại hồ sơ
+          Quay láº¡i há»“ sÆ¡
         </Link>
 
         <section className='mt-6 rounded-2xl bg-white p-8 shadow-lg shadow-[#001D3D]/5'>
@@ -71,9 +77,9 @@ const ChangePasswordPage = () => {
               <FaKey />
             </span>
             <div>
-              <h1 className='text-3xl font-black'>Đổi mật khẩu</h1>
+              <h1 className='text-3xl font-black'>Äá»•i máº­t kháº©u</h1>
               <p className='mt-1 text-sm font-medium text-gray-500'>
-                Cập nhật mật khẩu định kỳ để bảo vệ tài khoản UniStay của bạn.
+                Cáº­p nháº­t máº­t kháº©u Ä‘á»‹nh ká»³ Ä‘á»ƒ báº£o vá»‡ tÃ i khoáº£n UniStay cá»§a báº¡n.
               </p>
             </div>
           </div>
@@ -83,10 +89,10 @@ const ChangePasswordPage = () => {
 
           <form onSubmit={handleSubmit} className='mt-8 grid gap-5'>
             {[
-              ['currentPassword', 'Mật khẩu hiện tại'],
-              ['newPassword', 'Mật khẩu mới'],
-              ['confirmPassword', 'Xác nhận mật khẩu mới']
-            ].map(([name, label]) => (
+              ['currentPassword', 'Máº­t kháº©u hiá»‡n táº¡i', ''],
+              ['newPassword', 'Máº­t kháº©u má»›i', newPasswordError],
+              ['confirmPassword', 'XÃ¡c nháº­n máº­t kháº©u má»›i', confirmPasswordError]
+            ].map(([name, label, fieldError]) => (
               <label key={name} className='grid gap-2 text-sm font-extrabold'>
                 {label}
                 <span className='relative block'>
@@ -94,20 +100,32 @@ const ChangePasswordPage = () => {
                   <input
                     name={name}
                     type='password'
-                    className='h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 font-bold outline-none transition focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/30'
-                    placeholder='Nhập mật khẩu'
+                    value={form[name as keyof typeof form]}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        [name]: event.target.value
+                      }))
+                    }
+                    className={`h-12 w-full rounded-xl border bg-white pl-11 pr-4 font-bold outline-none transition focus:ring-2 ${
+                      fieldError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                        : 'border-gray-200 focus:border-[#FFC300] focus:ring-[#FFC300]/30'
+                    }`}
+                    placeholder='Nháº­p máº­t kháº©u'
                   />
                 </span>
+                {fieldError ? <span className='text-xs font-bold text-red-600'>{fieldError}</span> : null}
               </label>
             ))}
 
             <button
               type='submit'
-              disabled={loading}
+              disabled={isSubmitDisabled}
               className='mt-2 inline-flex items-center justify-center gap-3 rounded-full bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:bg-gray-300'
             >
               <FaSave />
-              {loading ? 'Đang cập nhật...' : 'Lưu mật khẩu mới'}
+              {loading ? 'Äang cáº­p nháº­t...' : 'LÆ°u máº­t kháº©u má»›i'}
             </button>
           </form>
         </section>

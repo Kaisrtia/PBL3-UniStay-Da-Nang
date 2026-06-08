@@ -31,7 +31,7 @@ postRouter.get(
 postRouter.get(
   '/me',
   verifyToken,
-  authorize([account_role.USER]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(postController.handleGetMyPosts)
 );
 
@@ -71,7 +71,7 @@ postRouter.get(
 postRouter.get(
   '/accommodation-requests/received',
   verifyToken,
-  authorize([account_role.USER]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(accommodationReqController.handleGetReceivedAccommodationRequests)
 );
 
@@ -89,7 +89,7 @@ postRouter.get(
 postRouter.post(
   '/',
   verifyToken,
-  authorize([account_role.USER]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   validate(createPostSchema),
   asyncHandler(postController.handleCreatePost)
 );

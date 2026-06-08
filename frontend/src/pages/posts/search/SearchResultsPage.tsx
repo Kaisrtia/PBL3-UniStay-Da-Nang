@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { FaBath, FaBed, FaBolt, FaMapMarkerAlt, FaRulerCombined } from 'react-icons/fa'
+import { FaArrowLeft, FaBath, FaBed, FaBolt, FaMapMarkerAlt, FaRulerCombined } from 'react-icons/fa'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -221,9 +221,11 @@ const SearchResultsPage = () => {
         <div className='mx-auto mb-6 max-w-7xl'>
           <Link
             to='/home'
-            className='inline-flex rounded-full border border-[#003566] bg-white px-5 py-2 text-sm font-extrabold text-[#003566] shadow-sm transition hover:bg-[#003566] hover:text-white'
+            aria-label='Quay lại trang chủ'
+            title='Quay lại trang chủ'
+            className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] bg-white text-sm font-extrabold text-[#003566] shadow-sm transition hover:bg-[#003566] hover:text-white'
           >
-            Quay lại trang chủ
+            <FaArrowLeft />
           </Link>
         </div>
         <section className='mx-auto max-w-7xl overflow-hidden rounded-2xl bg-white shadow-sm'>

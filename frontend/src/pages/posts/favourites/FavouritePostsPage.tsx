@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { FaHeart, FaMapMarkerAlt, FaTrash } from 'react-icons/fa'
+import { FaArrowLeft, FaHeart, FaMapMarkerAlt, FaTrash } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -61,9 +61,11 @@ const FavouritePostsPage = () => {
           <div>
             <Link
               to='/home'
-              className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+              aria-label='Quay lại trang chủ'
+              title='Quay lại trang chủ'
+              className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
             >
-              Quay lại trang chủ
+              <FaArrowLeft />
             </Link>
             <p className='mt-6 text-sm font-extrabold uppercase tracking-[0.24em] text-[#FFC300]'>UNISTAY</p>
             <h1 className='mt-3 text-4xl font-black'>Bài đăng yêu thích</h1>

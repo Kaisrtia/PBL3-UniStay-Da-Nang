@@ -19,7 +19,7 @@ const applyRolePostRules = <T extends {
   postPurpose?: post_purpose;
   roomType?: room_type;
 }>(currentUser: user, data: T): T => {
-  if (currentUser.roles.includes('HOST')) {
+  if (currentUser.role === 'HOST') {
     return {
       ...data,
       purpose: post_purpose.RENT,
@@ -28,7 +28,7 @@ const applyRolePostRules = <T extends {
     };
   }
 
-  if (currentUser.roles.includes('STUDENT')) {
+  if (currentUser.role === 'STUDENT') {
     return {
       ...data,
       purpose: post_purpose.FIND_ROOMMATE,

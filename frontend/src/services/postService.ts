@@ -47,7 +47,6 @@ export type Post = {
   purpose?: PostPurpose | string
   detailAddress: string
   exactAddress?: string | null
-  district?: string | null
   city?: string | null
   area: string | number
   price: string | number
@@ -102,7 +101,6 @@ export type CreatePostPayload = {
   purpose: PostPurpose
   detailAddress: string
   exactAddress?: string
-  district?: string
   city?: string
   area: number
   price: number

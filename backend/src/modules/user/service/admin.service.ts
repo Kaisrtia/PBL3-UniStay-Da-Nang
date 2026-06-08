@@ -94,7 +94,7 @@ export const getAllUsers = async (page: number = 1, limit: number = 10) => {
         phone: true,
         avatarUrl: true,
         status: true,
-        roles: true,
+        role: true,
         createdAt: true
       }
     }),
@@ -102,7 +102,10 @@ export const getAllUsers = async (page: number = 1, limit: number = 10) => {
   ]);
 
   return {
-    data: users,
+    data: users.map((user) => ({
+      ...user,
+      roles: [user.role]
+    })),
     meta: {
       total: totalCount,
       page,

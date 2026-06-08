@@ -11,7 +11,7 @@ const evaluationRouter = Router();
 evaluationRouter.post(
   '/system-feedback',
   verifyToken,
-  authorize([account_role.USER]),
+  authorize([account_role.USER, account_role.STUDENT, account_role.HOST, account_role.ADMIN]),
   asyncHandler(evaluationController.handleCreateSystemFeedback)
 );
 

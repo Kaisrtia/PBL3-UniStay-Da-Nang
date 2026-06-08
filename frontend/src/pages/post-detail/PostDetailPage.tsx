@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import axios from 'axios'
-import { FaCheckCircle, FaEllipsisV, FaFlag, FaHeart, FaPhoneAlt, FaRegHeart, FaUserCircle } from 'react-icons/fa'
+import { FaArrowLeft, FaCheckCircle, FaEllipsisV, FaFlag, FaHeart, FaPhoneAlt, FaRegHeart, FaUserCircle } from 'react-icons/fa'
 import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -54,7 +54,6 @@ type PostDetail = {
   roomType: string
   postPurpose: string
   exactAddress?: string | null
-  district?: string | null
   city?: string | null
   description: string
   latitude: string | number
@@ -153,9 +152,28 @@ const getInitials = (name?: string) => {
   return source.slice(0, 2).toUpperCase()
 }
 
-const CommentItem = ({ comment: item, isReply = false }: { comment: PostComment; isReply?: boolean }) => {
+type CommentItemProps = {
+  comment: PostComment
+  isReply?: boolean
+  submittingCommentId?: string
+  messagesByCommentId: Record<string, string>
+  errorsByCommentId: Record<string, string>
+  onReport: (commentId: string) => void
+}
+
+const CommentItem = ({
+  comment: item,
+  isReply = false,
+  submittingCommentId,
+  messagesByCommentId,
+  errorsByCommentId,
+  onReport
+}: CommentItemProps) => {
   const authorName = item.user?.fullName || 'Người dùng UniStay'
   const avatarUrl = item.user?.avatarUrl
+  const isSubmitting = submittingCommentId === item.id
+  const message = messagesByCommentId[item.id]
+  const error = errorsByCommentId[item.id]
 
   return (
     <article className={`${isReply ? 'ml-8 border-l border-gray-100 pl-4' : ''}`}>
@@ -166,15 +184,36 @@ const CommentItem = ({ comment: item, isReply = false }: { comment: PostComment;
         <div className='min-w-0 flex-1 rounded-2xl bg-gray-50 px-4 py-3'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <p className='font-extrabold text-gray-950'>{authorName}</p>
-            {item.createdAt ? <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p> : null}
+            <span className='flex items-center gap-2'>
+              {item.createdAt ? <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p> : null}
+              <button
+                type='button'
+                disabled={isSubmitting}
+                onClick={() => onReport(item.id)}
+                className='inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-extrabold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60'
+              >
+                <FaFlag />
+                Report
+              </button>
+            </span>
           </div>
           <p className='mt-2 whitespace-pre-line text-sm leading-6 text-gray-700'>{item.content}</p>
+          {message ? <p className='mt-2 text-xs font-bold text-green-600'>{message}</p> : null}
+          {error ? <p className='mt-2 text-xs font-bold text-red-600'>{error}</p> : null}
         </div>
       </div>
       {item.replies && item.replies.length > 0 ? (
         <div className='mt-3 grid gap-3'>
           {item.replies.map((reply) => (
-            <CommentItem key={reply.id} comment={reply} isReply />
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              isReply
+              submittingCommentId={submittingCommentId}
+              messagesByCommentId={messagesByCommentId}
+              errorsByCommentId={errorsByCommentId}
+              onReport={onReport}
+            />
           ))}
         </div>
       ) : null}
@@ -200,6 +239,9 @@ const PostDetailPage = () => {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [selectedReportReason, setSelectedReportReason] = useState(reportReasonOptions[0])
   const [customReportReason, setCustomReportReason] = useState('')
+  const [submittingCommentReportId, setSubmittingCommentReportId] = useState<string>()
+  const [commentReportMessages, setCommentReportMessages] = useState<Record<string, string>>({})
+  const [commentReportErrors, setCommentReportErrors] = useState<Record<string, string>>({})
   const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
   const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
   const needsStudentSetup = Boolean(storedUser?.status === 'SET_UP' || (storedUser && !isStudent && !isAdmin))
@@ -294,7 +336,7 @@ const PostDetailPage = () => {
 
     return [
       post.exactAddress || post.detailAddress,
-      [post.ward?.name, post.district, post.city].filter(Boolean).join(', ')
+      [post.ward?.name, post.city].filter(Boolean).join(', ')
     ].filter(Boolean)
   }, [post])
 
@@ -426,6 +468,31 @@ const PostDetailPage = () => {
     void runPostAction(() => engagementService.createReport(post.id, reason), 'Đã gửi báo cáo bài đăng.')
   }
 
+  const handleReportComment = (commentId: string) => {
+    if (submittingCommentReportId) return
+
+    void (async () => {
+      try {
+        setSubmittingCommentReportId(commentId)
+        setCommentReportMessages((current) => ({ ...current, [commentId]: '' }))
+        setCommentReportErrors((current) => ({ ...current, [commentId]: '' }))
+
+        const response = await engagementService.createCommentReport(commentId, 'Báo cáo bình luận không phù hợp')
+        setCommentReportMessages((current) => ({
+          ...current,
+          [commentId]: response.message || 'Đã gửi báo cáo bình luận.'
+        }))
+      } catch {
+        setCommentReportErrors((current) => ({
+          ...current,
+          [commentId]: 'Không thể gửi báo cáo bình luận. Vui lòng đăng nhập và thử lại.'
+        }))
+      } finally {
+        setSubmittingCommentReportId(undefined)
+      }
+    })()
+  }
+
   const handleBanPostOwner = () => {
     if (!post?.userId) {
       setActionError('Không tìm thấy chủ bài đăng để chặn.')
@@ -515,9 +582,11 @@ const PostDetailPage = () => {
           <div className='mx-auto max-w-5xl rounded-lg bg-white p-8 shadow-sm'>
             <Link
               to={backTo}
-              className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+              aria-label={backLabel}
+              title={backLabel}
+              className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
             >
-              {backLabel}
+              <FaArrowLeft />
             </Link>
             <h1 className='mt-4 text-2xl font-bold text-gray-900'>Không thể hiển thị bài đăng</h1>
             <p className='mt-2 text-gray-600'>{errorMessage || 'Bài đăng không tồn tại.'}</p>
@@ -539,9 +608,11 @@ const PostDetailPage = () => {
           <section className='rounded-lg bg-white p-6 shadow-sm'>
           <Link
             to={backTo}
-            className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+            aria-label={backLabel}
+            title={backLabel}
+            className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
           >
-            {backLabel}
+            <FaArrowLeft />
           </Link>
 
           {heroImage ? (
@@ -807,7 +878,14 @@ const PostDetailPage = () => {
               {comments.length > 0 ? (
                 <div className='grid gap-4'>
                   {comments.map((item) => (
-                    <CommentItem key={item.id} comment={item} />
+                    <CommentItem
+                      key={item.id}
+                      comment={item}
+                      submittingCommentId={submittingCommentReportId}
+                      messagesByCommentId={commentReportMessages}
+                      errorsByCommentId={commentReportErrors}
+                      onReport={handleReportComment}
+                    />
                   ))}
                 </div>
               ) : (

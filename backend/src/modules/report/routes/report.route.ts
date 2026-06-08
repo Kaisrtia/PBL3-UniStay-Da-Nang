@@ -27,7 +27,7 @@ reportRouter.patch(
 reportRouter.post(
   '/',
   verifyToken,
-  authorize([account_role.USER]),
+  authorize([account_role.USER, account_role.STUDENT, account_role.HOST]),
   asyncHandler(reportController.handleCreateReport)
 );
 

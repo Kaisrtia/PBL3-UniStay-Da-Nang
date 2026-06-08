@@ -197,8 +197,16 @@ const ensureAmenity = async ({ name, aliases }) => {
   return prisma.amenity.create({ data: { name } });
 };
 
+const toSingleRole = (roles = ['USER']) => {
+  if (roles.includes('ADMIN')) return 'ADMIN';
+  if (roles.includes('HOST')) return 'HOST';
+  if (roles.includes('STUDENT')) return 'STUDENT';
+  return 'USER';
+};
+
 const upsertUser = async ({ email, fullName, phone, roles, dob, gender, avatarUrl }) => {
   const hashedPassword = await bcrypt.hash(LOCAL_PASSWORD, 10);
+  const role = toSingleRole(roles);
 
   return prisma.user.upsert({
     where: { email },
@@ -212,7 +220,7 @@ const upsertUser = async ({ email, fullName, phone, roles, dob, gender, avatarUr
       emailVerified: true,
       phoneVerified: true,
       status: 'ACTIVE',
-      roles
+      role
     },
     create: {
       email,
@@ -225,7 +233,7 @@ const upsertUser = async ({ email, fullName, phone, roles, dob, gender, avatarUr
       emailVerified: true,
       phoneVerified: true,
       status: 'ACTIVE',
-      roles
+      role
     }
   });
 };

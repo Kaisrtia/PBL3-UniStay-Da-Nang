@@ -350,7 +350,7 @@ export const getPostDetail = async (postId: string) => {
               id: true,
               fullName: true,
               avatarUrl: true,
-              roles: true
+              role: true
             }
           },
           replies: {
@@ -362,7 +362,7 @@ export const getPostDetail = async (postId: string) => {
                   id: true,
                   fullName: true,
                   avatarUrl: true,
-                  roles: true
+                  role: true
                 }
               }
             }
@@ -376,7 +376,7 @@ export const getPostDetail = async (postId: string) => {
           fullName: true,
           phone: true,
           avatarUrl: true,
-          roles: true,
+          role: true,
           hosts: {
             select: { isVerified: true, avgStar: true }
           }

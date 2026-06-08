@@ -65,6 +65,11 @@ export const engagementService = {
   createReport: async (postId: string, reason: string) => {
     const response = await api.post<ApiResponse>('/reports', { postId, reason })
     return response.data
+  },
+
+  createCommentReport: async (commentId: string, reason: string) => {
+    const response = await api.post<ApiResponse>('/reports', { commentId, reason })
+    return response.data
   }
 }
 

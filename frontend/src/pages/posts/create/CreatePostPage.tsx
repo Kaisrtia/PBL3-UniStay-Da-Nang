@@ -103,7 +103,6 @@ type PostFormState = {
   title: string
   detailAddress: string
   exactAddress: string
-  district: string
   city: string
   area: string
   price: string
@@ -115,7 +114,6 @@ const emptyPostForm: PostFormState = {
   title: '',
   detailAddress: '',
   exactAddress: '',
-  district: '',
   city: 'Đà Nẵng',
   area: '',
   price: '',
@@ -395,6 +393,15 @@ const getStoredPostUser = () => {
   }
 }
 
+const digitsOnly = (value: string) => value.replace(/\D/g, '')
+
+const formatThousands = (value: string) => {
+  const digits = digitsOnly(value)
+  return digits ? Number(digits).toLocaleString('vi-VN') : ''
+}
+
+const parseFormattedNumber = (value: string) => Number(digitsOnly(value) || 0)
+
 const CreatePostPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -459,11 +466,10 @@ const CreatePostPage = () => {
           title: post.title || '',
           detailAddress: post.detailAddress || '',
           exactAddress: post.exactAddress || '',
-          district: post.district || '',
           city: post.city || 'Đà Nẵng',
           area: String(post.area || ''),
-          price: String(post.price || ''),
-          deposit: String(post.deposit || ''),
+          price: formatThousands(String(post.price || '')),
+          deposit: formatThousands(String(post.deposit || '')),
           description: post.description || ''
         })
         setRoomType((post.roomType || 'ROOM') as RoomType)
@@ -589,8 +595,8 @@ const CreatePostPage = () => {
       return
     }
 
-    if (!form.exactAddress.trim() || !form.district.trim() || !form.city.trim()) {
-      alert('Vui lòng nhập đầy đủ địa chỉ chính xác, quận/huyện và thành phố.')
+    if (!form.exactAddress.trim() || !form.city.trim()) {
+      alert('Vui lòng nhập đầy đủ địa chỉ chính xác và thành phố.')
       return
     }
 
@@ -607,20 +613,20 @@ const CreatePostPage = () => {
     try {
       const uploadedImageUrls =
         mediaPreviews.length > 0 ? await uploadPostImages(mediaPreviews.map((preview) => preview.file)) : []
+      const purposeValue: PostPurpose = isStudentUser ? 'FIND_ROOMMATE' : 'RENT'
 
       const payload = {
         title: form.title.trim(),
         wardId: Number(wardId),
-        purpose: isStudentUser ? 'FIND_ROOMMATE' : 'RENT',
-        detailAddress: `${form.exactAddress.trim()}, ${form.district.trim()}, ${form.city.trim()}`,
+        purpose: purposeValue,
+        detailAddress: `${form.exactAddress.trim()}, ${form.city.trim()}`,
         exactAddress: form.exactAddress.trim(),
-        district: form.district.trim(),
         city: form.city.trim(),
         area: Number(form.area || 0),
-        price: Number(form.price || 0),
-        deposit: Number(form.deposit || 0),
+        price: parseFormattedNumber(form.price),
+        deposit: parseFormattedNumber(form.deposit),
         roomType: isHostUser ? 'ROOM' : roomType,
-        postPurpose: isStudentUser ? 'FIND_ROOMMATE' : 'RENT',
+        postPurpose: purposeValue,
         description: form.description.trim(),
         latitude: latitudeValue,
         longitude: longitudeValue,
@@ -716,12 +722,6 @@ const CreatePostPage = () => {
                 onChange={(event) => updateForm('exactAddress', event.target.value)}
               />
               <TextField
-                label='Quận/Huyện'
-                name='district'
-                value={form.district}
-                onChange={(event) => updateForm('district', event.target.value)}
-              />
-              <TextField
                 label='Thành phố'
                 name='city'
                 value={form.city}
@@ -749,9 +749,8 @@ const CreatePostPage = () => {
               <TextField
                 label='Tiền cọc'
                 name='deposit'
-                type='number'
                 value={form.deposit}
-                onChange={(event) => updateForm('deposit', event.target.value)}
+                onChange={(event) => updateForm('deposit', formatThousands(event.target.value))}
               />
               <CoordinateField label='Vĩ độ' value={latitude} min={-90} max={90} onChange={setLatitude} />
               <CoordinateField label='Kinh độ' value={longitude} min={-180} max={180} onChange={setLongitude} />
@@ -795,10 +794,9 @@ const CreatePostPage = () => {
               />
               <TextField
                 name='price'
-                type='number'
                 placeholder='Giá thuê'
                 value={form.price}
-                onChange={(event) => updateForm('price', event.target.value)}
+                onChange={(event) => updateForm('price', formatThousands(event.target.value))}
               />
               <textarea
                 name='description'

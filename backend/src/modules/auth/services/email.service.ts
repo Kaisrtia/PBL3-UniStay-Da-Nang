@@ -5,6 +5,10 @@ import bcrypt from 'bcrypt';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 import transporter from '../../../core/config/nodemailer';
+import {
+  isStrongPassword,
+  strongPasswordMessage
+} from '../../../core/utils/passwordPolicy';
 
 
 
@@ -236,6 +240,10 @@ export const resetPasswordWithToken = async (
       HttpStatus.BAD_REQUEST,
       'Token and new password are required!'
     );
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, strongPasswordMessage);
   }
 
   // Look up the record by token (stored in the code field)

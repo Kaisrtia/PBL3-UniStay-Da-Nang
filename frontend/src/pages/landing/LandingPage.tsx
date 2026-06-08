@@ -1,15 +1,35 @@
 import { FaClock, FaHome, FaSearch, FaUserFriends } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { background, logo } from '@/assets/images'
+import { type PostPurpose } from '@/services/postService'
+
+type SearchMode = 'all' | PostPurpose
 
 const LandingPage = () => {
+  const navigate = useNavigate()
+  const [keyword, setKeyword] = useState('')
+  const [searchMode, setSearchMode] = useState<SearchMode>('all')
+
+  const getModeClass = (mode: SearchMode) =>
+    `px-3 py-1 rounded text-xs font-semibold ${searchMode === mode ? 'bg-gray-200' : 'hover:bg-gray-100'}`
+
+  const handleSearch = () => {
+    const params = new URLSearchParams()
+
+    if (keyword.trim()) params.set('keyword', keyword.trim())
+    if (searchMode !== 'all') params.set('purpose', searchMode)
+
+    navigate(params.toString() ? `/posts/search?${params.toString()}` : '/posts/search')
+  }
+
   return (
     <div className='min-h-screen relative'>
       <img src={background} alt='Background' className='absolute inset-0 w-cover h-cover object-cover -z-10' />
       <header className='whitespace-nowrap flex items-center justify-between px-8 py-6 bg-transparent'>
         <div className='flex items-center gap-2'>
-          <img src={logo} alt='Unistay Logo' style={{ width: '10%', height: '10%' }} />
+          <img src={logo} alt='Unistay Logo' className='h-16 w-28 object-contain' />
           <span className='text-white font-bold text-xl font-serif'>UNISTAY</span>
         </div>
         <nav className='flex gap-6 text-white text-sm'>
@@ -39,16 +59,30 @@ const LandingPage = () => {
         <h3 className='text-white text-xl mb-8 font-brand font-semibold'>TẠI ĐÀ NẴNG</h3>
         <div className='bg-white rounded-lg shadow-lg flex items-center w-full max-w-2xl mx-auto p-2'>
           <div className='flex gap-2 mr-4'>
-            <button className='px-3 py-1 rounded bg-gray-200 text-xs font-semibold'>Tất cả</button>
-            <button className='px-3 py-1 rounded text-xs font-semibold hover:bg-gray-100'>Môi giới</button>
-            <button className='px-3 py-1 rounded text-xs font-semibold hover:bg-gray-100'>Sinh viên</button>
+            <button type='button' onClick={() => setSearchMode('all')} className={getModeClass('all')}>
+              Tất cả
+            </button>
+            <button type='button' onClick={() => setSearchMode('RENT')} className={getModeClass('RENT')}>
+              Môi giới
+            </button>
+            <button type='button' onClick={() => setSearchMode('FIND_ROOMMATE')} className={getModeClass('FIND_ROOMMATE')}>
+              Sinh viên
+            </button>
           </div>
-          <input className='flex-1 px-4 py-2 outline-none text-sm' placeholder='Nhập vào từ khoá tìm kiếm' />
-          <button className='flex items-center gap-1 px-3 py-2 bg-gray-100 rounded text-xs font-semibold mr-2'>
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') handleSearch()
+            }}
+            className='flex-1 px-4 py-2 outline-none text-sm'
+            placeholder='Nhập vào từ khoá tìm kiếm'
+          />
+          <button type='button' onClick={() => navigate('/posts/search')} className='flex items-center gap-1 px-3 py-2 bg-gray-100 rounded text-xs font-semibold mr-2'>
             <FaSearch className='text-gray-500' />
             Nâng cao
           </button>
-          <button className='bg-yellow-400 p-2 rounded text-white'>
+          <button type='button' onClick={handleSearch} className='bg-yellow-400 p-2 rounded text-white'>
             <FaSearch />
           </button>
         </div>

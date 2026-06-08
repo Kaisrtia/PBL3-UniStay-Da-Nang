@@ -22,6 +22,7 @@ type Area = {
   name: string
   count: string
   color: string
+  wardId?: number
 }
 
 const fallbackListings: Listing[] = [
@@ -142,6 +143,7 @@ const ListingCard = ({ listing }: { listing: Listing }) => (
 
 const HomePage = () => {
   const [featuredListings, setFeaturedListings] = useState<Listing[]>(fallbackListings)
+  const [searchAreas, setSearchAreas] = useState<Area[]>(areas)
   const [overviewStats, setOverviewStats] = useState({
     approvedPosts: 0,
     wards: 0,
@@ -162,6 +164,17 @@ const HomePage = () => {
 
         if (postResult.data.length > 0) {
           setFeaturedListings(postResult.data.slice(0, 3).map(mapPostToListing))
+        }
+
+        if (wardResult.length > 0) {
+          setSearchAreas(
+            wardResult.slice(0, 4).map((ward, index) => ({
+              name: ward.name,
+              count: 'Xem danh sach bai dang trong khu vuc nay',
+              color: areas[index % areas.length].color,
+              wardId: ward.id
+            }))
+          )
         }
 
         setOverviewStats({
@@ -250,15 +263,16 @@ const HomePage = () => {
             <p className='mt-3 text-gray-500'>Bắt đầu từ những khu vực có nhiều lựa chọn phù hợp với sinh viên.</p>
           </div>
           <div className='mt-9 grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
-            {areas.map((area) => (
-              <article
+            {searchAreas.map((area) => (
+              <Link
                 key={area.name}
-                className='rounded-2xl border border-[#E6EAF0] bg-white p-6 shadow-lg shadow-[#001D3D]/5'
+                to={area.wardId ? `/posts/search?wardId=${area.wardId}` : `/posts/search?keyword=${encodeURIComponent(area.name)}`}
+                className='rounded-2xl border border-[#E6EAF0] bg-white p-6 shadow-lg shadow-[#001D3D]/5 transition hover:-translate-y-0.5 hover:border-[#FFC300]'
               >
                 <div className='h-1.5 w-16 rounded-full' style={{ backgroundColor: area.color }} />
                 <h3 className='mt-8 text-2xl font-extrabold'>{area.name}</h3>
                 <p className='mt-2 text-sm font-medium text-gray-500'>{area.count}</p>
-              </article>
+              </Link>
             ))}
           </div>
         </section>

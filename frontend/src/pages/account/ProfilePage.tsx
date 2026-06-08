@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 
 import {
+  FaArrowLeft,
   FaCheckCircle,
   FaEdit,
   FaEnvelope,
@@ -216,9 +217,11 @@ const ProfilePage = () => {
           <div>
             <Link
               to='/home'
-              className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
+              aria-label='Quay lại trang chủ'
+              title='Quay lại trang chủ'
+              className='inline-grid h-10 w-10 place-items-center rounded-full border border-[#003566] text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
             >
-              Quay lại trang chủ
+              <FaArrowLeft />
             </Link>
             <p className='mt-6 text-sm font-extrabold uppercase tracking-[0.24em] text-[#FFC300]'>UNISTAY</p>
             <h1 className='mt-3 text-4xl font-black'>Thông tin cá nhân</h1>

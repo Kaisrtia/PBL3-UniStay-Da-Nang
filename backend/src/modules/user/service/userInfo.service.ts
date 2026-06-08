@@ -3,6 +3,10 @@ import { account_status, account_role, user } from '@prisma/client';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
 import bcrypt from 'bcrypt';
+import {
+  isStrongPassword,
+  strongPasswordMessage
+} from '../../../core/utils/passwordPolicy';
 
 export const setupProfile = async (
   user: user,
@@ -49,7 +53,7 @@ export const setupProfile = async (
     const userUpdated = await tx.user.update({
       where: { id: user.id },
       data: {
-        roles: Array.from(new Set([...currentUser.roles, data.role])),
+        role: data.role,
         gender: data.gender,
         dob: data.dob ? new Date(data.dob) : null,
         phone: data.phone,
@@ -104,7 +108,7 @@ export const updateProfile = async (
     );
   }
 
-  if (data.universityId && user.roles.includes(account_role.STUDENT)) {
+  if (data.universityId && user.role === account_role.STUDENT) {
     const university = await prismaClient.university.findUnique({
       where: { id: data.universityId }
     });
@@ -125,7 +129,7 @@ export const updateProfile = async (
       }
     });
 
-    if (data.universityId && user.roles.includes(account_role.STUDENT)) {
+    if (data.universityId && user.role === account_role.STUDENT) {
       await tx.student.upsert({
         where: { studentId: user.id },
         update: { universityId: data.universityId },
@@ -150,6 +154,10 @@ export const changePassword = async (
 
   if (!newPassword) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'New password is required');
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, strongPasswordMessage);
   }
 
   if (user.provider === 'GOOGLE') {
@@ -188,7 +196,7 @@ export const getUserProfile = async (targetUserId: string) => {
       phoneVerified: true,
       provider: true,
       status: true,
-      roles: true,
+      role: true,
       createdAt: true,
       hosts: true,
       student: {
@@ -203,7 +211,10 @@ export const getUserProfile = async (targetUserId: string) => {
     throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
   }
 
-  return targetUser;
+  return {
+    ...targetUser,
+    roles: [targetUser.role]
+  };
 };
 
 export const getVerificationCandidates = async (

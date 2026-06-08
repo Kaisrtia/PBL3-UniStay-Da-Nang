@@ -112,7 +112,7 @@ model user {
   phoneVerified        Boolean?               @default(false)
   provider             provider               @default(SYSTEM)
   status               account_status         @default(LOCKED)
-  roles                account_role[]         @default([USER])
+  role                 account_role           @default(USER)
   createdAt            DateTime               @default(now())
   student              student?
   hosts                host[]
