@@ -26,6 +26,7 @@ export const getWardById = async (id: number) => {
 
 export const getAllUniversities = async () => {
   return prismaClient.university.findMany({
+    orderBy: { name: 'asc' },
     include: { ward: true }
   });
 };
@@ -40,7 +41,8 @@ export const getUniversitiesByWard = async (wardId: number) => {
   }
 
   return prismaClient.university.findMany({
-    where: { wardId: wardId }
+    where: { wardId },
+    orderBy: { name: 'asc' }
   });
 };
 

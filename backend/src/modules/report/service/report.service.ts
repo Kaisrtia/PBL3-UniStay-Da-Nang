@@ -1,21 +1,28 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { report_status, post_status, comment_status } from '@prisma/client';
+import {
+  Prisma,
+  report_status,
+  post_status,
+  comment_status
+} from '@prisma/client';
 
 export const getReports = async (
   page: number = 1,
   limit: number = 10,
   status?: report_status
 ) => {
-  const skip = (page - 1) * limit;
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const skip = (safePage - 1) * safeLimit;
   const where = status ? { status } : {};
 
   const [data, total] = await Promise.all([
     prismaClient.report.findMany({
       where,
       skip,
-      take: limit,
+      take: safeLimit,
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
@@ -65,9 +72,9 @@ export const getReports = async (
     data,
     meta: {
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit)
     }
   };
 };
@@ -87,46 +94,53 @@ export const tackleReport = async (
     );
   }
 
-  const existingReport = await prismaClient.report.findUnique({
-    where: { id: reportId }
-  });
-
-  if (!existingReport) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Report not found');
-  }
-
-  if (existingReport.status !== report_status.PENDING) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Report has already been tackled');
-  }
+  const adminNote = data.adminNote?.trim() || null;
 
   return prismaClient.$transaction(async (tx) => {
-    const updatedReport = await tx.report.update({
-      where: { id: reportId },
+    const existingReport = await tx.report.findUnique({
+      where: { id: reportId }
+    });
+
+    if (!existingReport) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Report not found');
+    }
+
+    const claimedReport = await tx.report.updateMany({
+      where: {
+        id: reportId,
+        status: report_status.PENDING
+      },
       data: {
         status: data.status,
-        adminNote: data.adminNote,
+        adminNote,
         adminId,
         tackledAt: new Date()
       }
     });
 
+    if (claimedReport.count === 0) {
+      throw new AppError(HttpStatus.CONFLICT, 'Report has already been tackled');
+    }
+
     if (data.status === report_status.RESOLVED) {
       if (existingReport.postId) {
-        await tx.post.update({
+        await tx.post.updateMany({
           where: { id: existingReport.postId },
           data: { status: post_status.HIDDEN }
         });
       }
 
       if (existingReport.commentId) {
-        await tx.comment.update({
+        await tx.comment.updateMany({
           where: { id: existingReport.commentId },
           data: { status: comment_status.HIDDEN }
         });
       }
     }
 
-    return updatedReport;
+    return tx.report.findUnique({
+      where: { id: reportId }
+    });
   });
 };
 
@@ -138,6 +152,12 @@ export const createReport = async (
     commentId?: string;
   }
 ) => {
+  const reason = data.reason.trim();
+
+  if (!reason) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'reason is required');
+  }
+
   if (!data.postId && !data.commentId) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Must provide either a postId or a commentId');
   }
@@ -146,35 +166,80 @@ export const createReport = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report both a post and a comment at the same time');
   }
 
-  let reportedUserId: string | undefined;
+  try {
+    return await prismaClient.$transaction(async (tx) => {
+      let reportedUserId: string;
 
-  if (data.postId) {
-    const post = await prismaClient.post.findUnique({ where: { id: data.postId } });
-    if (!post) {
-      throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+      if (data.postId) {
+        const post = await tx.post.findUnique({ where: { id: data.postId } });
+        if (!post) {
+          throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+        }
+        if (post.status === post_status.HIDDEN) {
+          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report a hidden post');
+        }
+        reportedUserId = post.userId;
+      } else {
+        const comment = await tx.comment.findUnique({
+          where: { id: data.commentId! }
+        });
+        if (!comment) {
+          throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
+        }
+        if (comment.status === comment_status.HIDDEN) {
+          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report a hidden comment');
+        }
+        reportedUserId = comment.userId;
+      }
+
+      if (reportedUserId === userId) {
+        throw new AppError(HttpStatus.BAD_REQUEST, 'You cannot report your own content');
+      }
+
+      const existingPendingReport = await tx.report.findFirst({
+        where: {
+          userId,
+          status: report_status.PENDING,
+          ...(data.postId
+            ? { postId: data.postId }
+            : { commentId: data.commentId })
+        },
+        select: { id: true }
+      });
+
+      if (existingPendingReport) {
+        throw new AppError(
+          HttpStatus.CONFLICT,
+          'You already have a pending report for this content'
+        );
+      }
+
+      return tx.report.create({
+        data: {
+          userId,
+          reportedUserId,
+          reason,
+          postId: data.postId,
+          commentId: data.commentId
+        }
+      });
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new AppError(
+        HttpStatus.CONFLICT,
+        'You already have a pending report for this content'
+      );
     }
-    reportedUserId = post.userId;
-  }
-
-  if (data.commentId) {
-    const comment = await prismaClient.comment.findUnique({ where: { id: data.commentId } });
-    if (!comment) {
-      throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2003'
+    ) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Reported content no longer exists');
     }
-    reportedUserId = comment.userId;
+    throw error;
   }
-
-  if (!reportedUserId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Reported user could not be determined');
-  }
-
-  return prismaClient.report.create({
-    data: {
-      userId,
-      reportedUserId,
-      reason: data.reason,
-      postId: data.postId,
-      commentId: data.commentId
-    }
-  });
 };

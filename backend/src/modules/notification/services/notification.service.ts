@@ -106,6 +106,12 @@ export const createPostCensorNotification = async (
   if (!post) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
   }
+  if (post.userId !== userId) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Notification recipient does not own the post'
+    );
+  }
 
   const title = status === post_status.REJECTED
     ? 'Bài đăng của bạn chưa được duyệt'
@@ -145,6 +151,22 @@ export const createRequestSharedAccommodationNotification = async (
   postId: string,
   postOwnerId: string
 ) => {
+  const post = await prismaClient.post.findUnique({
+    where: { id: postId },
+    select: { userId: true }
+  });
+
+  if (!post) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  if (post.userId !== postOwnerId) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Notification recipient does not own the post'
+    );
+  }
+
   // 1. Fetch all PENDING requesters for this post
   const requests = await prismaClient.accomodation_request.findMany({
     where: { postId, status: 'PENDING' },
@@ -209,17 +231,41 @@ export const createCommentNotification = async (
     where: { id: commentId },
     include: {
       user: { select: { fullName: true } },
-      post: { select: { title: true, userId: true, user: { select: { fullName: true } } } },
-      comment: { select: { userId: true, user: { select: { fullName: true } } } } // parent comment
+      post: {
+        select: {
+          title: true,
+          userId: true,
+          status: true,
+          user: { select: { fullName: true } }
+        }
+      },
+      comment: {
+        select: {
+          userId: true,
+          status: true,
+          user: { select: { fullName: true } }
+        }
+      }
     }
   });
 
   if (!currentComment) return null;
+  if (
+    currentComment.status !== 'DISPLAYED' ||
+    currentComment.post.status === post_status.HIDDEN
+  ) {
+    return null;
+  }
 
   const isReply = !!currentComment.parentId;
+  if (isReply && currentComment.comment?.status !== 'DISPLAYED') {
+    return null;
+  }
   
   // Determine target user
-  const targetUserId = isReply ? currentComment.comment!.userId : currentComment.post.userId;
+  const targetUserId = isReply
+    ? currentComment.comment!.userId
+    : currentComment.post.userId;
 
   // Don't notify the user about their own comment
   if (currentComment.userId === targetUserId) {
@@ -235,12 +281,19 @@ export const createCommentNotification = async (
       userId: { not: targetUserId },
       status: 'DISPLAYED'
     },
-    select: { user: { select: { fullName: true } } },
+    select: { user: { select: { id: true, fullName: true } } },
     orderBy: { createdAt: 'asc' }
   });
 
   // Group by distinct users
-  const distinctUsers = Array.from(new Set(siblingComments.map(c => c.user.fullName)));
+  const distinctUsers = Array.from(
+    new Map(
+      siblingComments.map(comment => [
+        comment.user.id,
+        comment.user.fullName
+      ])
+    ).values()
+  );
   
   if (distinctUsers.length === 0) return null;
 

@@ -60,8 +60,6 @@ export const sseHandler = async (req: Request, res: Response) => {
   res.write(': connected\n\n');
 
   try {
-    await connection.sadd('online_users', userId);
-
     const subscriber = connection.duplicate();
     await subscriber.subscribe(`user_notif:${userId}`);
 
@@ -78,7 +76,6 @@ export const sseHandler = async (req: Request, res: Response) => {
       clearInterval(heartbeatInterval);
       await subscriber.unsubscribe();
       await subscriber.quit();
-      await connection.srem('online_users', userId);
       res.end();
     });
   } catch (error) {

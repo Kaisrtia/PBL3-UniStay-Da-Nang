@@ -3,6 +3,7 @@ import { connection } from '../../../core/config/redis.connection';
 import prismaClient from '../../../core/config/prisma';
 import { calculateScore } from '../../demand/utils/matching.handler';
 import { notification_type } from '@prisma/client';
+import { pushNotificationIfOnline } from '../../notification/utils/pushNotification';
 
 export const matchDemandWorker = new Worker(
   'matchDemandQueue',
@@ -70,17 +71,8 @@ export const matchDemandWorker = new Worker(
             }
           });
 
-          // 5. Send SSE message if user is online
-          const isOnline = await connection.sismember(
-            'online_users',
-            demand.studentId
-          );
-          if (isOnline) {
-            await connection.publish(
-              `user_notif:${demand.studentId}`,
-              JSON.stringify(newNotif)
-            );
-          }
+          // 5. Send SSE message if the user has an active subscriber
+          await pushNotificationIfOnline(demand.studentId, newNotif);
         }
       }
     } catch (error) {

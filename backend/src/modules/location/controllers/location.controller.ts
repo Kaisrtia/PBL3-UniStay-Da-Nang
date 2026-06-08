@@ -13,38 +13,41 @@ export const handleGetAllWards = async (_req: Request, res: Response) => {
 
 export const handleGetWard = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const wardId = Number(id);
 
-  if (!id || isNaN(Number(id))) {
+  if (!Number.isInteger(wardId) || wardId <= 0) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Valid Ward ID is required');
   }
 
-  const ward = await locationService.getWardById(Number(id));
+  const ward = await locationService.getWardById(wardId);
   sendSuccess(res, HttpStatus.OK, ward);
 };
 
-export const handleGetAllUniversities = async (req: Request, res: Response) => {
+export const handleGetAllUniversities = async (_req: Request, res: Response) => {
   const universities = await locationService.getAllUniversities();
   sendSuccess(res, HttpStatus.OK, universities);
 };
 
 export const handleGetUniversitiesByWard = async (req: Request, res: Response) => {
   const { wardId } = req.params;
+  const parsedWardId = Number(wardId);
 
-  if (!wardId || isNaN(Number(wardId))) {
+  if (!Number.isInteger(parsedWardId) || parsedWardId <= 0) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Valid Ward ID is required');
   }
 
-  const universities = await locationService.getUniversitiesByWard(Number(wardId));
+  const universities = await locationService.getUniversitiesByWard(parsedWardId);
   sendSuccess(res, HttpStatus.OK, universities);
 };
 
 export const handleGetUniversity = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const universityId = id?.trim();
 
-  if (!id) {
+  if (!universityId) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'University ID is required');
   }
 
-  const university = await locationService.getUniversityById(id);
+  const university = await locationService.getUniversityById(universityId);
   sendSuccess(res, HttpStatus.OK, university);
 };

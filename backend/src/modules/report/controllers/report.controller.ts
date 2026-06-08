@@ -6,9 +6,20 @@ import { AppError } from '../../../core/exceptions/AppError';
 import { report_status } from '@prisma/client';
 
 export const handleGetReports = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 10);
   const status = req.query.status as report_status | undefined;
+
+  if (!Number.isInteger(page) || page < 1) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'page must be a positive integer');
+  }
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'limit must be an integer between 1 and 100'
+    );
+  }
 
   if (status && !Object.values(report_status).includes(status)) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid report status');
@@ -21,8 +32,9 @@ export const handleGetReports = async (req: Request, res: Response) => {
 export const handleTackleReport = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { status, adminNote } = req.body;
+  const reportId = id?.trim();
 
-  if (!id) {
+  if (!reportId) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Report ID is required');
   }
 
@@ -30,9 +42,11 @@ export const handleTackleReport = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'status is required');
   }
 
-  const tackledReport = await reportService.tackleReport(req.user!.id, id, {
+  const tackledReport = await reportService.tackleReport(req.user!.id, reportId, {
     status,
-    adminNote
+    adminNote: adminNote === undefined || adminNote === null
+      ? undefined
+      : String(adminNote)
   });
 
   sendSuccess(res, HttpStatus.OK, tackledReport, 'Report tackled successfully');
@@ -41,14 +55,24 @@ export const handleTackleReport = async (req: Request, res: Response) => {
 export const handleCreateReport = async (req: Request, res: Response) => {
   const { reason, postId, commentId } = req.body;
 
-  if (!reason) {
+  if (typeof reason !== 'string') {
     throw new AppError(HttpStatus.BAD_REQUEST, 'reason is required');
+  }
+
+  if (
+    (postId !== undefined && typeof postId !== 'string') ||
+    (commentId !== undefined && typeof commentId !== 'string')
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'postId and commentId must be strings'
+    );
   }
 
   const report = await reportService.createReport(req.user!.id, {
     reason,
-    postId,
-    commentId
+    postId: postId?.trim(),
+    commentId: commentId?.trim()
   });
 
   sendSuccess(res, HttpStatus.CREATED, report, 'Report submitted successfully');
