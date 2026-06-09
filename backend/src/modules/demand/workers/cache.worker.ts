@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq';
 import { connection } from '../../../core/config/redis.connection';
-import prismaClient from '../../../core/config/prisma';
+import { refreshStudentDemandCache } from '../utils/studentDemandCache';
 
 export const demandCacheWorker = new Worker(
   'demandCacheQueue',
@@ -10,31 +10,7 @@ export const demandCacheWorker = new Worker(
         'Running demandCacheWorker: caching student demands to Redis'
       );
 
-      const studentDemands = await prismaClient.student_demand.findMany({
-        include: {
-          ward: true,
-          university: true,
-          student: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  fullName: true,
-                  avatarUrl: true
-                }
-              },
-              demandAmenities: {
-                include: {
-                  amenity: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      const CACHE_KEY = 'cache:demands:student';
-      await connection.set(CACHE_KEY, JSON.stringify(studentDemands));
+      const studentDemands = await refreshStudentDemandCache();
 
       console.log(
         `Cached ${studentDemands.length} student demands successfully.`

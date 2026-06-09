@@ -3,14 +3,14 @@ import { connection } from '../../../core/config/redis.connection';
 import { post_status } from '@prisma/client';
 
 // Notification queues for post censoring results (automated and manual)
-const censorAutomaticalNotificationQueue = new Queue(
+export const censorAutomaticalNotificationQueue = new Queue(
   'censor-post-notification-queue',
   {
     connection
   }
 );
 
-const censorManualNotificationQueue = new Queue(
+export const censorManualNotificationQueue = new Queue(
   'censor-manual-notification-queue',
   {
     connection
@@ -57,7 +57,7 @@ export const addCensorPostNotificationJob = async <
 };
 
 // Request notification queue for accommodation requests
-const requestSharedAccommodationNotificationQueue = new Queue(
+export const requestSharedAccommodationNotificationQueue = new Queue(
   'request-shared-accommodation-notification-queue',
   {
     connection
@@ -88,7 +88,7 @@ export const addRequestSharedAccommodationNotificationJob = async (
 };
 
 // Comment notification queue
-const commentNotificationQueue = new Queue(
+export const commentNotificationQueue = new Queue(
   'comment-notification-queue',
   {
     connection

@@ -4,6 +4,18 @@ import { asyncHandler } from '../../../core/middlewares/async.handler';
 import { verifyToken } from '../../../core/middlewares/auth.middleware';
 import { authorize } from '../../../core/middlewares/role.middleware';
 import { account_role } from '@prisma/client';
+import { validate } from '../../../core/middlewares/validate.middleware';
+import {
+  adminUserActionSchema,
+  blockedUserParamSchema,
+  blockUserSchema,
+  changePasswordSchema,
+  hostReviewSchema,
+  publicUserParamSchema,
+  setupProfileSchema,
+  updateProfileSchema,
+  verifyHostSchema
+} from '../user.validation';
 
 const userRouter = Router();
 
@@ -30,6 +42,7 @@ userRouter.get(
 userRouter.patch(
   '/setup',
   verifyToken,
+  validate(setupProfileSchema),
   asyncHandler(userController.handleSetupProfile)
 );
 
@@ -37,6 +50,7 @@ userRouter.patch(
 userRouter.patch(
   '/update',
   verifyToken,
+  validate(updateProfileSchema),
   asyncHandler(userController.handleUpdateProfile)
 );
 
@@ -44,6 +58,7 @@ userRouter.patch(
 userRouter.patch(
   '/password',
   verifyToken,
+  validate(changePasswordSchema),
   asyncHandler(userController.handleChangePassword)
 );
 
@@ -60,6 +75,7 @@ userRouter.post(
   '/blocks',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  validate(blockUserSchema),
   asyncHandler(userController.handleBlockUser)
 );
 
@@ -67,6 +83,7 @@ userRouter.delete(
   '/blocks/:blockedId',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  validate(blockedUserParamSchema),
   asyncHandler(userController.handleUnblockUser)
 );
 
@@ -77,6 +94,7 @@ userRouter.patch(
   '/ban',
   verifyToken,
   authorize([account_role.ADMIN]),
+  validate(adminUserActionSchema),
   asyncHandler(userController.handleBanUser)
 );
 
@@ -85,6 +103,7 @@ userRouter.patch(
   '/unban',
   verifyToken,
   authorize([account_role.ADMIN]),
+  validate(adminUserActionSchema),
   asyncHandler(userController.handleUnbanUser)
 );
 
@@ -93,6 +112,7 @@ userRouter.patch(
   '/hosts/verify',
   verifyToken,
   authorize([account_role.ADMIN]),
+  validate(verifyHostSchema),
   asyncHandler(userController.handleVerifyHost)
 );
 
@@ -100,6 +120,7 @@ userRouter.patch(
 userRouter.get(
   '/hosts/verification-candidates',
   verifyToken,
+  authorize([account_role.ADMIN]),
   asyncHandler(userController.handleGetVerificationCandidates)
 );
 
@@ -110,10 +131,15 @@ userRouter.post(
   '/:id/reviews',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  validate(hostReviewSchema),
   asyncHandler(userController.handleCreateHostReview)
 );
 
 // Get public profile (MUST be at bottom to prevent overriding static routes like /me or /setup)
-userRouter.get('/:id', asyncHandler(userController.handleGetUserProfile));
+userRouter.get(
+  '/:id',
+  validate(publicUserParamSchema),
+  asyncHandler(userController.handleGetUserProfile)
+);
 
 export default userRouter;

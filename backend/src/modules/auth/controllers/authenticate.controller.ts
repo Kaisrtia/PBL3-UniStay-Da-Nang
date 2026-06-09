@@ -142,7 +142,12 @@ export const handleRefreshSession = async (req: Request, res: Response) => {
 export const handleSendEmailVerification = async (req: Request, res: Response) => {
   const { email } = req.body;
   await sendEmailOtpCode(email);
-  sendSuccess(res, HttpStatus.OK, null, 'Verification code sent to your email');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    null,
+    'If the account can be verified, a verification code has been sent.'
+  );
 };
 
 export const handleVerifyEmail = async (req: Request, res: Response) => {
@@ -156,7 +161,12 @@ export const handleVerifyEmail = async (req: Request, res: Response) => {
 export const handleSendForgotPassword = async (req: Request, res: Response) => {
   const { email } = req.body;
   await sendPasswordResetLink(email);
-  sendSuccess(res, HttpStatus.OK, null, 'Password reset link sent to your email');
+  sendSuccess(
+    res,
+    HttpStatus.OK,
+    null,
+    'If the account is eligible, a password reset link has been sent.'
+  );
 };
 
 export const handleResetPassword = async (req: Request, res: Response) => {

@@ -1,70 +1,134 @@
 import app from './app';
 import { connectDB, disconnectDB } from './core/config/database';
-
-// Initialize Background Workers
-import './modules/post/workers/image.moderation.worker';
-import './modules/post/workers/text.moderation.worker';
-import './modules/post/workers/finalStatus.moderation.worker';
-import './modules/post/workers/cache.worker';
-import './modules/post/workers/matchDemand.worker';
-import './modules/demand/workers/cache.worker';
-import './modules/notification/workers/censorPost.notification';
-import './modules/notification/workers/comment.worker';
-import './modules/notification/workers/requestAccomodation.worker';
-
-import { initCacheJob } from './modules/post/queues/cache.queue';
-import { initDemandCacheJob } from './modules/demand/queues/cache.queue';
-
 import config from './core/config/config';
+import { cacheConnection, connection } from './core/config/redis.connection';
+import { imageModerationWorker } from './modules/post/workers/image.moderation.worker';
+import { textModerationWorker } from './modules/post/workers/text.moderation.worker';
+import { finalModerationWorker } from './modules/post/workers/finalStatus.moderation.worker';
+import { postCacheWorker } from './modules/post/workers/cache.worker';
+import { matchDemandWorker } from './modules/post/workers/matchDemand.worker';
+import { demandCacheWorker } from './modules/demand/workers/cache.worker';
+import {
+  automatedCensorNotificationWorker,
+  manualCensorNotificationWorker
+} from './modules/notification/workers/censorPost.notification';
+import { commentNotificationWorker } from './modules/notification/workers/comment.worker';
+import { accommodationNotificationWorker } from './modules/notification/workers/requestAccomodation.worker';
+import {
+  initCacheJob,
+  postCacheQueue
+} from './modules/post/queues/cache.queue';
+import {
+  demandCacheQueue,
+  initDemandCacheJob
+} from './modules/demand/queues/cache.queue';
+import { matchDemandQueue } from './modules/post/queues/matchDemand.queue';
+import {
+  finalStatusQueue,
+  flowProducer,
+  imageModerationQueue,
+  textModerationQueue
+} from './modules/post/queues/moderation.queue';
+import {
+  censorAutomaticalNotificationQueue,
+  censorManualNotificationQueue,
+  commentNotificationQueue,
+  requestSharedAccommodationNotificationQueue
+} from './modules/notification/queues/notification.queue';
 
 const PORT = config.server.port;
-import { connection } from './core/config/redis.connection';
 
-const startServer = () => {
+const workers = [
+  imageModerationWorker,
+  textModerationWorker,
+  finalModerationWorker,
+  postCacheWorker,
+  matchDemandWorker,
+  demandCacheWorker,
+  automatedCensorNotificationWorker,
+  manualCensorNotificationWorker,
+  commentNotificationWorker,
+  accommodationNotificationWorker
+];
+
+const queues = [
+  postCacheQueue,
+  demandCacheQueue,
+  matchDemandQueue,
+  finalStatusQueue,
+  imageModerationQueue,
+  textModerationQueue,
+  censorAutomaticalNotificationQueue,
+  censorManualNotificationQueue,
+  commentNotificationQueue,
+  requestSharedAccommodationNotificationQueue
+];
+
+const closeBackgroundResources = async (force = false) => {
+  await Promise.allSettled(workers.map((worker) => worker.close(force)));
+  await Promise.allSettled([
+    ...queues.map((queue) => queue.close()),
+    flowProducer.close()
+  ]);
+};
+
+const startServer = async () => {
   try {
-    const server = app.listen(PORT, async () => {
+    await connectDB();
+    await cacheConnection.ping();
+    await initCacheJob();
+    await initDemandCacheJob();
+
+    const server = app.listen(PORT, () => {
       console.log(`Server is listening on port ${PORT}`);
-      // Initialize recurring jobs
-      await initCacheJob();
-      await initDemandCacheJob();
     });
 
-    // Graceful Shutdown strategy for Linux environments (e.g., when running in Docker)
-    // No need in windows because nodemon/ts-node-dev will automatically kill
-    // the process and restart it, so we don't need to handle SIGUSR2 signal
+    let shuttingDown = false;
     const gracefulShutdown = async (signal: string) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+
       console.log(`Received ${signal}, shutting down gracefully...`);
-      server.close(async () => {
-        try {
-          console.log('Closed out remaining connections.');
-          await disconnectDB();
-          await connection.quit(); // Close Redis connection
+      server.close();
 
-          process.exit(0);
-        } catch (err) {
-          console.error('Error during shutdown:', err);
-          process.exit(1);
-        }
-      });
-
-      // Force close wait for 5s
-      setTimeout(() => {
-        console.error(
-          'Could not close connections in time, forcefully shutting down'
-        );
+      const forceShutdownTimer = setTimeout(() => {
+        console.error('Graceful shutdown timed out');
+        server.closeAllConnections();
         process.exit(1);
-      }, 5000);
+      }, 10_000);
+      forceShutdownTimer.unref();
+
+      try {
+        await closeBackgroundResources();
+        await disconnectDB();
+        await Promise.allSettled([
+          cacheConnection.quit(),
+          connection.quit()
+        ]);
+        server.closeAllConnections();
+        clearTimeout(forceShutdownTimer);
+        process.exit(0);
+      } catch (error) {
+        console.error('Error during shutdown:', error);
+        server.closeAllConnections();
+        process.exit(1);
+      }
     };
 
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // commonly used by nodemon/ts-node-dev
+    process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+    process.on('SIGUSR2', () => void gracefulShutdown('SIGUSR2'));
   } catch (error) {
     console.error('Failed to start the server:', error);
+    await Promise.race([
+      closeBackgroundResources(true),
+      new Promise((resolve) => setTimeout(resolve, 2000))
+    ]);
+    cacheConnection.disconnect();
+    connection.disconnect();
+    await Promise.allSettled([disconnectDB()]);
     process.exit(1);
   }
 };
 
-startServer();
-
-connectDB();
+void startServer();

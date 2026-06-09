@@ -15,6 +15,8 @@ import commentRouter from './modules/comment/routes/comment.route';
 import locationRouter from './modules/location/routes/location.route';
 import notificationRouter from './modules/notification/routes/notification.route';
 import amenityRouter from './modules/amenity/routes/amenity.route';
+import prismaClient from './core/config/prisma';
+import { cacheConnection } from './core/config/redis.connection';
 
 const app: Application = express();
 
@@ -34,10 +36,21 @@ app.use(cookieParser());
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 
-app.get('/api/v1/health', (_req: Request, res: Response) => {
-  res
-    .status(200)
-    .json({ success: true, message: 'API is running successfully' });
+app.get('/api/v1/health', async (_req: Request, res: Response) => {
+  try {
+    await Promise.all([
+      prismaClient.$queryRaw`SELECT 1`,
+      cacheConnection.ping()
+    ]);
+    res
+      .status(200)
+      .json({ success: true, message: 'API is ready' });
+  } catch {
+    res.status(503).json({
+      success: false,
+      error: { code: 503, message: 'API is not ready' }
+    });
+  }
 });
 
 // ─── API v1 Routes ───────────────────────────────────────────────────────────

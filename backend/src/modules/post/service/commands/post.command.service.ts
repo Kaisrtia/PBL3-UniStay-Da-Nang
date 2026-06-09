@@ -279,7 +279,7 @@ export const updatePost = async (
     );
   }
 
-  if (normalizedData.wardId) {
+    if (normalizedData.wardId !== undefined) {
     const ward = await prismaClient.ward.findUnique({
       where: { id: normalizedData.wardId }
     });
@@ -305,29 +305,29 @@ export const updatePost = async (
     await tx.post.update({
       where: { id: postId },
       data: {
-        ...(normalizedData.title && { title: normalizedData.title }),
-        ...(normalizedData.wardId && { wardId: normalizedData.wardId }),
-        ...(normalizedData.purpose && { purpose: normalizedData.purpose }),
-        ...(normalizedData.detailAddress && {
+        ...(normalizedData.title !== undefined && { title: normalizedData.title }),
+        ...(normalizedData.wardId !== undefined && { wardId: normalizedData.wardId }),
+        ...(normalizedData.purpose !== undefined && { purpose: normalizedData.purpose }),
+        ...(normalizedData.detailAddress !== undefined && {
           detailAddress: normalizedData.detailAddress
         }),
-        ...(normalizedData.exactAddress && {
+        ...(normalizedData.exactAddress !== undefined && {
           exactAddress: normalizedData.exactAddress
         }),
-        ...(normalizedData.district && { district: normalizedData.district }),
-        ...(normalizedData.city && { city: normalizedData.city }),
-        ...(normalizedData.area && { area: normalizedData.area }),
-        ...(normalizedData.price && { price: normalizedData.price }),
-        ...(normalizedData.deposit && { deposit: normalizedData.deposit }),
-        ...(normalizedData.roomType && { roomType: normalizedData.roomType }),
-        ...(normalizedData.postPurpose && {
+        ...(normalizedData.district !== undefined && { district: normalizedData.district }),
+        ...(normalizedData.city !== undefined && { city: normalizedData.city }),
+        ...(normalizedData.area !== undefined && { area: normalizedData.area }),
+        ...(normalizedData.price !== undefined && { price: normalizedData.price }),
+        ...(normalizedData.deposit !== undefined && { deposit: normalizedData.deposit }),
+        ...(normalizedData.roomType !== undefined && { roomType: normalizedData.roomType }),
+        ...(normalizedData.postPurpose !== undefined && {
           postPurpose: normalizedData.postPurpose
         }),
-        ...(normalizedData.description && {
+        ...(normalizedData.description !== undefined && {
           description: normalizedData.description
         }),
-        ...(normalizedData.latitude && { latitude: normalizedData.latitude }),
-        ...(normalizedData.longitude && {
+        ...(normalizedData.latitude !== undefined && { latitude: normalizedData.latitude }),
+        ...(normalizedData.longitude !== undefined && {
           longitude: normalizedData.longitude
         }),
         status: 'UPDATED',

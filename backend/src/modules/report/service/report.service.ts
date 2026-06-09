@@ -187,19 +187,27 @@ export const createReport = async (
         if (!post) {
           throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
         }
-        if (post.status === post_status.HIDDEN) {
-          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report a hidden post');
+        if (post.status !== post_status.APPROVED) {
+          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report an inactive post');
         }
         reportedUserId = post.userId;
       } else {
         const comment = await tx.comment.findUnique({
-          where: { id: data.commentId! }
+          where: { id: data.commentId! },
+          include: {
+            post: {
+              select: { status: true }
+            }
+          }
         });
         if (!comment) {
           throw new AppError(HttpStatus.NOT_FOUND, 'Comment not found');
         }
-        if (comment.status === comment_status.HIDDEN) {
-          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report a hidden comment');
+        if (
+          comment.status !== comment_status.DISPLAYED ||
+          comment.post.status !== post_status.APPROVED
+        ) {
+          throw new AppError(HttpStatus.BAD_REQUEST, 'Cannot report an inactive comment');
         }
         reportedUserId = comment.userId;
       }

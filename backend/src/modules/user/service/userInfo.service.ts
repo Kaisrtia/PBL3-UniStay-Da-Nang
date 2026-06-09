@@ -235,10 +235,12 @@ export const changePassword = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid current password');
   }
 
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
   await prismaClient.$transaction([
     prismaClient.user.update({
       where: { id: user.id },
-      data: { hashedPassword: bcrypt.hashSync(newPassword, 10) }
+      data: { hashedPassword }
     }),
     prismaClient.session.deleteMany({ where: { userId: user.id } })
   ]);
@@ -289,6 +291,60 @@ export const getUserProfile = async (targetUserId: string) => {
   return {
     ...targetUser,
     roles: [targetUser.role],
+    reviews: targetUser.hostReviewsReceived
+  };
+};
+
+export const getPublicUserProfile = async (targetUserId: string) => {
+  const targetUser = await prismaClient.user.findFirst({
+    where: {
+      id: targetUserId,
+      status: account_status.ACTIVE
+    },
+    select: {
+      id: true,
+      fullName: true,
+      avatarUrl: true,
+      role: true,
+      createdAt: true,
+      hosts: {
+        select: {
+          isVerified: true,
+          avgStar: true,
+          totalPost: true
+        }
+      },
+      hostReviewsReceived: {
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          updatedAt: true,
+          reviewer: {
+            select: {
+              id: true,
+              fullName: true,
+              avatarUrl: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!targetUser) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
+  }
+
+  return {
+    id: targetUser.id,
+    fullName: targetUser.fullName,
+    avatarUrl: targetUser.avatarUrl,
+    role: targetUser.role,
+    createdAt: targetUser.createdAt,
+    host: targetUser.hosts[0] ?? null,
     reviews: targetUser.hostReviewsReceived
   };
 };

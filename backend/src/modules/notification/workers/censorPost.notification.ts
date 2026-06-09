@@ -4,7 +4,7 @@ import { Worker, Job } from 'bullmq';
 import { createPostCensorNotification } from '../services/notification.service';
 import { pushNotificationIfOnline } from '../utils/pushNotification';
 
-new Worker(
+export const automatedCensorNotificationWorker = new Worker(
   'censor-post-notification-queue',
   async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.name}`);
@@ -25,7 +25,7 @@ new Worker(
   { connection }
 );
 
-new Worker(
+export const manualCensorNotificationWorker = new Worker(
   'censor-manual-notification-queue',
   async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.name}`);

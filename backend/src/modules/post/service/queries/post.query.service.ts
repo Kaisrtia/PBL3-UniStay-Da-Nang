@@ -504,11 +504,23 @@ export const getPostsCountByWard = async () => {
   return result;
 };
 
-export const getPostDetail = async (postId: string, currentUserId?: string) => {
+export const getPostDetail = async (
+  postId: string,
+  currentUser?: Pick<user, 'id' | 'role'>
+) => {
+  const currentUserId = currentUser?.id;
   const blockedCommentUserFilter =
     await blockService.getBlockedCommentUserFilter(currentUserId);
-  const post = await prismaClient.post.findUnique({
-    where: { id: postId },
+  const post = await prismaClient.post.findFirst({
+    where: {
+      id: postId,
+      ...(currentUser?.role !== 'ADMIN' && {
+        OR: [
+          { status: post_status.APPROVED },
+          ...(currentUserId ? [{ userId: currentUserId }] : [])
+        ]
+      })
+    },
     include: {
       ward: true,
       postImages: true,

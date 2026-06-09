@@ -3,7 +3,7 @@ import { connection } from '../../../core/config/redis.connection';
 import { createCommentNotification } from '../services/notification.service';
 import { pushNotificationIfOnline } from '../utils/pushNotification';
 
-new Worker(
+export const commentNotificationWorker = new Worker(
   'comment-notification-queue',
   async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.name}`);

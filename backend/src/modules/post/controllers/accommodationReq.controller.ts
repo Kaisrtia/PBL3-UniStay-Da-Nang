@@ -3,6 +3,7 @@ import HttpStatus from 'http-status';
 import * as accommodationReqService from '../service/accommodationReq.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
+import { parsePagination } from '../../../core/utils/pagination';
 
 export const handleCreateAccommodationRequest = async (
   req: Request,
@@ -31,8 +32,7 @@ export const handleGetReceivedAccommodationRequests = async (
   req: Request,
   res: Response
 ) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 30;
+  const { page, limit } = parsePagination(req.query, 30, 60);
 
   const requests = await accommodationReqService.getReceivedAccommodationRequests(
     req.user!,
@@ -47,8 +47,7 @@ export const handleGetSentAccommodationRequests = async (
   req: Request,
   res: Response
 ) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 30;
+  const { page, limit } = parsePagination(req.query, 30, 60);
 
   const requests = await accommodationReqService.getSentAccommodationRequests(
     req.user!,

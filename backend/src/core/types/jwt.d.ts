@@ -1,4 +1,4 @@
-import * as jwt from 'jsonwebtoken';
+import 'jsonwebtoken';
 
 declare module 'jsonwebtoken' {
   export interface JwtPayload {

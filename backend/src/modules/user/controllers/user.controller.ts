@@ -6,6 +6,7 @@ import * as blockService from '../service/block.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { toUserResponseDto } from '../dto/user-response.dto';
 import { AppError } from '../../../core/exceptions/AppError';
+import { parsePagination } from '../../../core/utils/pagination';
 
 // -- User Info --
 
@@ -21,7 +22,7 @@ export const handleGetUserProfile = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'User ID is required');
   }
 
-  const profile = await userInfoService.getUserProfile(id);
+  const profile = await userInfoService.getPublicUserProfile(id);
   sendSuccess(res, HttpStatus.OK, profile);
 };
 
@@ -159,16 +160,14 @@ export const handleGetVerificationCandidates = async (
   req: Request,
   res: Response
 ) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePagination(req.query, 10, 100);
 
   const result = await userInfoService.getVerificationCandidates(page, limit);
   sendSuccess(res, HttpStatus.OK, result);
 };
 
 export const handleGetAllUsers = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePagination(req.query, 10, 100);
 
   const result = await adminService.getAllUsers(page, limit);
   sendSuccess(res, HttpStatus.OK, result);

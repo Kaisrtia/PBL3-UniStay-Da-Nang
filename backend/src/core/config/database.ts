@@ -4,8 +4,9 @@ const connectDB = async () => {
   try {
     await prismaClient.$connect();
     console.log('Connected to database');
-  } catch (error: any) {
-    console.error('Error connecting to database: ', error.message);
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+    throw error;
   }
 };
 
@@ -13,9 +14,9 @@ const disconnectDB = async () => {
   try {
     await prismaClient.$disconnect();
     console.log('Disconnected from database');
-  } catch (error: any) {
-    console.error('Error disconnecting from database: ', error.message);
-    process.exit(1);
+  } catch (error) {
+    console.error('Error disconnecting from database:', error);
+    throw error;
   }
 };
 

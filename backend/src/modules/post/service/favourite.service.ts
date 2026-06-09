@@ -1,7 +1,7 @@
 import prismaClient from '../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../core/exceptions/AppError';
-import { Prisma, user } from '@prisma/client';
+import { post_status, Prisma, user } from '@prisma/client';
 import { requirePost } from '../utils/post.helper';
 import * as blockService from '../../user/service/block.service';
 
@@ -15,13 +15,14 @@ export const getFavouritePosts = async (
   const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
   const where = {
     studentId: currentUser.id,
-    ...(blockedUserIds.length > 0 && {
-      post: {
+    post: {
+      status: post_status.APPROVED,
+      ...(blockedUserIds.length > 0 && {
         userId: {
           notIn: blockedUserIds
         }
-      }
-    })
+      })
+    }
   };
 
   const [favourites, totalCount] = await Promise.all([

@@ -6,6 +6,10 @@ import jwt from 'jsonwebtoken';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
+import {
+  isStrongPassword,
+  strongPasswordMessage
+} from '../../../core/utils/passwordPolicy';
 
 const getUserRoles = (user: Pick<User, 'role'>) => [user.role];
 
@@ -13,6 +17,8 @@ const hashRefreshToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
 
 const createRefreshToken = () => randomBytes(64).toString('hex');
+const DUMMY_PASSWORD_HASH =
+  '$2b$10$M9N4uFBOEJ.v14DBwZM5eOvmAJfMdE5wXgVHsR2wP5gD6v2.Uv2pe';
 
 const getRefreshTokenExpiresAt = () =>
   new Date(Date.now() + config.jwt.refresh_token_ttl_seconds * 1000);
@@ -63,6 +69,9 @@ export const signUp = async (
   if (!normalizedFullName) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Full name is required');
   }
+  if (!isStrongPassword(password)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, strongPasswordMessage);
+  }
 
   const checkUserEmail = await prismaClient.user.findUnique({
     where: {
@@ -73,12 +82,14 @@ export const signUp = async (
     throw new AppError(HttpStatus.CONFLICT, 'Email already exists');
   }
 
+  const hashedPassword = await bcrypt.hash(password, 10);
+
   await prismaClient.$transaction([
     prismaClient.user.create({
       data: {
         id: randomUUID(),
         email: normalizedEmail,
-        hashedPassword: bcrypt.hashSync(password, 10),
+        hashedPassword,
         fullName: normalizedFullName,
         provider: provider.SYSTEM
       }
@@ -106,19 +117,22 @@ export const login = async (email?: string, password?: string) => {
   });
 
   if (!user) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
   }
 
-  // Check for verified email after verifying the password to prevent user enumeration attacks
+  if (user.provider !== provider.SYSTEM || !user.hashedPassword) {
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
+  if (!isPasswordValid) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
+  }
+
   if (!user.emailVerified) {
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Email not verified');
-  }
-
-  if (user.provider === provider.GOOGLE) {
-    throw new AppError(
-      HttpStatus.UNAUTHORIZED,
-      'User is registered with Google, please login with Google'
-    );
   }
 
   if (user.status === account_status.BANNED) {
@@ -130,11 +144,6 @@ export const login = async (email?: string, password?: string) => {
     user.status !== account_status.SET_UP
   ) {
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Account is not active');
-  }
-
-  const isPasswordValid = await bcrypt.compare(password, user.hashedPassword!);
-  if (!isPasswordValid) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
   }
 
   const tokens = await generateAuthTokens(user);

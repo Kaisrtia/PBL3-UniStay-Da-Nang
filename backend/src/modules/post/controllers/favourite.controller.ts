@@ -3,10 +3,10 @@ import HttpStatus from 'http-status';
 import * as favouriteService from '../service/favourite.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
+import { parsePagination } from '../../../core/utils/pagination';
 
 export const handleGetFavouritePosts = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const { page, limit } = parsePagination(req.query, 20, 100);
 
   const favourites = await favouriteService.getFavouritePosts(
     req.user!,
