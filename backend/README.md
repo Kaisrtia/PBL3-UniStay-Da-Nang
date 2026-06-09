@@ -39,7 +39,16 @@ Accounts:
 - `host.test@unistay.local` / `Test@123456`
 - `admin.test@unistay.local` / `Test@123456`
 
-The initializer creates wards, universities, amenities, approved listings, and image URLs so the local application starts with realistic content.
+The initializer creates wards, universities, amenities, 500 load-test users, 1,000 seeded listings, comments, reports, favourites, accommodation requests, and image URLs so the local application starts with realistic content.
+
+For local database benchmarking, run PostgreSQL from Docker and point Prisma to the local DB:
+```powershell
+docker compose up -d db redis
+$env:DATABASE_URL="postgresql://postgres:1@localhost:3005/uni-stay-dn-db"
+npx prisma migrate deploy
+npm run seed:local
+npm run db:load-test
+```
 
 ## Architecture
 - `src/core/`: Foundation files (Database config, Express middlewares, shared Utils).
