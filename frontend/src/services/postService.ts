@@ -65,6 +65,7 @@ export type Post = {
   user?: PostOwner
   _count?: {
     comments?: number
+    reports?: number
   }
 }
 

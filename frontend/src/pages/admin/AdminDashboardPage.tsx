@@ -60,6 +60,7 @@ const getPostCountByStatus = (stats: AdminPostStatistic, status: string) =>
   stats.byStatus?.find((item) => item.status === status)?.count || 0
 
 const REPORTS_PER_PAGE = 10
+const ADMIN_POSTS_ANALYTICS_LIMIT = 1000
 
 type ChartPoint = {
   label: string
@@ -67,10 +68,83 @@ type ChartPoint = {
   approved: number
 }
 
+type AdminPostSort = 'newest' | 'statusPriority' | 'reportsDesc'
+
 const getPostDate = (post: Post) => {
   const date = post.createdAt ? new Date(post.createdAt) : null
   return date && !Number.isNaN(date.getTime()) ? date : null
 }
+
+const getPostsInStatsPeriod = (posts: Post[], stats: AdminPostStatistic) => {
+  const since = stats.since ? new Date(stats.since) : null
+
+  if (!since || Number.isNaN(since.getTime())) {
+    return posts
+  }
+
+  return posts.filter((post) => {
+    const date = getPostDate(post)
+    return Boolean(date && date >= since)
+  })
+}
+
+const getPostReportCount = (post: Post) => post._count?.reports || 0
+
+const getPostStatusPriority = (post: Post) => {
+  const priorities: Record<string, number> = {
+    PENDING: 0,
+    UPDATED: 1,
+    REJECTED: 2,
+    APPROVED: 3,
+    HIDDEN: 4
+  }
+
+  return priorities[String(post.status)] ?? 5
+}
+
+const sortAdminPosts = (posts: Post[], sort: AdminPostSort) => {
+  const sortedPosts = [...posts]
+
+  if (sort === 'statusPriority') {
+    return sortedPosts.sort(
+      (a, b) =>
+        getPostStatusPriority(a) - getPostStatusPriority(b) ||
+        getPostReportCount(b) - getPostReportCount(a) ||
+        (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0)
+    )
+  }
+
+  if (sort === 'reportsDesc') {
+    return sortedPosts.sort(
+      (a, b) =>
+        getPostReportCount(b) - getPostReportCount(a) ||
+        getPostStatusPriority(a) - getPostStatusPriority(b) ||
+        (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0)
+    )
+  }
+
+  return sortedPosts.sort((a, b) => (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0))
+}
+
+const SortHeaderButton = ({
+  label,
+  active,
+  onClick
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) => (
+  <button
+    type='button'
+    onClick={onClick}
+    className={`ml-2 rounded-full px-2 py-1 text-[10px] font-extrabold transition ${
+      active ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+    }`}
+  >
+    {label}
+  </button>
+)
 
 const buildDailyChartData = (posts: Post[]): ChartPoint[] => {
   const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
@@ -279,9 +353,12 @@ const RegionalStatistics = ({ posts }: { posts: Post[] }) => {
           </div>
         ))}
       </div>
-      <button className='mt-8 h-14 w-full rounded-lg bg-gray-100 text-base font-extrabold text-gray-500'>
+      <Link
+        to='/admin/posts'
+        className='mt-8 grid h-14 w-full place-items-center rounded-lg bg-gray-100 text-base font-extrabold text-gray-600 transition hover:bg-[#001D3D] hover:text-white'
+      >
         Xem chi tiết
-      </button>
+      </Link>
     </section>
   )
 }
@@ -290,7 +367,7 @@ const OverviewContent = () => {
   const [period, setPeriod] = useState<AdminStatsPeriod>('day')
   const [stats, setStats] = useState<AdminPostStatistic>({})
   const [posts, setPosts] = useState<Post[]>([])
-  const [users, setUsers] = useState<AdminUser[]>([])
+  const [totalUsers, setTotalUsers] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
@@ -299,12 +376,12 @@ const OverviewContent = () => {
         setErrorMessage('')
         const [statResult, postResult, userResult] = await Promise.all([
           adminService.getPostStatistics(period),
-          adminService.getAdminPosts({ limit: 100 }),
+          adminService.getAdminPosts({ limit: ADMIN_POSTS_ANALYTICS_LIMIT }),
           adminService.getUsers({ limit: 5 })
         ])
         setStats(statResult)
         setPosts(postResult.data)
-        setUsers(userResult.data)
+        setTotalUsers(userResult.meta?.total || userResult.data.length)
       } catch {
         setErrorMessage('Không tải được dữ liệu admin. Hãy đăng nhập bằng tài khoản ADMIN.')
       }
@@ -314,10 +391,17 @@ const OverviewContent = () => {
   }, [period])
 
   const recentFlaggedPosts = posts
-    .filter((post) => (post._count?.comments || 0) > 0 || post.status !== 'APPROVED')
+    .filter((post) => getPostReportCount(post) > 0 || post.status !== 'APPROVED')
+    .sort(
+      (a, b) =>
+        getPostReportCount(b) - getPostReportCount(a) ||
+        getPostStatusPriority(a) - getPostStatusPriority(b) ||
+        (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0)
+    )
     .slice(0, 3)
-  const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
-  const hourlyChartData = useMemo(() => buildHourlyChartData(posts), [posts])
+  const periodPosts = useMemo(() => getPostsInStatsPeriod(posts, stats), [posts, stats])
+  const dailyChartData = useMemo(() => buildDailyChartData(periodPosts), [periodPosts])
+  const hourlyChartData = useMemo(() => buildHourlyChartData(periodPosts), [periodPosts])
 
   return (
     <AdminShell activeTab='overview'>
@@ -326,7 +410,7 @@ const OverviewContent = () => {
       ) : null}
 
       <section className='mt-12 grid gap-16 lg:grid-cols-2'>
-        <StatCard label='Tổng người dùng' value={users.length ? users.length : 0} />
+        <StatCard label='Tổng người dùng' value={totalUsers} />
         <StatCard label='Số lượng bài đăng mới' value={stats.totalPosts || posts.length} />
       </section>
 
@@ -338,7 +422,7 @@ const OverviewContent = () => {
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
           <DateFilterCard />
-          <RegionalStatistics posts={posts} />
+          <RegionalStatistics posts={periodPosts} />
         </aside>
       </section>
 
@@ -354,7 +438,7 @@ const OverviewContent = () => {
                 <th className='py-3'>Người đăng</th>
                 <th className='py-3'>Trạng thái</th>
                 <th className='py-3'>Bài đăng</th>
-                <th className='py-3'>Bình luận</th>
+                <th className='py-3'>Báo cáo</th>
                 <th className='py-3 text-right'>Quyết định</th>
               </tr>
             </thead>
@@ -368,7 +452,7 @@ const OverviewContent = () => {
                     </span>
                   </td>
                   <td className='max-w-xs truncate py-4'>{post.title}</td>
-                  <td className='py-4'>{post._count?.comments || 0}</td>
+                  <td className='py-4'>{getPostReportCount(post)}</td>
                   <td className='py-4 text-right'>
                     <Link to='/admin/posts' className='rounded-full bg-[#F8D977] px-5 py-2 text-xs font-extrabold'>
                       Xử lý
@@ -387,6 +471,7 @@ const OverviewContent = () => {
 const AdminPostsContent = () => {
   const [period, setPeriod] = useState<AdminStatsPeriod>('day')
   const [statusFilter, setStatusFilter] = useState<PostStatus | 'ALL'>('ALL')
+  const [postSort, setPostSort] = useState<AdminPostSort>('newest')
   const [stats, setStats] = useState<AdminPostStatistic>({})
   const [posts, setPosts] = useState<Post[]>([])
   const [message, setMessage] = useState('')
@@ -394,7 +479,10 @@ const AdminPostsContent = () => {
   const loadPosts = useCallback(async () => {
     const [statResult, postResult] = await Promise.all([
       adminService.getPostStatistics(period),
-      adminService.getAdminPosts({ status: statusFilter === 'ALL' ? undefined : statusFilter, limit: 100 })
+      adminService.getAdminPosts({
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        limit: ADMIN_POSTS_ANALYTICS_LIMIT
+      })
     ])
     setStats(statResult)
     setPosts(postResult.data)
@@ -417,8 +505,10 @@ const AdminPostsContent = () => {
       setMessage('Không thể cập nhật trạng thái bài đăng.')
     }
   }
-  const dailyChartData = useMemo(() => buildDailyChartData(posts), [posts])
-  const hourlyChartData = useMemo(() => buildHourlyChartData(posts), [posts])
+  const periodPosts = useMemo(() => getPostsInStatsPeriod(posts, stats), [posts, stats])
+  const dailyChartData = useMemo(() => buildDailyChartData(periodPosts), [periodPosts])
+  const hourlyChartData = useMemo(() => buildHourlyChartData(periodPosts), [periodPosts])
+  const sortedPosts = useMemo(() => sortAdminPosts(posts, postSort), [postSort, posts])
 
   return (
     <AdminShell activeTab='posts'>
@@ -472,15 +562,29 @@ const AdminPostsContent = () => {
             <thead>
               <tr className='text-sm font-extrabold text-[#181A20]'>
                 <th className='py-3'>Người dùng</th>
-                <th className='py-3'>Trạng thái</th>
+                <th className='py-3'>
+                  Trạng thái
+                  <SortHeaderButton
+                    label='chờ trước'
+                    active={postSort === 'statusPriority'}
+                    onClick={() => setPostSort((current) => (current === 'statusPriority' ? 'newest' : 'statusPriority'))}
+                  />
+                </th>
                 <th className='py-3'>Bài đăng</th>
                 <th className='py-3'>Khu vực</th>
-                <th className='py-3'>Báo cáo</th>
+                <th className='py-3'>
+                  Báo cáo
+                  <SortHeaderButton
+                    label='nhiều nhất'
+                    active={postSort === 'reportsDesc'}
+                    onClick={() => setPostSort((current) => (current === 'reportsDesc' ? 'newest' : 'reportsDesc'))}
+                  />
+                </th>
                 <th className='py-3 text-right'>Quyết định</th>
               </tr>
             </thead>
             <tbody>
-              {posts.map((post) => (
+              {sortedPosts.map((post) => (
                 <tr key={post.id} className='border-t border-gray-100'>
                   <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'Người dùng'}</td>
                   <td className='py-4'>
@@ -490,7 +594,7 @@ const AdminPostsContent = () => {
                   </td>
                   <td className='max-w-xs truncate py-4'>{post.title}</td>
                   <td className='py-4'>{post.ward?.name || 'Chưa rõ'}</td>
-                  <td className='py-4'>{post._count?.comments || 0}</td>
+                  <td className='py-4'>{getPostReportCount(post)}</td>
                   <td className='py-4'>
                     <div className='flex justify-end gap-2'>
                       <Link

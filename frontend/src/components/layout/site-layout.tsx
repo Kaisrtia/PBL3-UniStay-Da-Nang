@@ -22,10 +22,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { logo } from '@/assets/images'
 import { defaultAmenityNames, defaultBenefitNames } from '@/constants/rentalFeatures'
 import amenityService, { type Amenity } from '@/services/amenityService'
-import { type AuthUser } from '@/services/authService'
+import authService, { type AuthUser } from '@/services/authService'
 import locationService, { type Ward } from '@/services/locationService'
 import notificationService, { type AppNotification } from '@/services/notificationService'
 import { type PostPurpose, type RoomType } from '@/services/postService'
+import { clearAuthSession } from '@/utils/authSession'
 
 type SiteHeaderProps = {
   accountLabel?: string
@@ -608,9 +609,8 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('token')
-    localStorage.removeItem('authUser')
+    void authService.logout().catch(() => undefined)
+    clearAuthSession()
     setUser(null)
     setHasToken(false)
     closeHeaderMenus()

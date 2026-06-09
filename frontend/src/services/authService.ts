@@ -92,6 +92,15 @@ export const authService = {
   resetPassword: async (payload: ResetPasswordPayload) => {
     const response = await api.patch<AuthResponse>('/auth/forgot-password', payload)
     return response.data
+  },
+
+  refreshSession: async () => {
+    const response = await api.post<AuthResponse>('/auth/sessions/refresh')
+    return response.data
+  },
+
+  logout: async () => {
+    await api.delete('/auth/sessions')
   }
 }
 
