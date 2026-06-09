@@ -5,6 +5,7 @@ import * as postCommandService from '../service/commands/post.command.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 import { room_type, post_purpose, post_status } from '@prisma/client';
+import { parsePagination } from '../../../core/utils/pagination';
 
 // -- Post Listing --
 
@@ -45,12 +46,38 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     filters.purpose = purpose as post_purpose;
   }
 
-  if (wardId !== undefined) filters.wardId = Number(wardId);
+  if (wardId !== undefined) {
+    const parsedWardId = Number(wardId);
+    if (!Number.isInteger(parsedWardId) || parsedWardId <= 0) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'wardId must be a positive integer');
+    }
+    filters.wardId = parsedWardId;
+  }
 
-  if (minArea !== undefined) filters.minArea = Number(minArea);
-  if (maxArea !== undefined) filters.maxArea = Number(maxArea);
-  if (minPrice !== undefined) filters.minPrice = Number(minPrice);
-  if (maxPrice !== undefined) filters.maxPrice = Number(maxPrice);
+  const numericFilters = { minArea, maxArea, minPrice, maxPrice };
+  for (const [field, value] of Object.entries(numericFilters)) {
+    if (value === undefined) continue;
+    const parsedValue = Number(value);
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      throw new AppError(HttpStatus.BAD_REQUEST, `${field} must be a non-negative number`);
+    }
+    filters[field as keyof typeof numericFilters] = parsedValue;
+  }
+
+  if (
+    filters.minArea !== undefined &&
+    filters.maxArea !== undefined &&
+    filters.minArea > filters.maxArea
+  ) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'minArea must not exceed maxArea');
+  }
+  if (
+    filters.minPrice !== undefined &&
+    filters.maxPrice !== undefined &&
+    filters.minPrice > filters.maxPrice
+  ) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'minPrice must not exceed maxPrice');
+  }
 
   if (roomType !== undefined) {
     const validRoomTypes: room_type[] = ['ROOM', 'APARTMENT', 'HOUSE'];
@@ -63,9 +90,18 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     filters.roomType = roomType as room_type;
   }
 
-  if (verifiedHost !== undefined)
+  if (verifiedHost !== undefined) {
+    if (verifiedHost !== 'true' && verifiedHost !== 'false') {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'verifiedHost must be true or false');
+    }
     filters.verifiedHost = verifiedHost === 'true';
-  if (hasMedia !== undefined) filters.hasMedia = hasMedia === 'true';
+  }
+  if (hasMedia !== undefined) {
+    if (hasMedia !== 'true' && hasMedia !== 'false') {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'hasMedia must be true or false');
+    }
+    filters.hasMedia = hasMedia === 'true';
+  }
 
   // amenities = "1,3,5" → [1, 3, 5]
   if (
@@ -73,25 +109,29 @@ export const handleGetPosts = async (req: Request, res: Response) => {
     typeof amenities === 'string' &&
     amenities.trim().length > 0
   ) {
-    filters.amenities = amenities
-      .split(',')
-      .map(Number)
-      .filter((n) => !isNaN(n));
+    const amenityIds = amenities.split(',').map(Number);
+    if (!amenityIds.every((id) => Number.isInteger(id) && id > 0)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'amenities must contain positive integer IDs');
+    }
+    filters.amenities = Array.from(new Set(amenityIds));
   }
 
-  if (page !== undefined) filters.page = Math.max(1, Number(page));
-  if (limit !== undefined)
-    filters.limit = Math.min(100, Math.max(1, Number(limit)));
+  const pagination = parsePagination({ page, limit }, 10, 100);
+  filters.page = pagination.page;
+  filters.limit = pagination.limit;
 
   const validSortFields = ['createdAt', 'price', 'area', 'viewCount'];
-  if (sortBy !== undefined && validSortFields.includes(sortBy as string)) {
+  if (sortBy !== undefined) {
+    if (!validSortFields.includes(sortBy as string)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid sortBy value');
+    }
     filters.sortBy = sortBy as postQueryService.PostFilters['sortBy'];
   }
 
-  if (
-    sortOrder !== undefined &&
-    ['asc', 'desc'].includes(sortOrder as string)
-  ) {
+  if (sortOrder !== undefined) {
+    if (!['asc', 'desc'].includes(sortOrder as string)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'sortOrder must be asc or desc');
+    }
     filters.sortOrder = sortOrder as 'asc' | 'desc';
   }
 
@@ -106,7 +146,10 @@ const parseFiniteNumber = (value: unknown) => {
   }
 
   const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) ? parsedValue : undefined;
+  if (!Number.isFinite(parsedValue)) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Query parameter must be a finite number');
+  }
+  return parsedValue;
 };
 
 export const handleGetNearbyPosts = async (req: Request, res: Response) => {
@@ -190,8 +233,7 @@ export const handleGetRecommendedPosts = async (
   req: Request,
   res: Response
 ) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePagination(req.query, 10, 100);
 
   const result = await postQueryService.getRecommendedPosts(
     req.user!,
@@ -208,8 +250,7 @@ export const handleGetRecommendedPosts = async (
 };
 
 export const handleGetMyPosts = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePagination(req.query, 10, 100);
 
   const result = await postQueryService.getMyPosts(req.user!, page, limit);
 
@@ -221,8 +262,7 @@ export const handleGetPostsByStatusForAdmin = async (
   res: Response
 ) => {
   const { status } = req.query;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePagination(req.query, 10, 100);
 
   let postStatus: post_status | undefined;
   if (status) {
@@ -342,7 +382,7 @@ export const handleGetPostDetail = async (req: Request, res: Response) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
   }
 
-  const post = await postQueryService.getPostDetail(postId, req.user?.id);
+  const post = await postQueryService.getPostDetail(postId, req.user);
 
   sendSuccess(res, HttpStatus.OK, post, 'Post detail fetched successfully');
 };

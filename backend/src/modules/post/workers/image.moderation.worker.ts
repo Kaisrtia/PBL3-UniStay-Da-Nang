@@ -10,6 +10,7 @@ import {
   parseAiModerationAnswer,
   stringifyModerationResult
 } from '../utils/moderation.helper';
+import { fetchSafeRemoteImage } from '../../../core/utils/safeRemoteImage';
 
 const moondreamClient = new vl({ apiKey: config.ai_key.moondream });
 const IMAGE_MODERATION_PROMPT = `
@@ -82,19 +83,7 @@ export const imageModerationWorker = new Worker(
       );
 
       try {
-        const response = await fetch(imageUrl);
-        if (!response.ok) {
-          manualReviewReasons.push(
-            buildImageReason(
-              imageIndex,
-              `Unable to fetch image. HTTP status ${response.status}`
-            )
-          );
-          continue;
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const imageBuffer = Buffer.from(arrayBuffer);
+        const imageBuffer = await fetchSafeRemoteImage(imageUrl);
 
         const mdResponse = await moondreamClient.query({
           image: imageBuffer,

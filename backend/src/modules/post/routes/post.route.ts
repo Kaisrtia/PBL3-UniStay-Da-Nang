@@ -11,7 +11,11 @@ import { authorize } from '../../../core/middlewares/role.middleware';
 import { validate } from '../../../core/middlewares/validate.middleware';
 import {
   createPostSchema,
-  updatePostSchema
+  updatePostSchema,
+  censorPostSchema,
+  favouritePostParamSchema,
+  favouritePostSchema,
+  postIdParamSchema
 } from '../validation/post.validation';
 import { account_role } from '@prisma/client';
 
@@ -117,6 +121,7 @@ postRouter.post(
 postRouter.get(
   '/:postId',
   optionalVerifyToken,
+  validate(postIdParamSchema),
   asyncHandler(postController.handleGetPostDetail)
 );
 
@@ -134,6 +139,7 @@ postRouter.patch(
   '/:postId/hide',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
+  validate(postIdParamSchema),
   asyncHandler(postController.handleHidePost)
 );
 
@@ -142,6 +148,7 @@ postRouter.patch(
   '/:postId/censor',
   verifyToken,
   authorize([account_role.ADMIN]),
+  validate(censorPostSchema),
   asyncHandler(postController.handleCensorPostManually)
 );
 
@@ -150,6 +157,7 @@ postRouter.delete(
   '/:postId',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
+  validate(postIdParamSchema),
   asyncHandler(postController.handleDeletePost)
 );
 
@@ -158,6 +166,7 @@ postRouter.post(
   '/favourites',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
+  validate(favouritePostSchema),
   asyncHandler(favouriteController.handleAddFavouritePost)
 );
 
@@ -166,6 +175,7 @@ postRouter.delete(
   '/favourites/:postId',
   verifyToken,
   authorize([account_role.STUDENT, account_role.HOST]),
+  validate(favouritePostParamSchema),
   asyncHandler(favouriteController.handleRemoveFavouritePost)
 );
 
@@ -176,6 +186,7 @@ postRouter.post(
   '/accommodation-requests',
   verifyToken,
   authorize([account_role.STUDENT]),
+  validate(favouritePostSchema),
   asyncHandler(accommodationReqController.handleCreateAccommodationRequest)
 );
 
