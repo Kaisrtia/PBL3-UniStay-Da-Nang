@@ -24,12 +24,12 @@ export const sendEmailOtpCode = async (email: string) => {
   });
 
   if (!user) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Email not found');
+    return;
   }
 
   // Check if the user's email is already verified
   if (user.emailVerified) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Email already verified');
+    return;
   }
 
   // Check if there is an existing verification token that has not expired
@@ -44,10 +44,7 @@ export const sendEmailOtpCode = async (email: string) => {
     existingToken.expiresAt &&
     existingToken.expiresAt > new Date()
   ) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'Verification email already sent'
-    );
+    return;
   }
 
   // Generate a new verification token and save it to the database
@@ -99,12 +96,12 @@ export const verifyEmailOtpCode = async (email: string, code: string) => {
   });
 
   if (!user) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Email not found');
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or expired verification code');
   }
 
   // Check if the user's email is already verified
   if (user.emailVerified) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Email already verified');
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or expired verification code');
   }
 
   // Check if there is an existing verification token that has not expired
@@ -120,14 +117,14 @@ export const verifyEmailOtpCode = async (email: string, code: string) => {
     existingToken.expiresAt <= new Date()
   ) {
     throw new AppError(
-      HttpStatus.NOT_FOUND,
-      'Verification email not found or expired'
+      HttpStatus.BAD_REQUEST,
+      'Invalid or expired verification code'
     );
   }
 
   // Check if the verification code matches
   if (existingToken.code !== code) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid verification code');
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid or expired verification code');
   }
 
   await prismaClient.$transaction([
@@ -165,18 +162,15 @@ export const sendPasswordResetLink = async (email: string) => {
   });
 
   if (!user) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Email not found');
+    return;
   }
 
   if (!user.emailVerified) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Email is not verified');
+    return;
   }
 
   if (user.provider === 'GOOGLE') {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'Google accounts cannot reset password this way'
-    );
+    return;
   }
 
   // Check if there is an existing token that has not expired
@@ -189,10 +183,7 @@ export const sendPasswordResetLink = async (email: string) => {
     existingRecord.expiresAt &&
     existingRecord.expiresAt > new Date()
   ) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'Reset link already sent, please wait before requesting again'
-    );
+    return;
   }
 
   // Generate a secure random token and store it in the code field
@@ -258,7 +249,7 @@ export const resetPasswordWithToken = async (
     );
   }
 
-  const newHashedPassword = bcrypt.hashSync(newPassword, 10);
+  const newHashedPassword = await bcrypt.hash(newPassword, 10);
 
   await prismaClient.$transaction([
     prismaClient.user.update({
