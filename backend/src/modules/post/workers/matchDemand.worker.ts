@@ -4,6 +4,7 @@ import prismaClient from '../../../core/config/prisma';
 import { calculateScore } from '../../demand/utils/matching.handler';
 import { notification_type } from '@prisma/client';
 import { pushNotificationIfOnline } from '../../notification/utils/pushNotification';
+import { getStudentDemandsWithFallback } from '../../demand/utils/studentDemandCache';
 
 const MIN_SCORE_THRESHOLD = 0.6;
 
@@ -31,16 +32,8 @@ export const matchDemandWorker = new Worker(
         return;
       }
 
-      // 2. Access student demands from Cache
-      const CACHE_KEY = 'cache:demands:student';
-      const cachedDemandsJson = await connection.get(CACHE_KEY);
-
-      if (!cachedDemandsJson) {
-        console.log('No student demands cached.');
-        return;
-      }
-
-      const demands = JSON.parse(cachedDemandsJson);
+      // 2. Access student demands from cache, with a database fallback.
+      const demands = await getStudentDemandsWithFallback();
 
       // 3. Match score for each demand. Recommended posts must reach 60%.
       for (const demand of demands) {

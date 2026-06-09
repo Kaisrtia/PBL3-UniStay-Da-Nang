@@ -8,8 +8,13 @@ export const demandCacheQueue = new Queue('demandCacheQueue', {
 export const addDemandCacheRefreshJob = async () => {
   return demandCacheQueue.add('cacheStudentDemands:on-demand', {}, {
     jobId: 'cacheStudentDemands:on-demand',
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 1000
+    },
     removeOnComplete: true,
-    removeOnFail: false
+    removeOnFail: true
   });
 };
 

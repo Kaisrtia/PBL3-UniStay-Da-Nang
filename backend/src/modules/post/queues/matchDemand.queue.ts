@@ -10,7 +10,12 @@ export const addMatchDemandJob = async (
   data: { postId: string }
 ) => {
   await matchDemandQueue.add(jobName, data, {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 3000
+    },
     removeOnComplete: true,
-    removeOnFail: false
+    removeOnFail: 100
   });
 };
