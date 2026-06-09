@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { useEffect, type FormEvent, useState } from 'react'
 
 import axios from 'axios'
 import { FaKey, FaLock, FaSave } from 'react-icons/fa'
@@ -7,33 +7,62 @@ import { Link } from 'react-router-dom'
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import userService from '@/services/userService'
 
+const googlePasswordMessage =
+  'Tài khoản Google không thể đổi mật khẩu trong UniStay. Vui lòng quản lý mật khẩu trong tài khoản Google.'
+
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u. Vui lÃ²ng thá»­ láº¡i.'
+    const message = data?.error?.message || data?.message
+
+    if (message === 'Users logged in with Google cannot change password') {
+      return googlePasswordMessage
+    }
+
+    return message || 'Không thể đổi mật khẩu. Vui lòng thử lại.'
   }
 
-  return 'KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u. Vui lÃ²ng thá»­ láº¡i.'
+  return 'Không thể đổi mật khẩu. Vui lòng thử lại.'
 }
 
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
-const passwordPolicyMessage = 'Máº­t kháº©u pháº£i cÃ³ Ã­t nháº¥t 8 kÃ½ tá»±, gá»“m chá»¯ hoa, chá»¯ thÆ°á»ng, sá»‘ vÃ  kÃ½ tá»± Ä‘áº·c biá»‡t.'
+const passwordPolicyMessage =
+  'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.'
 
 const ChangePasswordPage = () => {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [isGoogleAccount, setIsGoogleAccount] = useState(false)
   const [form, setForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   })
 
+  useEffect(() => {
+    userService
+      .getMyProfile()
+      .then((profile) => {
+        setIsGoogleAccount(profile?.provider === 'GOOGLE')
+      })
+      .catch(() => {
+        setError('Không tải được thông tin tài khoản. Vui lòng đăng nhập lại.')
+      })
+  }, [])
+
   const newPasswordError = form.newPassword && !strongPasswordRegex.test(form.newPassword) ? passwordPolicyMessage : ''
   const confirmPasswordError =
-    form.confirmPassword && form.newPassword !== form.confirmPassword ? 'Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p.' : ''
+    form.confirmPassword && form.newPassword !== form.confirmPassword
+      ? 'Mật khẩu mới và mật khẩu xác nhận không khớp.'
+      : ''
   const isSubmitDisabled =
-    loading || !form.currentPassword || !form.newPassword || !form.confirmPassword || Boolean(newPasswordError || confirmPasswordError)
+    isGoogleAccount ||
+    loading ||
+    !form.currentPassword ||
+    !form.newPassword ||
+    !form.confirmPassword ||
+    Boolean(newPasswordError || confirmPasswordError)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -51,7 +80,7 @@ const ChangePasswordPage = () => {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword
       })
-      setMessage(response.message || 'ÄÃ£ cáº­p nháº­t máº­t kháº©u.')
+      setMessage(response.message || 'Đã cập nhật mật khẩu.')
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (changePasswordError) {
       setError(getErrorMessage(changePasswordError))
@@ -68,7 +97,7 @@ const ChangePasswordPage = () => {
           to='/account/profile'
           className='inline-flex rounded-full border border-[#003566] px-5 py-2 text-sm font-extrabold text-[#003566] transition hover:bg-[#003566] hover:text-white'
         >
-          Quay láº¡i há»“ sÆ¡
+          Quay lại hồ sơ
         </Link>
 
         <section className='mt-6 rounded-2xl bg-white p-8 shadow-lg shadow-[#001D3D]/5'>
@@ -77,21 +106,26 @@ const ChangePasswordPage = () => {
               <FaKey />
             </span>
             <div>
-              <h1 className='text-3xl font-black'>Äá»•i máº­t kháº©u</h1>
+              <h1 className='text-3xl font-black'>Đổi mật khẩu</h1>
               <p className='mt-1 text-sm font-medium text-gray-500'>
-                Cáº­p nháº­t máº­t kháº©u Ä‘á»‹nh ká»³ Ä‘á»ƒ báº£o vá»‡ tÃ i khoáº£n UniStay cá»§a báº¡n.
+                Cập nhật mật khẩu định kỳ để bảo vệ tài khoản UniStay của bạn.
               </p>
             </div>
           </div>
 
+          {isGoogleAccount ? (
+            <p className='mt-6 rounded-xl bg-[#FFF7D6] px-5 py-3 text-sm font-bold text-[#6F5616]'>
+              {googlePasswordMessage}
+            </p>
+          ) : null}
           {message ? <p className='mt-6 rounded-xl bg-green-50 px-5 py-3 text-sm font-bold text-green-700'>{message}</p> : null}
           {error ? <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{error}</p> : null}
 
           <form onSubmit={handleSubmit} className='mt-8 grid gap-5'>
             {[
-              ['currentPassword', 'Máº­t kháº©u hiá»‡n táº¡i', ''],
-              ['newPassword', 'Máº­t kháº©u má»›i', newPasswordError],
-              ['confirmPassword', 'XÃ¡c nháº­n máº­t kháº©u má»›i', confirmPasswordError]
+              ['currentPassword', 'Mật khẩu hiện tại', ''],
+              ['newPassword', 'Mật khẩu mới', newPasswordError],
+              ['confirmPassword', 'Xác nhận mật khẩu mới', confirmPasswordError]
             ].map(([name, label, fieldError]) => (
               <label key={name} className='grid gap-2 text-sm font-extrabold'>
                 {label}
@@ -101,18 +135,19 @@ const ChangePasswordPage = () => {
                     name={name}
                     type='password'
                     value={form[name as keyof typeof form]}
+                    disabled={isGoogleAccount}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
                         [name]: event.target.value
                       }))
                     }
-                    className={`h-12 w-full rounded-xl border bg-white pl-11 pr-4 font-bold outline-none transition focus:ring-2 ${
+                    className={`h-12 w-full rounded-xl border bg-white pl-11 pr-4 font-bold outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
                       fieldError
                         ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
                         : 'border-gray-200 focus:border-[#FFC300] focus:ring-[#FFC300]/30'
                     }`}
-                    placeholder='Nháº­p máº­t kháº©u'
+                    placeholder='Nhập mật khẩu'
                   />
                 </span>
                 {fieldError ? <span className='text-xs font-bold text-red-600'>{fieldError}</span> : null}
@@ -125,7 +160,7 @@ const ChangePasswordPage = () => {
               className='mt-2 inline-flex items-center justify-center gap-3 rounded-full bg-[#001D3D] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:bg-gray-300'
             >
               <FaSave />
-              {loading ? 'Äang cáº­p nháº­t...' : 'LÆ°u máº­t kháº©u má»›i'}
+              {loading ? 'Đang cập nhật...' : 'Lưu mật khẩu mới'}
             </button>
           </form>
         </section>

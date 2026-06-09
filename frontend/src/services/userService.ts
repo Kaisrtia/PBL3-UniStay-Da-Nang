@@ -23,6 +23,7 @@ export type UserProfile = {
   avatarUrl?: string | null
   emailVerified?: boolean | null
   phoneVerified?: boolean | null
+  provider?: string | null
   status?: string | null
   roles?: string[]
   student?: {
