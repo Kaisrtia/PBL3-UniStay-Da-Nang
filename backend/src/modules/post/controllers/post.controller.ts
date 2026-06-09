@@ -10,6 +10,7 @@ import { room_type, post_purpose, post_status } from '@prisma/client';
 
 export const handleGetPosts = async (req: Request, res: Response) => {
   const {
+    userId,
     purpose,
     wardId,
 
@@ -28,6 +29,10 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   } = req.query;
 
   const filters: postQueryService.PostFilters = {};
+
+  if (userId !== undefined && typeof userId === 'string') {
+    filters.userId = userId;
+  }
 
   if (purpose !== undefined) {
     const validPurposes: post_purpose[] = ['RENT', 'FIND_ROOMMATE'];
@@ -413,4 +418,28 @@ export const handleUpdatePost = async (req: Request, res: Response) => {
     updatedPost,
     'Post updated successfully. It is now in UPDATED state.'
   );
+};
+
+export const handleHidePost = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const updatedPost = await postCommandService.hideOwnPost(req.user!, postId);
+
+  sendSuccess(res, HttpStatus.OK, updatedPost, 'Post hidden successfully.');
+};
+
+export const handleDeletePost = async (req: Request, res: Response) => {
+  const { postId } = req.params;
+
+  if (!postId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'postId is required');
+  }
+
+  const result = await postCommandService.deleteOwnPost(req.user!, postId);
+
+  sendSuccess(res, HttpStatus.OK, result, 'Post deleted successfully.');
 };

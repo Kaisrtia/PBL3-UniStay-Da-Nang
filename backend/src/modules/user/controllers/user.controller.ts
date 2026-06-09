@@ -25,6 +25,22 @@ export const handleGetUserProfile = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, profile);
 };
 
+export const handleCreateHostReview = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  if (!id) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'User ID is required');
+  }
+
+  const review = await userInfoService.createHostReview(req.user!, id, {
+    rating,
+    comment
+  });
+
+  sendSuccess(res, HttpStatus.CREATED, review, 'Review submitted successfully');
+};
+
 export const handleSetupProfile = async (req: Request, res: Response) => {
   const { role, dob, phone, gender, universityId } = req.body;
 

@@ -259,6 +259,18 @@ export const getUserProfile = async (targetUserId: string) => {
       role: true,
       createdAt: true,
       hosts: true,
+      hostReviewsReceived: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          reviewer: {
+            select: {
+              id: true,
+              fullName: true,
+              avatarUrl: true
+            }
+          }
+        }
+      },
       student: {
         include: {
           university: true
@@ -273,8 +285,92 @@ export const getUserProfile = async (targetUserId: string) => {
 
   return {
     ...targetUser,
-    roles: [targetUser.role]
+    roles: [targetUser.role],
+    reviews: targetUser.hostReviewsReceived
   };
+};
+
+export const createHostReview = async (
+  currentUser: user,
+  hostId: string,
+  data: {
+    rating?: number;
+    comment?: string;
+  }
+) => {
+  const targetHostId = hostId.trim();
+  const rating = Number(data.rating);
+  const comment = data.comment?.trim();
+
+  if (!targetHostId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'hostId is required');
+  }
+
+  if (currentUser.id === targetHostId) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'You cannot review yourself');
+  }
+
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Rating must be from 1 to 5');
+  }
+
+  if (!comment) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Comment is required');
+  }
+
+  const hostUser = await prismaClient.user.findUnique({
+    where: { id: targetHostId },
+    include: { hosts: true }
+  });
+
+  if (!hostUser || hostUser.role !== account_role.HOST) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Host not found');
+  }
+
+  return prismaClient.$transaction(async (tx) => {
+    const review = await tx.host_review.upsert({
+      where: {
+        reviewerId_hostId: {
+          reviewerId: currentUser.id,
+          hostId: targetHostId
+        }
+      },
+      update: {
+        rating,
+        comment,
+        updatedAt: new Date()
+      },
+      create: {
+        rating,
+        comment,
+        reviewerId: currentUser.id,
+        hostId: targetHostId
+      },
+      include: {
+        reviewer: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+
+    const aggregate = await tx.host_review.aggregate({
+      where: { hostId: targetHostId },
+      _avg: { rating: true }
+    });
+
+    await tx.host.updateMany({
+      where: { hostId: targetHostId },
+      data: {
+        avgStar: aggregate._avg.rating ?? -1
+      }
+    });
+
+    return review;
+  });
 };
 
 export const getVerificationCandidates = async (

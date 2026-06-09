@@ -26,7 +26,7 @@ export const createComment = async (
       throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
     }
 
-    if (post.status !== post_status.APPROVED) {
+    if (post.status !== post_status.APPROVED && post.userId !== currentUser.id) {
       throw new AppError(
         HttpStatus.BAD_REQUEST,
         'Cannot comment on a post that is not approved'

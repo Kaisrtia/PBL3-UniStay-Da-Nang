@@ -1,10 +1,12 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import axios from 'axios'
 import {
   FaArrowLeft,
-  FaBan,
   FaCheckCircle,
+  FaChevronLeft,
+  FaChevronRight,
+  FaEdit,
   FaEllipsisV,
   FaFlag,
   FaHeart,
@@ -20,7 +22,7 @@ import adminService from '@/services/adminService'
 import { API_BASE_URL } from '@/services/api'
 import contactService from '@/services/contactService'
 import engagementService, { type PostComment } from '@/services/engagementService'
-import userService from '@/services/userService'
+import postService from '@/services/postService'
 
 type PostImage = {
   id: number
@@ -71,8 +73,11 @@ type PostDetail = {
   longitude: string | number
   postImages?: PostImage[]
   postAmenities?: PostAmenity[]
+  amenities?: Array<string | { id?: string | number; name?: string }>
+  benefits?: string[]
   comments?: PostComment[]
   isBlockedByCurrentUser?: boolean
+  status?: string
 }
 
 type ApiResponse<T> = {
@@ -157,6 +162,32 @@ const getCommentReportErrorMessage = (error: unknown) => {
   }
 
   return backendMessage || 'Không thể gửi báo cáo bình luận. Vui lòng thử lại.'
+}
+
+const getCreateCommentErrorMessage = (error: unknown) => {
+  if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+    return 'Vui lòng đăng nhập để gửi bình luận.'
+  }
+
+  const backendMessage = getBackendErrorMessage(error)
+
+  if (backendMessage === 'content is required') {
+    return 'Vui lòng nhập nội dung bình luận.'
+  }
+
+  if (backendMessage === 'Post not found') {
+    return 'Không tìm thấy bài đăng cần bình luận.'
+  }
+
+  if (backendMessage === 'Cannot comment on a post that is not approved') {
+    return 'Bài đăng này chưa sẵn sàng để nhận bình luận.'
+  }
+
+  if (backendMessage === 'You cannot comment because one of you has blocked the other user') {
+    return 'Không thể bình luận vì một trong hai người đã chặn người còn lại.'
+  }
+
+  return backendMessage || 'Không thể gửi bình luận. Vui lòng thử lại.'
 }
 
 const toNumber = (value: string | number) => Number(value)
@@ -286,6 +317,9 @@ const PostDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [comment, setComment] = useState('')
+  const [commentMessage, setCommentMessage] = useState('')
+  const [commentError, setCommentError] = useState('')
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
@@ -301,9 +335,9 @@ const PostDetailPage = () => {
   const [submittingCommentReportId, setSubmittingCommentReportId] = useState<string>()
   const [commentReportMessages, setCommentReportMessages] = useState<Record<string, string>>({})
   const [commentReportErrors, setCommentReportErrors] = useState<Record<string, string>>({})
+  const thumbnailStripRef = useRef<HTMLDivElement | null>(null)
   const isAdmin = Boolean(storedUser?.roles?.includes('ADMIN'))
   const isStudent = Boolean(storedUser?.roles?.includes('STUDENT'))
-  const isHost = Boolean(storedUser?.roles?.includes('HOST'))
   const needsStudentSetup = Boolean(storedUser?.status === 'SET_UP' || (storedUser && !isStudent && !isAdmin))
   const routeState = location.state as { returnTo?: string; returnLabel?: string } | null
   const backTo = routeState?.returnTo || '/home'
@@ -336,16 +370,20 @@ const PostDetailPage = () => {
 
         setPost(payload.data)
 
-        if (isStudent) {
+        if (storedUser && !isAdmin) {
           try {
-            const [favourites, sentRequests] = await Promise.all([
-              engagementService.getFavouritePosts({ limit: 200 }),
-              contactService.getSentRequests({ limit: 200 })
-            ])
+            const favourites = await engagementService.getFavouritePosts({ limit: 200 })
             setIsFavourite(favourites.data.some((item) => item.id === payload.data?.id))
-            setIsAccommodationRequested(sentRequests.data.some((request) => request.postId === payload.data?.id))
           } catch {
             setIsFavourite(false)
+          }
+        }
+
+        if (isStudent) {
+          try {
+            const sentRequests = await contactService.getSentRequests({ limit: 200 })
+            setIsAccommodationRequested(sentRequests.data.some((request) => request.postId === payload.data?.id))
+          } catch {
             setIsAccommodationRequested(false)
           }
         }
@@ -359,7 +397,7 @@ const PostDetailPage = () => {
         setIsLoading(false)
       }
     },
-    [isStudent, postId]
+    [isAdmin, isStudent, postId, storedUser]
   )
 
   useEffect(() => {
@@ -404,6 +442,47 @@ const PostDetailPage = () => {
     () => post?.postAmenities?.filter((item) => Boolean(item.amenity?.name || item.amenityId)) ?? [],
     [post?.postAmenities]
   )
+  const utilityItems = useMemo(() => {
+    if (!post) return []
+
+    const namedAmenities = postAmenities.map((item) => ({
+      key: `amenity-${item.amenityId}-${item.amenity?.name || ''}`,
+      name: item.amenity?.name || `Tiện ích #${item.amenityId}`,
+      detail: item.currentCondition ? amenityConditionLabel[String(item.currentCondition)] : ''
+    }))
+    const directAmenities =
+      post.amenities?.map((item, index) => {
+        const name = typeof item === 'string' ? item : item.name
+        return name
+          ? {
+              key: `direct-amenity-${typeof item === 'string' ? index : item.id || index}`,
+              name,
+              detail: ''
+            }
+          : null
+      }) ?? []
+    const benefits =
+      post.benefits?.map((name, index) => ({
+        key: `benefit-${index}-${name}`,
+        name,
+        detail: ''
+      })) ?? []
+
+    const seenNames = new Set<string>()
+    return [...namedAmenities, ...directAmenities, ...benefits].filter((item): item is {
+      key: string
+      name: string
+      detail: string
+    } => {
+      if (!item) return false
+
+      const normalizedName = item.name.trim().toLowerCase()
+      if (!normalizedName || seenNames.has(normalizedName)) return false
+
+      seenNames.add(normalizedName)
+      return true
+    })
+  }, [post, postAmenities])
   const listingCriteria = useMemo(() => {
     if (!post) return []
 
@@ -425,7 +504,8 @@ const PostDetailPage = () => {
   const ownerPhone = formatPhoneNumber(owner?.phone)
   const ownerVerified = Boolean(owner?.hosts?.some((host) => host.isVerified))
   const ownerRating = owner?.hosts?.find((host) => host.avgStar !== undefined)?.avgStar
-  const isOwnerSelf = Boolean(storedUser?.id && owner?.id === storedUser.id)
+  const postOwnerId = post?.userId || owner?.id
+  const isOwnerSelf = Boolean(storedUser?.id && postOwnerId === storedUser.id)
   const addressLines = useMemo(() => {
     if (!post) return []
 
@@ -437,6 +517,13 @@ const PostDetailPage = () => {
   useEffect(() => {
     setSelectedImageIndex(0)
   }, [post?.id])
+
+  const scrollThumbnails = (direction: 'left' | 'right') => {
+    thumbnailStripRef.current?.scrollBy({
+      left: direction === 'left' ? -280 : 280,
+      behavior: 'smooth'
+    })
+  }
 
   const runPostAction = async (action: () => Promise<{ message?: string }>, fallbackMessage: string) => {
     if (isSubmittingAction) {
@@ -459,11 +546,10 @@ const PostDetailPage = () => {
 
   const handleAddFavourite = () => {
     if (!post) return
-    if (isHost) return
 
-    if (needsStudentSetup) {
+    if (!getAccessToken()) {
       setActionMessage('')
-      setActionError('Vui lòng hoàn tất hồ sơ Sinh viên trong mục Thông tin cá nhân trước khi lưu bài đăng.')
+      setActionError('Vui lòng đăng nhập để lưu bài đăng.')
       return
     }
 
@@ -486,7 +572,7 @@ const PostDetailPage = () => {
         await engagementService.addFavouritePost(post.id)
         setIsFavourite(true)
       } catch {
-        setActionError('Không thể cập nhật trạng thái lưu bài. Vui lòng đăng nhập đúng vai trò và thử lại.')
+        setActionError('Không thể cập nhật trạng thái lưu bài. Vui lòng đăng nhập và thử lại.')
       } finally {
         setIsSubmittingAction(false)
       }
@@ -542,30 +628,6 @@ const PostDetailPage = () => {
     setIsReportModalOpen(true)
   }
 
-  const handleBlockOwner = () => {
-    if (!post?.user?.id) {
-      setActionError('Không tìm thấy người dùng cần chặn.')
-      return
-    }
-
-    const ownerId = post.user.id
-
-    if (!getAccessToken()) {
-      setActionError('Vui lòng đăng nhập để chặn người dùng.')
-      return
-    }
-
-    if (!window.confirm(`Bạn có chắc chắn muốn chặn ${ownerName}?`)) {
-      return
-    }
-
-    void runPostAction(async () => {
-      await userService.blockUser(ownerId)
-      navigate('/home', { replace: true })
-      return { message: 'Đã chặn người dùng.' }
-    }, 'Đã chặn người dùng.')
-  }
-
   const handleSubmitReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -610,20 +672,6 @@ const PostDetailPage = () => {
     })()
   }
 
-  const handleBanPostOwner = () => {
-    if (!post?.userId) {
-      setActionError('Không tìm thấy chủ bài đăng để chặn.')
-      return
-    }
-
-    if (!window.confirm('Chặn người dùng đã đăng bài này?')) {
-      return
-    }
-
-    const ownerId = post.userId
-    void runPostAction(() => adminService.banUser(ownerId), 'Đã chặn người dùng.')
-  }
-
   const handleRemovePost = () => {
     if (!post) return
 
@@ -641,40 +689,70 @@ const PostDetailPage = () => {
     )
   }
 
-  const handleBanOwnerAndRemovePost = () => {
-    if (!post?.userId) {
-      setActionError('Không tìm thấy chủ bài đăng để chặn.')
+  const handleHideOwnPost = () => {
+    if (!post) return
+
+    if (!window.confirm('Ẩn bài đăng này khỏi danh sách công khai?')) {
       return
     }
 
-    if (!window.confirm('Chặn người dùng và xóa bài viết này?')) {
-      return
-    }
-
-    const ownerId = post.userId
     void runPostAction(async () => {
-      await adminService.banUser(ownerId)
-      await adminService.censorPost(post.id, {
-        status: 'REJECTED',
-        rejectionReason: 'Người dùng bị chặn và bài viết bị quản trị viên xóa khỏi danh sách công khai.'
-      })
-      return { message: 'Đã chặn người dùng và xóa bài viết.' }
-    }, 'Đã chặn người dùng và xóa bài viết.')
+      const response = await postService.hidePost(post.id)
+      setPost((current) => (current ? { ...current, status: 'HIDDEN' } : current))
+      return { message: response.message || 'Đã ẩn bài đăng.' }
+    }, 'Đã ẩn bài đăng.')
+  }
+
+  const handleDeleteOwnPost = () => {
+    if (!post) return
+
+    if (!window.confirm('Xóa vĩnh viễn bài đăng này?')) {
+      return
+    }
+
+    void runPostAction(async () => {
+      const response = await postService.deletePost(post.id)
+      navigate('/posts/me', { replace: true })
+      return { message: response.message || 'Đã xóa bài đăng.' }
+    }, 'Đã xóa bài đăng.')
   }
 
   const handleCreateComment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!post || !comment.trim()) {
+      setCommentMessage('')
+      setCommentError('Vui lòng nhập nội dung bình luận.')
       return
     }
 
-    void runPostAction(async () => {
-      const response = await engagementService.createComment(post.id, comment.trim())
-      setComment('')
-      await loadPostDetail(undefined, false)
-      return response
-    }, 'Đã gửi bình luận.')
+    if (!getAccessToken()) {
+      setCommentMessage('')
+      setCommentError('Vui lòng đăng nhập để gửi bình luận.')
+      return
+    }
+
+    if (isSubmittingComment) {
+      return
+    }
+
+    void (async () => {
+      try {
+        setIsSubmittingComment(true)
+        setCommentMessage('')
+        setCommentError('')
+
+        const response = await engagementService.createComment(post.id, comment.trim())
+        setComment('')
+        setCommentMessage(response.message || 'Đã gửi bình luận.')
+        await loadPostDetail(undefined, false)
+      } catch (error) {
+        setCommentMessage('')
+        setCommentError(getCreateCommentErrorMessage(error))
+      } finally {
+        setIsSubmittingComment(false)
+      }
+    })()
   }
 
   if (isLoading) {
@@ -744,25 +822,48 @@ const PostDetailPage = () => {
                 </div>
 
                 {postImages.length > 1 ? (
-                  <div className='mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5'>
-                    {postImages.map((image, index) => (
-                      <button
-                        key={image.id || `${image.imageUrl}-${index}`}
-                        type='button'
-                        onClick={() => setSelectedImageIndex(index)}
-                        className={`h-20 overflow-hidden rounded-lg border-2 bg-gray-100 transition ${
-                          selectedImageIndex === index
-                            ? 'border-[#FFC300] shadow-md shadow-[#001D3D]/15'
-                            : 'border-transparent hover:border-[#F6D983]'
-                        }`}
-                      >
-                        <img
-                          src={image.imageUrl}
-                          alt={`${post.title} ${index + 1}`}
-                          className='h-full w-full object-cover'
-                        />
-                      </button>
-                    ))}
+                  <div className='mt-3 flex items-center gap-2'>
+                    <button
+                      type='button'
+                      onClick={() => scrollThumbnails('left')}
+                      className='grid h-10 w-10 shrink-0 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                      aria-label='Xem ảnh trước'
+                      title='Xem ảnh trước'
+                    >
+                      <FaChevronLeft />
+                    </button>
+                    <div
+                      ref={thumbnailStripRef}
+                      className='flex min-w-0 flex-1 flex-nowrap gap-3 overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                    >
+                      {postImages.map((image, index) => (
+                        <button
+                          key={image.id || `${image.imageUrl}-${index}`}
+                          type='button'
+                          onClick={() => setSelectedImageIndex(index)}
+                          className={`h-20 w-28 shrink-0 overflow-hidden rounded-lg border-2 bg-gray-100 transition ${
+                            selectedImageIndex === index
+                              ? 'border-[#FFC300] shadow-md shadow-[#001D3D]/15'
+                              : 'border-transparent hover:border-[#F6D983]'
+                          }`}
+                        >
+                          <img
+                            src={image.imageUrl}
+                            alt={`${post.title} ${index + 1}`}
+                            className='h-full w-full object-cover'
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type='button'
+                      onClick={() => scrollThumbnails('right')}
+                      className='grid h-10 w-10 shrink-0 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                      aria-label='Xem ảnh tiếp theo'
+                      title='Xem ảnh tiếp theo'
+                    >
+                      <FaChevronRight />
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -782,48 +883,77 @@ const PostDetailPage = () => {
                 </div>
                 {!isAdmin ? (
                   <div className='relative flex shrink-0 items-center gap-2'>
-                    {!isHost ? (
-                      <button
-                        type='button'
-                        disabled={isSubmittingAction}
-                        onClick={handleAddFavourite}
-                        className={`grid h-11 w-11 place-items-center rounded-full border text-lg transition ${
-                          isFavourite
-                            ? 'border-[#FFC300] bg-[#FFF2B8] text-[#D79A00]'
-                            : 'border-gray-200 bg-white text-gray-800 hover:border-[#FFC300] hover:text-[#D79A00]'
-                        } disabled:cursor-not-allowed disabled:opacity-70`}
-                        aria-label={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
-                        title={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
-                      >
-                        {isFavourite ? <FaHeart /> : <FaRegHeart />}
-                      </button>
-                    ) : null}
-                    {!isOwnerSelf ? (
-                      <>
-                        <button
-                          type='button'
-                          onClick={() => setIsActionMenuOpen((current) => !current)}
-                          className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
-                          aria-expanded={isActionMenuOpen}
-                          aria-label='Mở menu thao tác'
-                          title='Thao tác'
-                        >
-                          <FaEllipsisV />
-                        </button>
-                        {isActionMenuOpen ? (
-                          <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                    <button
+                      type='button'
+                      disabled={isSubmittingAction}
+                      onClick={handleAddFavourite}
+                      className={`grid h-11 w-11 place-items-center rounded-full border text-lg transition ${
+                        isFavourite
+                          ? 'border-[#FFC300] bg-[#FFF2B8] text-[#D79A00]'
+                          : 'border-gray-200 bg-white text-gray-800 hover:border-[#FFC300] hover:text-[#D79A00]'
+                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                      aria-label={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
+                      title={isFavourite ? 'Bỏ lưu bài đăng' : 'Lưu bài đăng'}
+                    >
+                      {isFavourite ? <FaHeart /> : <FaRegHeart />}
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setIsActionMenuOpen((current) => !current)}
+                      className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                      aria-expanded={isActionMenuOpen}
+                      aria-label='Mở menu thao tác'
+                      title='Thao tác'
+                    >
+                      <FaEllipsisV />
+                    </button>
+                    {isActionMenuOpen ? (
+                      <div className='absolute right-0 top-12 z-20 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                        {isOwnerSelf ? (
+                          <>
+                            <Link
+                              to={`/posts/create?edit=${post.id}`}
+                              onClick={() => setIsActionMenuOpen(false)}
+                              className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-gray-700 transition hover:bg-gray-50'
+                            >
+                              <FaEdit />
+                              Sửa bài đăng
+                            </Link>
                             <button
                               type='button'
                               disabled={isSubmittingAction}
-                              onClick={handleReport}
+                              onClick={() => {
+                                setIsActionMenuOpen(false)
+                                handleHideOwnPost()
+                              }}
+                              className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-70'
+                            >
+                              Ẩn bài đăng
+                            </button>
+                            <button
+                              type='button'
+                              disabled={isSubmittingAction}
+                              onClick={() => {
+                                setIsActionMenuOpen(false)
+                                handleDeleteOwnPost()
+                              }}
                               className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
                             >
-                              <FaFlag />
-                              Report Post
+                              Xóa bài đăng
                             </button>
-                          </div>
-                        ) : null}
-                      </>
+                          </>
+                        ) : (
+                          <button
+                            type='button'
+                            disabled={isSubmittingAction}
+                            onClick={handleReport}
+                            className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                          >
+                            <FaFlag />
+                            Report Post
+                          </button>
+                        )}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -871,26 +1001,25 @@ const PostDetailPage = () => {
               ) : null}
 
               <div>
-                <h2 className='text-xl font-bold text-gray-950'>Tiện ích</h2>
-                {postAmenities.length > 0 ? (
-                  <div className='mt-4 flex flex-wrap gap-3'>
-                    {postAmenities.map((item) => {
-                      const condition = item.currentCondition
-                        ? amenityConditionLabel[String(item.currentCondition)]
-                        : ''
-
-                      return (
-                        <div
-                          key={`${item.amenityId}-${item.amenity?.name || ''}`}
-                          className='rounded-full border border-[#F1C232] bg-[#FFF7D6] px-4 py-2 text-sm font-extrabold text-[#001D3D]'
-                        >
-                          {item.amenity?.name || `Tiện ích #${item.amenityId}`}
-                          {condition ? (
-                            <span className='ml-2 text-xs font-bold text-gray-500'>({condition})</span>
+                <h2 className='text-xl font-bold text-gray-950'>Lợi ích/Tiện ích</h2>
+                {utilityItems.length > 0 ? (
+                  <div className='mt-4 grid gap-3 sm:grid-cols-2'>
+                    {utilityItems.map((item) => (
+                      <div
+                        key={item.key}
+                        className='flex items-center gap-3 rounded-2xl border border-[#F1C232] bg-[#FFF7D6] px-4 py-3 text-sm font-extrabold text-[#001D3D]'
+                      >
+                        <span className='grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#D79A00] shadow-sm'>
+                          <FaCheckCircle />
+                        </span>
+                        <span className='min-w-0'>
+                          <span className='block truncate'>{item.name}</span>
+                          {item.detail ? (
+                            <span className='mt-0.5 block text-xs font-bold text-gray-500'>{item.detail}</span>
                           ) : null}
-                        </div>
-                      )
-                    })}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className='mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
@@ -903,7 +1032,10 @@ const PostDetailPage = () => {
 
           <aside className='space-y-4'>
             <section className='rounded-xl bg-[#FFF0C7] p-5 shadow-sm shadow-[#001D3D]/10'>
-              <div className='flex items-center gap-3'>
+              <Link
+                to={owner?.id ? `/users/${owner.id}` : '#'}
+                className='flex items-center gap-3 rounded-xl transition hover:bg-white/45'
+              >
                 <div className='grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#001D3D]/20 bg-white text-2xl text-[#001D3D]'>
                   {owner?.avatarUrl ? (
                     <img src={owner.avatarUrl} alt={ownerName} className='h-full w-full object-cover' />
@@ -924,7 +1056,7 @@ const PostDetailPage = () => {
                       : 'Chủ bài đăng UniStay'}
                   </p>
                 </div>
-              </div>
+              </Link>
               <a
                 href={owner?.phone ? `tel:${owner.phone}` : undefined}
                 className='mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#C7A643] px-4 py-3 text-sm font-black text-[#001D3D] shadow-md shadow-[#001D3D]/10 transition hover:bg-[#B9972E]'
@@ -938,56 +1070,27 @@ const PostDetailPage = () => {
               <h2 className='text-lg font-bold text-gray-950'>Thao tác</h2>
               <div className='mt-4 grid gap-3'>
                 {isAdmin ? (
-                  <>
-                    <button
-                      type='button'
-                      disabled={isSubmittingAction}
-                      onClick={handleBanPostOwner}
-                      className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
-                    >
-                      Chặn người dùng
-                    </button>
-                    <button
-                      type='button'
-                      disabled={isSubmittingAction}
-                      onClick={handleRemovePost}
-                      className='rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70'
-                    >
-                      Xóa bài viết
-                    </button>
-                    <button
-                      type='button'
-                      disabled={isSubmittingAction}
-                      onClick={handleBanOwnerAndRemovePost}
-                      className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
-                    >
-                      Chặn và xóa bài
-                    </button>
-                  </>
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction}
+                    onClick={handleRemovePost}
+                    className='rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    Xóa bài viết
+                  </button>
+                ) : !isOwnerSelf ? (
+                  <button
+                    type='button'
+                    disabled={isSubmittingAction || isAccommodationRequested}
+                    onClick={handleAccommodationRequest}
+                    className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
+                  </button>
                 ) : (
-                  <>
-                    {!isOwnerSelf ? (
-                      <button
-                        type='button'
-                        disabled={isSubmittingAction}
-                        onClick={handleBlockOwner}
-                        className='rounded-lg border border-red-300 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
-                      >
-                        <span className='inline-flex items-center justify-center gap-2'>
-                          <FaBan />
-                          Chặn người dùng
-                        </span>
-                      </button>
-                    ) : null}
-                    <button
-                      type='button'
-                      disabled={isSubmittingAction || isAccommodationRequested}
-                      onClick={handleAccommodationRequest}
-                      className='rounded-lg bg-[#001D3D] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003566] disabled:cursor-not-allowed disabled:opacity-70'
-                    >
-                      {isAccommodationRequested ? 'Đã gửi yêu cầu' : 'Gửi yêu cầu thuê/ở ghép'}
-                    </button>
-                  </>
+                  <p className='rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500'>
+                    Quản lý bài đăng trong menu ba chấm phía trên.
+                  </p>
                 )}
               </div>
               {actionMessage ? <p className='mt-3 text-sm font-semibold text-green-600'>{actionMessage}</p> : null}
@@ -1013,17 +1116,31 @@ const PostDetailPage = () => {
                 <form onSubmit={handleCreateComment} className='mt-4 grid gap-3'>
                   <textarea
                     value={comment}
-                    onChange={(event) => setComment(event.target.value)}
+                    onChange={(event) => {
+                      setComment(event.target.value)
+                      if (commentError) setCommentError('')
+                      if (commentMessage) setCommentMessage('')
+                    }}
                     placeholder='Nhập bình luận của bạn'
                     className='min-h-28 resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200'
                   />
                   <button
                     type='submit'
-                    disabled={isSubmittingAction || !comment.trim()}
+                    disabled={isSubmittingComment || !comment.trim()}
                     className='rounded-lg bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-950 transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-70'
                   >
-                    Gửi bình luận
+                    {isSubmittingComment ? 'Đang gửi...' : 'Gửi bình luận'}
                   </button>
+                  {commentMessage ? (
+                    <p className='rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-600'>
+                      {commentMessage}
+                    </p>
+                  ) : null}
+                  {commentError ? (
+                    <p className='rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600'>
+                      {commentError}
+                    </p>
+                  ) : null}
                 </form>
 
                 <div className='mt-6 border-t border-gray-100 pt-5'>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 
 import { FaEdit, FaMapMarkerAlt, FaPlus } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
@@ -68,47 +68,62 @@ const MyPostsPage = () => {
           </Link>
         </div>
 
-        {message ? <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{message}</p> : null}
+        {message ? (
+          <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{message}</p>
+        ) : null}
 
         <section className='mt-8 grid gap-5'>
-          {posts.map((post) => (
-            <article key={post.id} className='grid gap-5 rounded-2xl bg-white p-5 shadow-lg shadow-[#001D3D]/5 md:grid-cols-[180px_minmax(0,1fr)_auto]'>
-              <div className='h-32 overflow-hidden rounded-xl bg-[#001D3D]'>
-                {post.postImages?.[0]?.imageUrl ? (
-                  <img src={post.postImages[0].imageUrl} alt={post.title} className='h-full w-full object-cover' />
-                ) : null}
-              </div>
-              <div className='min-w-0'>
-                <div className='flex flex-wrap items-center gap-3'>
-                  <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusClass(post.status)}`}>
-                    {statusLabels[String(post.status)] || post.status}
-                  </span>
-                  <span className='text-sm font-bold text-gray-500'>{roomTypeLabels[String(post.roomType)] || post.roomType}</span>
+          {posts.map((post) => {
+            const isHidden = post.status === 'HIDDEN'
+
+            return (
+              <article
+                key={post.id}
+                className={`grid gap-5 rounded-2xl p-5 shadow-lg shadow-[#001D3D]/5 md:grid-cols-[180px_minmax(0,1fr)_auto] ${
+                  isHidden ? 'bg-gray-100 opacity-70 grayscale' : 'bg-white'
+                }`}
+              >
+                <div className='h-32 overflow-hidden rounded-xl bg-[#001D3D]'>
+                  {post.postImages?.[0]?.imageUrl ? (
+                    <img src={post.postImages[0].imageUrl} alt={post.title} className='h-full w-full object-cover' />
+                  ) : null}
                 </div>
-                <h2 className='mt-3 truncate text-2xl font-extrabold'>{post.title}</h2>
-                <p className='mt-2 flex items-center gap-2 text-sm text-gray-500'>
-                  <FaMapMarkerAlt className='text-[#FFC300]' />
-                  {post.detailAddress}
-                </p>
-                <p className='mt-3 text-lg font-black text-[#003566]'>{currencyFormatter.format(Number(post.price || 0))}</p>
-              </div>
-              <div className='flex items-center gap-3 md:flex-col md:items-end md:justify-center'>
-                <Link
-                  to={`/posts/${post.id}`}
-                  className='rounded-full bg-[#001D3D] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#003566]'
-                >
-                  Xem chi tiết
-                </Link>
-                <Link
-                  to={`/posts/create?edit=${post.id}`}
-                  className='inline-flex items-center gap-2 rounded-full bg-[#FFF1B8] px-5 py-2 text-sm font-extrabold text-[#6F5616] transition hover:bg-[#FFE28A]'
-                >
-                  <FaEdit />
-                  Sửa
-                </Link>
-              </div>
-            </article>
-          ))}
+                <div className='min-w-0'>
+                  <div className='flex flex-wrap items-center gap-3'>
+                    <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusClass(post.status)}`}>
+                      {statusLabels[String(post.status)] || post.status}
+                    </span>
+                    <span className='text-sm font-bold text-gray-500'>
+                      {roomTypeLabels[String(post.roomType)] || post.roomType}
+                    </span>
+                  </div>
+                  <h2 className='mt-3 truncate text-2xl font-extrabold'>{post.title}</h2>
+                  <p className='mt-2 flex items-center gap-2 text-sm text-gray-500'>
+                    <FaMapMarkerAlt className='text-[#FFC300]' />
+                    {post.detailAddress}
+                  </p>
+                  <p className='mt-3 text-lg font-black text-[#003566]'>
+                    {currencyFormatter.format(Number(post.price || 0))}
+                  </p>
+                </div>
+                <div className='flex items-center gap-3 md:flex-col md:items-end md:justify-center'>
+                  <Link
+                    to={`/posts/${post.id}`}
+                    className='rounded-full bg-[#001D3D] px-5 py-2 text-sm font-extrabold text-white transition hover:bg-[#003566]'
+                  >
+                    Xem chi tiết
+                  </Link>
+                  <Link
+                    to={`/posts/create?edit=${post.id}`}
+                    className='inline-flex items-center gap-2 rounded-full bg-[#FFF1B8] px-5 py-2 text-sm font-extrabold text-[#6F5616] transition hover:bg-[#FFE28A]'
+                  >
+                    <FaEdit />
+                    Sửa
+                  </Link>
+                </div>
+              </article>
+            )
+          })}
 
           {!message && posts.length === 0 ? (
             <div className='rounded-2xl bg-white p-10 text-center shadow-lg shadow-[#001D3D]/5'>

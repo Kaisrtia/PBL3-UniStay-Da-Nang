@@ -90,8 +90,16 @@ export const addFavouritePost = async (currentUser: user, postId: string) => {
   }
 
   try {
-    return await prismaClient.student_favorite_post.create({
-      data: { studentId: currentUser.id, postId }
+    return await prismaClient.$transaction(async (tx) => {
+      await tx.student.upsert({
+        where: { studentId: currentUser.id },
+        update: {},
+        create: { studentId: currentUser.id }
+      });
+
+      return tx.student_favorite_post.create({
+        data: { studentId: currentUser.id, postId }
+      });
     });
   } catch (error) {
     if (

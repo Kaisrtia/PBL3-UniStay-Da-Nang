@@ -38,6 +38,22 @@ export type UserProfile = {
     isVerified?: boolean
     avgStar?: string | number
   }>
+  reviews?: HostReview[]
+}
+
+export type HostReview = {
+  id: string
+  rating: number
+  comment: string
+  reviewerId: string
+  hostId: string
+  createdAt?: string
+  updatedAt?: string | null
+  reviewer?: {
+    id: string
+    fullName?: string
+    avatarUrl?: string | null
+  } | null
 }
 
 export type UpdateProfilePayload = {
@@ -69,6 +85,11 @@ export const userService = {
     return response.data.data
   },
 
+  getUserProfile: async (userId: string) => {
+    const response = await api.get<ApiResponse<UserProfile>>(`/users/${userId}`)
+    return response.data.data
+  },
+
   setupProfile: async (payload: SetupProfilePayload) => {
     const response = await api.patch<ApiResponse<UserProfile>>('/users/setup', payload)
     return response.data
@@ -96,6 +117,11 @@ export const userService = {
 
   unblockUser: async (blockedId: string) => {
     const response = await api.delete<ApiResponse>(`/users/blocks/${blockedId}`)
+    return response.data
+  },
+
+  createHostReview: async (hostId: string, payload: { rating: number; comment: string }) => {
+    const response = await api.post<ApiResponse<HostReview>>(`/users/${hostId}/reviews`, payload)
     return response.data
   }
 }

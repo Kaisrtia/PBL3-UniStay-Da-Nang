@@ -24,8 +24,11 @@ const buildApprovedPostWhere = (
   blockedUserIds: string[]
 ): Prisma.postWhereInput => ({
   status: 'APPROVED',
-  ...(blockedUserIds.length > 0 && {
-    userId: { notIn: blockedUserIds }
+  ...((filters.userId || blockedUserIds.length > 0) && {
+    userId: {
+      ...(filters.userId && { equals: filters.userId }),
+      ...(blockedUserIds.length > 0 && { notIn: blockedUserIds })
+    }
   }),
   ...(filters.purpose && { purpose: filters.purpose }),
   ...(filters.wardId !== undefined && { wardId: filters.wardId }),
@@ -56,6 +59,7 @@ const buildApprovedPostWhere = (
 });
 
 export interface PostFilters {
+  userId?: string;
   purpose?: post_purpose;
   status?: post_status; // Used for admin-level filtering
   wardId?: number;

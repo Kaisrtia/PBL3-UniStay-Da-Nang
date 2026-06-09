@@ -129,6 +129,8 @@ model user {
   notifications        notification[]
   blockedUsers         user_block[]           @relation("blocked_by_user")
   blockedByUsers       user_block[]           @relation("blocked_user")
+  hostReviewsGiven     host_review[]          @relation("host_review_reviewer")
+  hostReviewsReceived  host_review[]          @relation("host_review_host")
 
   userReports    report[] @relation("report")
   wasReported    report[] @relation("was reported")
@@ -148,7 +150,21 @@ model user_block {
   @@index([blockedId])
 }
 
+model host_review {
+  id         String    @id @default(uuid())
+  rating     Int
+  comment    String    @db.Text
+  reviewerId String
+  hostId     String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime?
 
+  reviewer user @relation("host_review_reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  host     user @relation("host_review_host", fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, hostId])
+  @@index([hostId, createdAt])
+}
 
 model ward {
   id             Int              @id @default(autoincrement())
@@ -164,8 +180,8 @@ model university {
   wardId         Int
   streetName     String           @db.VarChar(255)
   houseNumber    String           @db.VarChar(50)
-  latitude        Decimal?         @db.Decimal(9, 6)
-  longitude       Decimal?         @db.Decimal(9, 6)
+  latitude       Decimal?         @db.Decimal(9, 6)
+  longitude      Decimal?         @db.Decimal(9, 6)
   ward           ward             @relation(fields: [wardId], references: [id])
   students       student[]
   studentDemands student_demand[]
@@ -183,11 +199,11 @@ model student {
 }
 
 model host {
-  hostId               String                  @id @default(uuid())
-  totalPost            Int                     @default(0)
-  isVerified           Boolean                 @default(false)
-  avgStar              Decimal                 @default(-1) @db.Decimal(3, 2)
-  user                 user                    @relation(fields: [hostId], references: [id])
+  hostId     String  @id @default(uuid())
+  totalPost  Int     @default(0)
+  isVerified Boolean @default(false)
+  avgStar    Decimal @default(-1) @db.Decimal(3, 2)
+  user       user    @relation(fields: [hostId], references: [id])
 }
 
 model system_feedback {
@@ -207,7 +223,7 @@ model comment {
   content   String         @db.Text
   status    comment_status @default(DISPLAYED)
   createdAt DateTime       @default(now())
-  updatedAt DateTime?    
+  updatedAt DateTime?
   user      user           @relation(fields: [userId], references: [id])
   post      post           @relation(fields: [postId], references: [id])
   comment   comment?       @relation("ReplyRelation", fields: [parentId], references: [id])
@@ -241,7 +257,7 @@ model post {
   status               post_status             @default(PENDING)
   rejectionReason      String?                 @db.Text
   createdAt            DateTime                @default(now())
-  updatedAt            DateTime?               
+  updatedAt            DateTime?
   user                 user                    @relation(fields: [userId], references: [id])
   moderator            user?                   @relation("moderator", fields: [moderatorId], references: [id])
   ward                 ward                    @relation(fields: [wardId], references: [id])
@@ -345,38 +361,38 @@ model accomodation_request {
 }
 
 model report {
-  id        String        @id @default(uuid())
-  userId    String
-  adminId   String?
-  postId    String?
-  commentId String?
+  id             String        @id @default(uuid())
+  userId         String
+  adminId        String?
+  postId         String?
+  commentId      String?
   reportedUserId String
-  reason    String
-  status    report_status @default(PENDING)
-  adminNote String?
-  createdAt DateTime      @default(now())
-  tackledAt DateTime?
-  user      user          @relation("report", fields: [userId], references: [id])
-  reportedUser user       @relation("was reported", fields: [reportedUserId], references: [id])
-  admin     user?         @relation("handle", fields: [adminId], references: [id])
-  post      post?         @relation(fields: [postId], references: [id])
-  comment   comment?      @relation(fields: [commentId], references: [id])
+  reason         String
+  status         report_status @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime      @default(now())
+  tackledAt      DateTime?
+  user           user          @relation("report", fields: [userId], references: [id])
+  reportedUser   user          @relation("was reported", fields: [reportedUserId], references: [id])
+  admin          user?         @relation("handle", fields: [adminId], references: [id])
+  post           post?         @relation(fields: [postId], references: [id])
+  comment        comment?      @relation(fields: [commentId], references: [id])
 
   @@index([postId])
   @@index([status, createdAt])
 }
 
 model notification {
-  id        Int            @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   userId    String
-  dedupeKey String?        @unique @db.VarChar(255)
+  dedupeKey String?           @unique @db.VarChar(255)
   title     String            @db.VarChar(255)
   content   String?           @db.Text
-  type      notification_type 
+  type      notification_type
   isRead    Boolean           @default(false)
   metaData  Json?             @db.JsonB
   createdAt DateTime          @default(now())
-  updatedAt DateTime?       
+  updatedAt DateTime?
   user      user              @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead, createdAt(sort: Desc)])

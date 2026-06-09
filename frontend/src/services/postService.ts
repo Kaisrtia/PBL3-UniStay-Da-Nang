@@ -69,6 +69,7 @@ export type Post = {
 }
 
 export type PostFilters = {
+  userId?: string
   purpose?: PostPurpose
   wardId?: number
   minArea?: number
@@ -224,6 +225,16 @@ export const postService = {
 
   updatePost: async (postId: string, payload: Partial<CreatePostPayload>) => {
     const response = await api.patch<PostResponse<Post>>(`/posts/${postId}`, payload)
+    return response.data
+  },
+
+  hidePost: async (postId: string) => {
+    const response = await api.patch<PostResponse<Post>>(`/posts/${postId}/hide`)
+    return response.data
+  },
+
+  deletePost: async (postId: string) => {
+    const response = await api.delete<PostResponse>(`/posts/${postId}`)
     return response.data
   }
 }

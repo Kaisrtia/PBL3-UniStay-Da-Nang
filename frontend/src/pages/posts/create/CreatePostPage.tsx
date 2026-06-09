@@ -498,7 +498,6 @@ const CreatePostPage = () => {
 
   useEffect(() => {
     if (isHostUser) {
-      setRoomType('ROOM')
       setPostPurpose('RENT')
       return
     }
@@ -625,7 +624,7 @@ const CreatePostPage = () => {
         area: Number(form.area || 0),
         price: parseFormattedNumber(form.price),
         deposit: parseFormattedNumber(form.deposit),
-        roomType: isHostUser ? 'ROOM' : roomType,
+        roomType,
         postPurpose: purposeValue,
         description: form.description.trim(),
         latitude: latitudeValue,
@@ -671,9 +670,7 @@ const CreatePostPage = () => {
                   <PillButton
                     key={type.value}
                     selected={roomType === type.value}
-                    onClick={() => {
-                      if (!isHostUser) setRoomType(type.value)
-                    }}
+                    onClick={() => setRoomType(type.value)}
                   >
                     {type.label}
                   </PillButton>
@@ -746,12 +743,6 @@ const CreatePostPage = () => {
                 onChange={(event) => setAmenityCondition((event.target.value || 'GOOD') as AmenityCondition)}
                 options={amenityConditionOptions}
               />
-              <TextField
-                label='Tiền cọc'
-                name='deposit'
-                value={form.deposit}
-                onChange={(event) => updateForm('deposit', formatThousands(event.target.value))}
-              />
               <CoordinateField label='Vĩ độ' value={latitude} min={-90} max={90} onChange={setLatitude} />
               <CoordinateField label='Kinh độ' value={longitude} min={-180} max={180} onChange={setLongitude} />
               <div className='md:col-span-2'>
@@ -797,6 +788,12 @@ const CreatePostPage = () => {
                 placeholder='Giá thuê'
                 value={form.price}
                 onChange={(event) => updateForm('price', formatThousands(event.target.value))}
+              />
+              <TextField
+                name='deposit'
+                placeholder='Tiền cọc'
+                value={form.deposit}
+                onChange={(event) => updateForm('deposit', formatThousands(event.target.value))}
               />
               <textarea
                 name='description'

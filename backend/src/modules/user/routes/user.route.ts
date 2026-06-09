@@ -105,6 +105,14 @@ userRouter.get(
 
 // -- Public User Read --
 
+// Create or update a review for a Host
+userRouter.post(
+  '/:id/reviews',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST, account_role.USER]),
+  asyncHandler(userController.handleCreateHostReview)
+);
+
 // Get public profile (MUST be at bottom to prevent overriding static routes like /me or /setup)
 userRouter.get('/:id', asyncHandler(userController.handleGetUserProfile));
 

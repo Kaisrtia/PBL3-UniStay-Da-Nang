@@ -748,7 +748,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
         </div>
 
         <div className='ml-5 flex items-center gap-4'>
-          {isStudent ? (
+          {isAuthenticated && !isAdmin ? (
             <div className='relative'>
               <button
                 type='button'
@@ -1014,7 +1014,7 @@ export const SiteHeader = ({ accountLabel = 'Đăng nhập' }: SiteHeaderProps) 
                   <Link
                     to='/posts/favourites'
                     onClick={() => setIsAccountOpen(false)}
-                    className={`${isStudent ? 'flex' : 'hidden'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
+                    className={`${!isAdmin ? 'flex' : 'hidden'} items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#FFF7D6]`}
                   >
                     <FaHeart className='text-[#FFC300]' />
                     Yêu thích

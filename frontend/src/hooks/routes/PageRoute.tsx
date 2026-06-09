@@ -27,6 +27,7 @@ import {
   RegisterPage,
   ResetPasswordPage,
   SearchResultsPage,
+  UserDetailPage,
   VerifyEmailPage
 } from '@/pages/index.tsx'
 import userService, { type UserProfile } from '@/services/userService'
@@ -198,6 +199,7 @@ const AppRoutes = () => {
         <Route path='/posts/search' element={<SearchResultsPage />}></Route>
         <Route path='/posts/nearby' element={<NearbyPostsPage />}></Route>
         <Route path='/posts/:postId' element={<PostDetailPage />}></Route>
+        <Route path='/users/:id' element={<UserDetailPage />}></Route>
         <Route path='/account/profile' element={<ProfilePage />}></Route>
         <Route path='/account/password' element={<ChangePasswordPage />}></Route>
         <Route path='/account/blocked-users' element={<BlockedUsersPage />}></Route>

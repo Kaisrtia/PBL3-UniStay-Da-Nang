@@ -55,17 +55,21 @@ const validatePostAmenities = async (
   }
 };
 
-const applyRolePostRules = <T extends {
-  purpose?: string;
-  postPurpose?: post_purpose;
-  roomType?: room_type;
-}>(currentUser: user, data: T): T => {
+const applyRolePostRules = <
+  T extends {
+    purpose?: string;
+    postPurpose?: post_purpose;
+    roomType?: room_type;
+  }
+>(
+  currentUser: user,
+  data: T
+): T => {
   if (currentUser.role === 'HOST') {
     return {
       ...data,
       purpose: post_purpose.RENT,
-      postPurpose: post_purpose.RENT,
-      roomType: room_type.ROOM
+      postPurpose: post_purpose.RENT
     };
   }
 
@@ -127,7 +131,7 @@ export const censorPost = async (
 
   addCensorPostNotificationJob('automated_censoring', {
     notificationId: notification.id
-  }).catch(err => {
+  }).catch((err) => {
     console.error('Error enqueueing post censor notification job:', err);
   });
 
@@ -304,18 +308,28 @@ export const updatePost = async (
         ...(normalizedData.title && { title: normalizedData.title }),
         ...(normalizedData.wardId && { wardId: normalizedData.wardId }),
         ...(normalizedData.purpose && { purpose: normalizedData.purpose }),
-        ...(normalizedData.detailAddress && { detailAddress: normalizedData.detailAddress }),
-        ...(normalizedData.exactAddress && { exactAddress: normalizedData.exactAddress }),
+        ...(normalizedData.detailAddress && {
+          detailAddress: normalizedData.detailAddress
+        }),
+        ...(normalizedData.exactAddress && {
+          exactAddress: normalizedData.exactAddress
+        }),
         ...(normalizedData.district && { district: normalizedData.district }),
         ...(normalizedData.city && { city: normalizedData.city }),
         ...(normalizedData.area && { area: normalizedData.area }),
         ...(normalizedData.price && { price: normalizedData.price }),
         ...(normalizedData.deposit && { deposit: normalizedData.deposit }),
         ...(normalizedData.roomType && { roomType: normalizedData.roomType }),
-        ...(normalizedData.postPurpose && { postPurpose: normalizedData.postPurpose }),
-        ...(normalizedData.description && { description: normalizedData.description }),
+        ...(normalizedData.postPurpose && {
+          postPurpose: normalizedData.postPurpose
+        }),
+        ...(normalizedData.description && {
+          description: normalizedData.description
+        }),
         ...(normalizedData.latitude && { latitude: normalizedData.latitude }),
-        ...(normalizedData.longitude && { longitude: normalizedData.longitude }),
+        ...(normalizedData.longitude && {
+          longitude: normalizedData.longitude
+        }),
         status: 'UPDATED',
         updatedAt: new Date()
       }
@@ -359,4 +373,80 @@ export const updatePost = async (
 
   queuePostCacheRefresh();
   return updatedPost;
+};
+
+export const hideOwnPost = async (currentUser: user, postId: string) => {
+  const post = await prismaClient.post.findUnique({
+    where: { id: postId }
+  });
+
+  if (!post) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  if (post.userId !== currentUser.id) {
+    throw new AppError(
+      HttpStatus.FORBIDDEN,
+      'You can only hide your own posts'
+    );
+  }
+
+  const updatedPost = await prismaClient.post.update({
+    where: { id: postId },
+    data: {
+      status: post_status.HIDDEN,
+      updatedAt: new Date()
+    }
+  });
+
+  queuePostCacheRefresh();
+  return updatedPost;
+};
+
+export const deleteOwnPost = async (currentUser: user, postId: string) => {
+  const post = await prismaClient.post.findUnique({
+    where: { id: postId }
+  });
+
+  if (!post) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Post not found');
+  }
+
+  if (post.userId !== currentUser.id) {
+    throw new AppError(
+      HttpStatus.FORBIDDEN,
+      'You can only delete your own posts'
+    );
+  }
+
+  await prismaClient.$transaction(async (tx) => {
+    const comments = await tx.comment.findMany({
+      where: { postId },
+      select: { id: true }
+    });
+    const commentIds = comments.map((comment) => comment.id);
+
+    await tx.report.updateMany({
+      where: { postId },
+      data: { postId: null }
+    });
+
+    if (commentIds.length > 0) {
+      await tx.report.updateMany({
+        where: { commentId: { in: commentIds } },
+        data: { commentId: null }
+      });
+    }
+
+    await tx.accomodation_request.deleteMany({ where: { postId } });
+    await tx.student_favorite_post.deleteMany({ where: { postId } });
+    await tx.post_amenity.deleteMany({ where: { postId } });
+    await tx.post_image.deleteMany({ where: { postId } });
+    await tx.comment.deleteMany({ where: { postId, parentId: { not: null } } });
+    await tx.comment.deleteMany({ where: { postId } });
+    await tx.post.delete({ where: { id: postId } });
+  });
+
+  queuePostCacheRefresh();
+  return { message: 'Post deleted successfully' };
 };

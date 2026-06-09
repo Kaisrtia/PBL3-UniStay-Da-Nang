@@ -23,6 +23,7 @@ import NearbyPostsPage from '@/pages/posts/nearby/NearbyPostsPage'
 import SearchResultsPage from '@/pages/posts/search/SearchResultsPage'
 import RegisterPage from '@/pages/register/RegisterPage'
 import ResetPasswordPage from '@/pages/reset-password/ResetPasswordPage'
+import UserDetailPage from '@/pages/users/UserDetailPage'
 import VerifyEmailPage from '@/pages/verify-email/VerifyEmailPage'
 
 export {
@@ -49,5 +50,6 @@ export {
   RegisterPage,
   ResetPasswordPage,
   SearchResultsPage,
+  UserDetailPage,
   VerifyEmailPage
 }

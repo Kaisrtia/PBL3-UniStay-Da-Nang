@@ -72,18 +72,15 @@ postRouter.get(
 );
 
 // Calculate one road-network route after a user selects a specific post marker
-postRouter.get(
-  '/route',
-  asyncHandler(postController.handleGetRoutePath)
-);
+postRouter.get('/route', asyncHandler(postController.handleGetRoutePath));
 
 // -- Favourite Posts --
 
-// List favourite posts (Student only)
+// List favourite posts (Student, Host)
 postRouter.get(
   '/favourites',
   verifyToken,
-  authorize([account_role.STUDENT]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(favouriteController.handleGetFavouritePosts)
 );
 
@@ -132,6 +129,14 @@ postRouter.patch(
   asyncHandler(postController.handleUpdatePost)
 );
 
+// Hide own post (Student, Host)
+postRouter.patch(
+  '/:postId/hide',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST]),
+  asyncHandler(postController.handleHidePost)
+);
+
 // Censor post (Admin only)
 postRouter.patch(
   '/:postId/censor',
@@ -140,19 +145,27 @@ postRouter.patch(
   asyncHandler(postController.handleCensorPostManually)
 );
 
-// Add a post to favourites (Student only)
+// Delete own post (Student, Host)
+postRouter.delete(
+  '/:postId',
+  verifyToken,
+  authorize([account_role.STUDENT, account_role.HOST]),
+  asyncHandler(postController.handleDeletePost)
+);
+
+// Add a post to favourites (Student, Host)
 postRouter.post(
   '/favourites',
   verifyToken,
-  authorize([account_role.STUDENT]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(favouriteController.handleAddFavouritePost)
 );
 
-// Remove a post from favourites (Student only)
+// Remove a post from favourites (Student, Host)
 postRouter.delete(
   '/favourites/:postId',
   verifyToken,
-  authorize([account_role.STUDENT]),
+  authorize([account_role.STUDENT, account_role.HOST]),
   asyncHandler(favouriteController.handleRemoveFavouritePost)
 );
 
