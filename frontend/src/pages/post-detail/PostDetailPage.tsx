@@ -126,6 +126,39 @@ const getStoredUser = () => {
   }
 }
 
+const getBackendErrorMessage = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return ''
+
+  const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
+  return data?.error?.message || data?.message || ''
+}
+
+const getCommentReportErrorMessage = (error: unknown) => {
+  if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+    return 'Vui lòng đăng nhập bằng tài khoản có quyền báo cáo bình luận.'
+  }
+
+  const backendMessage = getBackendErrorMessage(error)
+
+  if (backendMessage === 'You cannot report your own content') {
+    return 'Bạn không thể báo cáo bình luận của chính mình.'
+  }
+
+  if (backendMessage === 'You already have a pending report for this content') {
+    return 'Bạn đã gửi báo cáo cho bình luận này và đang chờ xử lý.'
+  }
+
+  if (backendMessage === 'Comment not found') {
+    return 'Không tìm thấy bình luận cần báo cáo.'
+  }
+
+  if (backendMessage === 'Cannot report a hidden comment') {
+    return 'Không thể báo cáo bình luận đã bị ẩn.'
+  }
+
+  return backendMessage || 'Không thể gửi báo cáo bình luận. Vui lòng thử lại.'
+}
+
 const toNumber = (value: string | number) => Number(value)
 
 const formatPhoneNumber = (value?: string | null) => value || 'Chưa cập nhật'
@@ -167,6 +200,7 @@ const getInitials = (name?: string) => {
 type CommentItemProps = {
   comment: PostComment
   isReply?: boolean
+  currentUserId?: string
   submittingCommentId?: string
   messagesByCommentId: Record<string, string>
   errorsByCommentId: Record<string, string>
@@ -176,6 +210,7 @@ type CommentItemProps = {
 const CommentItem = ({
   comment: item,
   isReply = false,
+  currentUserId,
   submittingCommentId,
   messagesByCommentId,
   errorsByCommentId,
@@ -186,6 +221,7 @@ const CommentItem = ({
   const isSubmitting = submittingCommentId === item.id
   const message = messagesByCommentId[item.id]
   const error = errorsByCommentId[item.id]
+  const isOwnComment = Boolean(currentUserId && item.userId === currentUserId)
 
   return (
     <article className={`${isReply ? 'ml-8 border-l border-gray-100 pl-4' : ''}`}>
@@ -204,15 +240,17 @@ const CommentItem = ({
               {item.createdAt ? (
                 <p className='text-xs font-semibold text-gray-400'>{formatCommentTime(item.createdAt)}</p>
               ) : null}
-              <button
-                type='button'
-                disabled={isSubmitting}
-                onClick={() => onReport(item.id)}
-                className='inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-extrabold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60'
-              >
-                <FaFlag />
-                Report
-              </button>
+              {!isOwnComment ? (
+                <button
+                  type='button'
+                  disabled={isSubmitting}
+                  onClick={() => onReport(item.id)}
+                  className='inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-extrabold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60'
+                >
+                  <FaFlag />
+                  Report
+                </button>
+              ) : null}
             </span>
           </div>
           <p className='mt-2 whitespace-pre-line text-sm leading-6 text-gray-700'>{item.content}</p>
@@ -227,6 +265,7 @@ const CommentItem = ({
               key={reply.id}
               comment={reply}
               isReply
+              currentUserId={currentUserId}
               submittingCommentId={submittingCommentId}
               messagesByCommentId={messagesByCommentId}
               errorsByCommentId={errorsByCommentId}
@@ -509,6 +548,8 @@ const PostDetailPage = () => {
       return
     }
 
+    const ownerId = post.user.id
+
     if (!getAccessToken()) {
       setActionError('Vui lòng đăng nhập để chặn người dùng.')
       return
@@ -519,7 +560,7 @@ const PostDetailPage = () => {
     }
 
     void runPostAction(async () => {
-      await userService.blockUser(post.user!.id)
+      await userService.blockUser(ownerId)
       navigate('/home', { replace: true })
       return { message: 'Đã chặn người dùng.' }
     }, 'Đã chặn người dùng.')
@@ -558,10 +599,10 @@ const PostDetailPage = () => {
           ...current,
           [commentId]: response.message || 'Đã gửi báo cáo bình luận.'
         }))
-      } catch {
+      } catch (error) {
         setCommentReportErrors((current) => ({
           ...current,
-          [commentId]: 'Không thể gửi báo cáo bình luận. Vui lòng đăng nhập và thử lại.'
+          [commentId]: getCommentReportErrorMessage(error)
         }))
       } finally {
         setSubmittingCommentReportId(undefined)
@@ -757,28 +798,32 @@ const PostDetailPage = () => {
                         {isFavourite ? <FaHeart /> : <FaRegHeart />}
                       </button>
                     ) : null}
-                    <button
-                      type='button'
-                      onClick={() => setIsActionMenuOpen((current) => !current)}
-                      className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
-                      aria-expanded={isActionMenuOpen}
-                      aria-label='Mở menu thao tác'
-                      title='Thao tác'
-                    >
-                      <FaEllipsisV />
-                    </button>
-                    {isActionMenuOpen ? (
-                      <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                    {!isOwnerSelf ? (
+                      <>
                         <button
                           type='button'
-                          disabled={isSubmittingAction}
-                          onClick={handleReport}
-                          className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                          onClick={() => setIsActionMenuOpen((current) => !current)}
+                          className='grid h-11 w-11 place-items-center rounded-full border border-gray-200 bg-white text-gray-800 transition hover:border-[#FFC300] hover:text-[#001D3D]'
+                          aria-expanded={isActionMenuOpen}
+                          aria-label='Mở menu thao tác'
+                          title='Thao tác'
                         >
-                          <FaFlag />
-                          Report Post
+                          <FaEllipsisV />
                         </button>
-                      </div>
+                        {isActionMenuOpen ? (
+                          <div className='absolute right-0 top-12 z-20 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-2 shadow-xl shadow-[#001D3D]/15'>
+                            <button
+                              type='button'
+                              disabled={isSubmittingAction}
+                              onClick={handleReport}
+                              className='flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70'
+                            >
+                              <FaFlag />
+                              Report Post
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 ) : null}
@@ -988,6 +1033,7 @@ const PostDetailPage = () => {
                         <CommentItem
                           key={item.id}
                           comment={item}
+                          currentUserId={storedUser?.id}
                           submittingCommentId={submittingCommentReportId}
                           messagesByCommentId={commentReportMessages}
                           errorsByCommentId={commentReportErrors}
