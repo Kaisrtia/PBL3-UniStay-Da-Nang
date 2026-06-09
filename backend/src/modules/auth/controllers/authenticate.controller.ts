@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { CookieOptions, Request, Response } from 'express';
 import HttpStatus from 'http-status';
 import * as authService from '../services/authenticate.service';
 import {
@@ -15,6 +15,28 @@ import { toUserResponseDto } from '../../user/dto/user-response.dto';
 
 // Auth Handlers
 
+const refreshTokenCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: config.node_env === 'production',
+  sameSite: config.node_env === 'production' ? 'none' : 'lax',
+  path: '/api/v1/auth/sessions'
+};
+
+const clearRefreshTokenCookie = (res: Response) => {
+  res.clearCookie('refreshToken', refreshTokenCookieOptions);
+};
+
+const setRefreshTokenCookie = (
+  res: Response,
+  token: string,
+  expiresAt: Date
+) => {
+  res.cookie('refreshToken', token, {
+    ...refreshTokenCookieOptions,
+    expires: expiresAt
+  });
+};
+
 export const handleRegister = async (req: Request, res: Response) => {
   const { email, password, fullName } = req.body;
   await authService.signUp(email, password, fullName);
@@ -29,6 +51,12 @@ export const handleRegister = async (req: Request, res: Response) => {
 export const handleLogin = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const result = await authService.login(email, password);
+
+  setRefreshTokenCookie(
+    res,
+    result.refreshToken,
+    result.refreshTokenExpiresAt
+  );
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
@@ -54,10 +82,49 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
     payload.picture
   );
 
+  setRefreshTokenCookie(
+    res,
+    result.refreshToken,
+    result.refreshTokenExpiresAt
+  );
+
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
     user: toUserResponseDto(result.user)
   });
+};
+
+export const handleDeleteSession = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies?.refreshToken;
+
+  if (refreshToken) {
+    await authService.logout(refreshToken);
+  }
+
+  clearRefreshTokenCookie(res);
+  res.status(HttpStatus.NO_CONTENT).send();
+};
+
+export const handleRefreshSession = async (req: Request, res: Response) => {
+  const currentRefreshToken = req.cookies?.refreshToken;
+  if (!currentRefreshToken) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is required');
+  }
+
+  try {
+    const tokens = await authService.refreshToken(currentRefreshToken);
+    setRefreshTokenCookie(
+      res,
+      tokens.refreshToken,
+      tokens.refreshTokenExpiresAt
+    );
+    sendSuccess(res, HttpStatus.OK, { accessToken: tokens.accessToken });
+  } catch (error) {
+    if (error instanceof AppError && error.statusCode === HttpStatus.UNAUTHORIZED) {
+      clearRefreshTokenCookie(res);
+    }
+    throw error;
+  }
 };
 
 // Email Verification Handlers

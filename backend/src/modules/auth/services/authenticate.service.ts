@@ -3,11 +3,19 @@ import { account_status, provider, type user as User } from '@prisma/client';
 import HttpStatus from 'http-status';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
 const getUserRoles = (user: Pick<User, 'role'>) => [user.role];
+
+const hashRefreshToken = (token: string) =>
+  createHash('sha256').update(token).digest('hex');
+
+const createRefreshToken = () => randomBytes(64).toString('hex');
+
+const getRefreshTokenExpiresAt = () =>
+  new Date(Date.now() + config.jwt.refresh_token_ttl_seconds * 1000);
 
 const generateAccessToken = (user: Pick<User, 'id' | 'role'>) => {
   return jwt.sign(
@@ -15,6 +23,27 @@ const generateAccessToken = (user: Pick<User, 'id' | 'role'>) => {
     config.jwt.secret,
     { expiresIn: config.jwt.access_token_ttl_seconds }
   );
+};
+
+const generateAuthTokens = async (user: Pick<User, 'id' | 'role'>) => {
+  const accessToken = generateAccessToken(user);
+  const refreshToken = createRefreshToken();
+  const refreshTokenExpiresAt = getRefreshTokenExpiresAt();
+
+  await prismaClient.$transaction([
+    prismaClient.session.deleteMany({
+      where: { expiresAt: { lte: new Date() } }
+    }),
+    prismaClient.session.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashRefreshToken(refreshToken),
+        expiresAt: refreshTokenExpiresAt
+      }
+    })
+  ]);
+
+  return { accessToken, refreshToken, refreshTokenExpiresAt };
 };
 
 export const signUp = async (
@@ -103,8 +132,8 @@ export const login = async (email?: string, password?: string) => {
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
   }
 
-  const accessToken = generateAccessToken(user);
-  return { accessToken, user: { ...user, roles: getUserRoles(user) } };
+  const tokens = await generateAuthTokens(user);
+  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
 };
 
 export const googleLogin = async (
@@ -156,6 +185,81 @@ export const googleLogin = async (
     });
   }
 
-  const accessToken = generateAccessToken(user);
-  return { accessToken, user: { ...user, roles: getUserRoles(user) } };
+  const tokens = await generateAuthTokens(user);
+  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
+};
+
+export const logout = async (refreshToken: string) => {
+  await prismaClient.session.deleteMany({
+    where: { tokenHash: hashRefreshToken(refreshToken) }
+  });
+};
+
+export const refreshToken = async (refreshToken: string) => {
+  const currentTokenHash = hashRefreshToken(refreshToken);
+  const rotatedRefreshToken = createRefreshToken();
+  const rotatedTokenHash = hashRefreshToken(rotatedRefreshToken);
+
+  const result = await prismaClient.$transaction(async (tx) => {
+    const session = await tx.session.findUnique({
+      where: { tokenHash: currentTokenHash },
+      include: { user: true }
+    });
+
+    if (!session) {
+      return { status: 'INVALID' as const };
+    }
+
+    if (session.expiresAt <= new Date()) {
+      await tx.session.delete({ where: { id: session.id } });
+      return { status: 'EXPIRED' as const };
+    }
+
+    if (
+      session.user.status !== account_status.ACTIVE &&
+      session.user.status !== account_status.SET_UP
+    ) {
+      await tx.session.deleteMany({ where: { userId: session.userId } });
+      return { status: 'INACTIVE' as const };
+    }
+
+    const rotated = await tx.session.updateMany({
+      where: {
+        id: session.id,
+        tokenHash: currentTokenHash
+      },
+      data: {
+        tokenHash: rotatedTokenHash
+      }
+    });
+
+    if (rotated.count !== 1) {
+      return { status: 'INVALID' as const };
+    }
+
+    return {
+      status: 'OK' as const,
+      accessToken: generateAccessToken(session.user),
+      refreshToken: rotatedRefreshToken,
+      refreshTokenExpiresAt: session.expiresAt
+    };
+  });
+
+  if (result.status === 'EXPIRED') {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is expired');
+  }
+
+  if (result.status === 'INACTIVE') {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'User account is not active');
+  }
+
+  if (result.status !== 'OK') {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is invalid');
+  }
+
+  return {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    refreshTokenExpiresAt: result.refreshTokenExpiresAt
+  };
 };

@@ -235,10 +235,13 @@ export const changePassword = async (
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid current password');
   }
 
-  await prismaClient.user.update({
-    where: { id: user.id },
-    data: { hashedPassword: bcrypt.hashSync(newPassword, 10) }
-  });
+  await prismaClient.$transaction([
+    prismaClient.user.update({
+      where: { id: user.id },
+      data: { hashedPassword: bcrypt.hashSync(newPassword, 10) }
+    }),
+    prismaClient.session.deleteMany({ where: { userId: user.id } })
+  ]);
 };
 
 export const getUserProfile = async (targetUserId: string) => {

@@ -91,6 +91,18 @@ enum demand_criterion_priority {
 }
 
 // Models
+model session {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique @db.Char(64)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model email_verification {
   email     String    @id
   code      String?
@@ -99,6 +111,7 @@ model email_verification {
 
 model user {
   id                   String                 @id @default(uuid())
+  sessions             session[]
   email                String                 @unique @db.VarChar(255)
   hashedPassword       String?                @db.VarChar(255)
   fullName             String                 @db.VarChar(100)

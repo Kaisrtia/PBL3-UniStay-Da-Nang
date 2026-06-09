@@ -265,6 +265,9 @@ export const resetPasswordWithToken = async (
       where: { email: record.email },
       data: { hashedPassword: newHashedPassword }
     }),
+    prismaClient.session.deleteMany({
+      where: { user: { email: record.email } }
+    }),
     prismaClient.email_verification.delete({
       where: { email: record.email }
     })

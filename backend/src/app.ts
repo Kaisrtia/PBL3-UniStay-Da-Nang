@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import config from './core/config/config';
 import authRouter from './modules/auth/routes/auth.route';
 import { errorHandler } from './core/middlewares/error.handler';
 import userRouter from './modules/user/routes/user.route';
@@ -20,9 +22,15 @@ const app: Application = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(
+  cors({
+    origin: config.frontend_origin,
+    credentials: true
+  })
+);
 app.use(helmet());
 app.use(morgan('dev'));
+app.use(cookieParser());
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 

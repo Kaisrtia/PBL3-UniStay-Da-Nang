@@ -16,6 +16,7 @@ const envSchema = Joi.object()
     DATABASE_URL: Joi.string().required(),
     JWT_SECRET: Joi.string().required(),
     ACCESS_TOKEN_TTL_SECONDS: Joi.number().integer().positive().required(),
+    REFRESH_TOKEN_TTL_SECONDS: Joi.number().integer().positive().required(),
     EMAIL_VERIFICATION_TTL: Joi.number().required(),
     EMAIL_USER: Joi.string().email().required(),
     EMAIL_PASSWORD: Joi.string().required(),
@@ -57,7 +58,8 @@ const config = {
   },
   jwt: {
     secret: validatedEnv.JWT_SECRET,
-    access_token_ttl_seconds: validatedEnv.ACCESS_TOKEN_TTL_SECONDS
+    access_token_ttl_seconds: validatedEnv.ACCESS_TOKEN_TTL_SECONDS,
+    refresh_token_ttl_seconds: validatedEnv.REFRESH_TOKEN_TTL_SECONDS
   },
   email: {
     user: validatedEnv.EMAIL_USER,
@@ -69,6 +71,7 @@ const config = {
     client_secret: validatedEnv.GOOGLE_CLIENT_SECRET
   },
   frontend_url: validatedEnv.FRONTEND_URL,
+  frontend_origin: new URL(validatedEnv.FRONTEND_URL).origin,
   ai_key: {
     moondream: validatedEnv.MOONDREAM_API_KEY,
     gemini: validatedEnv.GEMINI_API_KEY
