@@ -1,44 +1,14 @@
 import { Worker } from 'bullmq';
 import { connection } from '../../../core/config/redis.connection';
-import prismaClient from '../../../core/config/prisma';
+import { refreshApprovedPostCache } from '../utils/approvedPostCache';
 
 export const postCacheWorker = new Worker(
   'postCacheQueue',
-  async (job) => {
+  async () => {
     try {
       console.log('Running postCacheWorker: caching APPROVED posts to Redis');
 
-      const approvedPosts = await prismaClient.post.findMany({
-        where: {
-          status: 'APPROVED'
-        },
-        include: {
-          postImages: true,
-          postAmenities: {
-            include: { amenity: true }
-          },
-          ward: true,
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-              avatarUrl: true,
-              hosts: {
-                select: { isVerified: true }
-              }
-            }
-          },
-          _count: {
-            select: { comments: true }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-
-      const CACHE_KEY = 'cache:posts:approved';
-      await connection.set(CACHE_KEY, JSON.stringify(approvedPosts));
+      const approvedPosts = await refreshApprovedPostCache();
 
       console.log(
         `Cached ${approvedPosts.length} APPROVED posts successfully.`

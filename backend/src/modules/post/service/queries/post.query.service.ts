@@ -2,8 +2,12 @@ import prismaClient from '../../../../core/config/prisma';
 import HttpStatus from 'http-status';
 import { AppError } from '../../../../core/exceptions/AppError';
 import { calculateScore } from '../../../demand/utils/matching.handler';
-import { connection } from '../../../../core/config/redis.connection';
 import * as blockService from '../../../user/service/block.service';
+import {
+  ApprovedPostCacheEntry,
+  approvedPostInclude,
+  getApprovedPostsWithFallback
+} from '../../utils/approvedPostCache';
 import {
   user,
   room_type,
@@ -14,6 +18,42 @@ import {
 } from '@prisma/client';
 
 const RECOMMENDATION_SCORE_THRESHOLD = 0.6;
+
+const buildApprovedPostWhere = (
+  filters: PostFilters,
+  blockedUserIds: string[]
+): Prisma.postWhereInput => ({
+  status: 'APPROVED',
+  ...(blockedUserIds.length > 0 && {
+    userId: { notIn: blockedUserIds }
+  }),
+  ...(filters.purpose && { purpose: filters.purpose }),
+  ...(filters.wardId !== undefined && { wardId: filters.wardId }),
+  ...((filters.minArea !== undefined || filters.maxArea !== undefined) && {
+    area: {
+      ...(filters.minArea !== undefined && { gte: filters.minArea }),
+      ...(filters.maxArea !== undefined && { lte: filters.maxArea })
+    }
+  }),
+  ...((filters.minPrice !== undefined || filters.maxPrice !== undefined) && {
+    price: {
+      ...(filters.minPrice !== undefined && { gte: filters.minPrice }),
+      ...(filters.maxPrice !== undefined && { lte: filters.maxPrice })
+    }
+  }),
+  ...(filters.roomType && { roomType: filters.roomType }),
+  ...(filters.verifiedHost === true && {
+    user: { hosts: { some: { isVerified: true } } }
+  }),
+  ...(filters.amenities?.length && {
+    postAmenities: {
+      some: { amenityId: { in: filters.amenities } }
+    }
+  }),
+  ...(filters.hasMedia === true && {
+    postImages: { some: {} }
+  })
+});
 
 export interface PostFilters {
   purpose?: post_purpose;
@@ -91,99 +131,17 @@ export const getPosts = async (
   const sortBy = filters.sortBy ?? 'createdAt';
   const sortOrder = filters.sortOrder ?? 'desc';
 
-  // Build dynamic where clause — every filter is optional and cumulative (AND)
-  const where: Prisma.postWhereInput = {
-    status: 'APPROVED'
-  };
-  const blockedPostFilter =
-    await blockService.getBlockedUserFilter(currentUserId);
-  if (Object.keys(blockedPostFilter).length > 0) {
-    where.AND = [blockedPostFilter];
-  }
-
-  // Purpose
-  if (filters.purpose) {
-    where.purpose = filters.purpose;
-  }
-
-  // Location — filter by specific ward or by district (all wards within it)
-  if (filters.wardId !== undefined) {
-    where.wardId = filters.wardId;
-  }
-
-  // Area range
-  if (filters.minArea !== undefined || filters.maxArea !== undefined) {
-    where.area = {};
-    if (filters.minArea !== undefined)
-      (where.area as Prisma.DecimalFilter).gte = filters.minArea;
-    if (filters.maxArea !== undefined)
-      (where.area as Prisma.DecimalFilter).lte = filters.maxArea;
-  }
-
-  // Price range
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    where.price = {};
-    if (filters.minPrice !== undefined)
-      (where.price as Prisma.DecimalFilter).gte = filters.minPrice;
-    if (filters.maxPrice !== undefined)
-      (where.price as Prisma.DecimalFilter).lte = filters.maxPrice;
-  }
-
-  // Room type
-  if (filters.roomType) {
-    where.roomType = filters.roomType;
-  }
-
-  // Verified host — traverse post → user → hosts[] → isVerified
-  if (filters.verifiedHost === true) {
-    where.user = {
-      hosts: {
-        some: { isVerified: true }
-      }
-    };
-  }
-
-  // Amenities — posts must have at least one of the specified amenity IDs
-  if (filters.amenities && filters.amenities.length > 0) {
-    where.postAmenities = {
-      some: {
-        amenityId: { in: filters.amenities }
-      }
-    };
-  }
-
-  // Has media (images)
-  if (filters.hasMedia === true) {
-    where.postImages = { some: {} };
-  }
-
+  const blockedUserIds = currentUserId
+    ? await blockService.getBlockedUserIds(currentUserId)
+    : [];
+  const where = buildApprovedPostWhere(filters, blockedUserIds);
   const [posts, totalCount] = await Promise.all([
     prismaClient.post.findMany({
       where,
       skip,
       take: limit,
       orderBy: { [sortBy]: sortOrder },
-      include: {
-        postImages: true,
-        postAmenities: {
-          include: { amenity: true }
-        },
-        ward: true,
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-            hosts: {
-              select: { isVerified: true }
-            }
-          }
-        },
-        _count: {
-          select: { comments: true }
-        }
-      }
+      include: approvedPostInclude
     }),
     prismaClient.post.count({ where })
   ]);
@@ -204,41 +162,15 @@ export const getNearbyPosts = async (
   currentUserId?: string
 ) => {
   const limit = filters.limit ?? 80;
-  const where: Prisma.postWhereInput = {
-    status: 'APPROVED'
-  };
-
-  const blockedPostFilter =
-    await blockService.getBlockedUserFilter(currentUserId);
-  if (Object.keys(blockedPostFilter).length > 0) {
-    where.AND = [blockedPostFilter];
-  }
-
-  const posts = await prismaClient.post.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      postImages: true,
-      postAmenities: {
-        include: { amenity: true }
-      },
-      ward: true,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          phone: true,
-          avatarUrl: true,
-          hosts: {
-            select: { isVerified: true }
-          }
-        }
-      },
-      _count: {
-        select: { comments: true }
-      }
-    }
-  });
+  const [approvedPosts, blockedUserIds] = await Promise.all([
+    getApprovedPostsWithFallback(),
+    currentUserId
+      ? blockService.getBlockedUserIds(currentUserId)
+      : Promise.resolve([])
+  ]);
+  const posts = approvedPosts.filter(
+    (post) => !blockedUserIds.includes(post.userId)
+  );
 
   const nearbyPosts = posts
     .map((post) => {
@@ -363,30 +295,26 @@ export const getRecommendedPosts = async (
     throw new AppError(HttpStatus.NOT_FOUND, 'Student demand not found');
   }
 
-  const cachedPostsJson = await connection.get('cache:posts:approved');
-  if (!cachedPostsJson) {
-    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
-  }
-
-  let cachedPosts = JSON.parse(cachedPostsJson);
+  let cachedPosts: ApprovedPostCacheEntry[] =
+    await getApprovedPostsWithFallback();
   const blockedUserIds = await blockService.getBlockedUserIds(currentUser.id);
 
   if (blockedUserIds.length > 0) {
     cachedPosts = cachedPosts.filter(
-      (post: any) => !blockedUserIds.includes(post.userId || post.user?.id)
+      (post) => !blockedUserIds.includes(post.userId)
     );
   }
 
   // Filter and score posts
   const scoredPosts = cachedPosts
-    .map((post: any) => ({
+    .map((post) => ({
       ...post,
       score: calculateScore(post, demand)
     }))
-    .filter((post: any) => post.score >= RECOMMENDATION_SCORE_THRESHOLD);
+    .filter((post) => post.score >= RECOMMENDATION_SCORE_THRESHOLD);
 
   // Sort by score descending
-  scoredPosts.sort((a: any, b: any) => b.score - a.score);
+  scoredPosts.sort((first, second) => second.score - first.score);
 
   // Paginate
   const skip = (page - 1) * limit;

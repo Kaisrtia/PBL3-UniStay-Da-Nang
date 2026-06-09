@@ -13,11 +13,18 @@ import { generateHybridId } from '../../../../core/utils/generateId';
 import { addModerationFlow } from '../../queues/moderation.queue';
 import { addCensorPostNotificationJob } from '../../../notification/queues/notification.queue';
 import { addMatchDemandJob } from '../../queues/matchDemand.queue';
+import { addPostCacheRefreshJob } from '../../queues/cache.queue';
 import { createPostCensorNotification } from '../../../notification/services/notification.service';
 
 type PostAmenityInput = {
   amenityId: number;
   currentCondition?: amenity_condition;
+};
+
+const queuePostCacheRefresh = () => {
+  addPostCacheRefreshJob().catch((error) => {
+    console.error('Error enqueueing approved post cache refresh job:', error);
+  });
 };
 
 const validatePostAmenities = async (
@@ -109,6 +116,7 @@ export const censorPost = async (
       }
     }
   });
+  queuePostCacheRefresh();
 
   const notification = await createPostCensorNotification(
     post.userId,
@@ -286,7 +294,7 @@ export const updatePost = async (
     );
   }
 
-  return prismaClient.$transaction(async (tx) => {
+  const updatedPost = await prismaClient.$transaction(async (tx) => {
     await validatePostAmenities(normalizedData.postAmenities, tx);
 
     // Basic update
@@ -348,4 +356,7 @@ export const updatePost = async (
       }
     });
   });
+
+  queuePostCacheRefresh();
+  return updatedPost;
 };

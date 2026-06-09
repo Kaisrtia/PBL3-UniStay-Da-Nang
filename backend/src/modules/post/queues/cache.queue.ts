@@ -5,6 +5,17 @@ export const postCacheQueue = new Queue('postCacheQueue', {
   connection
 });
 
+export const addPostCacheRefreshJob = async () => {
+  await postCacheQueue.add(
+    'cacheApprovedPosts:changed',
+    {},
+    {
+      removeOnComplete: true,
+      removeOnFail: false
+    }
+  );
+};
+
 // Initialize the repeatable job to trace and cache approved posts
 export const initCacheJob = async () => {
   await postCacheQueue.add('cacheApprovedPosts:startup', {}, {

@@ -4,6 +4,7 @@ import prismaClient from '../../../core/config/prisma';
 import { addCensorPostNotificationJob } from '../../notification/queues/notification.queue';
 import { createPostCensorNotification } from '../../notification/services/notification.service';
 import { addMatchDemandJob } from '../queues/matchDemand.queue';
+import { addPostCacheRefreshJob } from '../queues/cache.queue';
 import {
   ModerationResult,
   ModerationStep,
@@ -34,6 +35,12 @@ const createCensorNotificationJob = async (
   });
 };
 
+const queuePostCacheRefresh = () => {
+  addPostCacheRefreshJob().catch((error) => {
+    console.error('Error enqueueing approved post cache refresh job:', error);
+  });
+};
+
 const markPostPendingManualReview = async (postId: string, reason: string) => {
   await prismaClient.post.update({
     where: { id: postId },
@@ -42,6 +49,7 @@ const markPostPendingManualReview = async (postId: string, reason: string) => {
       rejectionReason: reason
     }
   });
+  queuePostCacheRefresh();
 };
 
 export const finalModerationWorker = new Worker(
@@ -102,6 +110,7 @@ export const finalModerationWorker = new Worker(
           rejectionReason: imageModerationResult.reason
         }
       });
+      queuePostCacheRefresh();
       await createCensorNotificationJob(
         post.userId,
         job.data.postId,
@@ -118,6 +127,7 @@ export const finalModerationWorker = new Worker(
           rejectionReason: textModerationResult.reason
         }
       });
+      queuePostCacheRefresh();
       await createCensorNotificationJob(
         post.userId,
         job.data.postId,
@@ -133,6 +143,7 @@ export const finalModerationWorker = new Worker(
           status: 'APPROVED'
         }
       });
+      queuePostCacheRefresh();
       await createCensorNotificationJob(
         post.userId,
         job.data.postId,

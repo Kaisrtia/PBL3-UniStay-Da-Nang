@@ -7,6 +7,7 @@ import {
   post_status,
   comment_status
 } from '@prisma/client';
+import { addPostCacheRefreshJob } from '../../post/queues/cache.queue';
 
 export const getReports = async (
   page: number = 1,
@@ -96,7 +97,8 @@ export const tackleReport = async (
 
   const adminNote = data.adminNote?.trim() || null;
 
-  return prismaClient.$transaction(async (tx) => {
+  let hiddenPost = false;
+  const report = await prismaClient.$transaction(async (tx) => {
     const existingReport = await tx.report.findUnique({
       where: { id: reportId }
     });
@@ -128,6 +130,7 @@ export const tackleReport = async (
           where: { id: existingReport.postId },
           data: { status: post_status.HIDDEN }
         });
+        hiddenPost = true;
       }
 
       if (existingReport.commentId) {
@@ -142,6 +145,14 @@ export const tackleReport = async (
       where: { id: reportId }
     });
   });
+
+  if (hiddenPost) {
+    addPostCacheRefreshJob().catch((error) => {
+      console.error('Error enqueueing approved post cache refresh job:', error);
+    });
+  }
+
+  return report;
 };
 
 export const createReport = async (
