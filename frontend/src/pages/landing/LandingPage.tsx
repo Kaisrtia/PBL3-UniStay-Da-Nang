@@ -1,5 +1,6 @@
-import { FaClock, FaHome, FaSearch, FaUserFriends } from 'react-icons/fa'
 import { useState } from 'react'
+
+import { FaClock, FaHome, FaSearch, FaUserFriends } from 'react-icons/fa'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { background, logo } from '@/assets/images'
@@ -25,9 +26,9 @@ const LandingPage = () => {
   }
 
   return (
-    <div className='relative min-h-screen overflow-x-hidden'>
+    <div className='relative overflow-x-hidden'>
       <img src={background} alt='Background' className='absolute inset-0 -z-10 h-full w-full object-cover' />
-      <div className='absolute inset-0 -z-10 bg-[#000814]/45' />
+      <div className='inset-0 -z-10 bg-gradient-to-b from-[#0D63C2] to-[#000814]' />
       <header className='flex flex-wrap items-center justify-between gap-4 bg-transparent px-5 py-5 md:px-8 md:py-6'>
         <div className='flex items-center gap-2'>
           <img src={logo} alt='Unistay Logo' className='h-16 w-28 object-contain' />
@@ -116,11 +117,6 @@ const LandingPage = () => {
               <span className='text-yellow-400 text-lg'>•</span> Đăng tin miễn phí, quản lý thông tin dễ dàng
             </li>
           </ul>
-          <div>
-            <button className='border border-yellow-400 text-yellow-400 px-6 py-2 rounded text-sm font-semibold hover:bg-yellow-400 hover:text-white transition'>
-              Tìm hiểu thêm
-            </button>
-          </div>
         </div>
       </section>
 
@@ -161,7 +157,10 @@ const LandingPage = () => {
         </div>
       </section>
 
-      <footer id='footer' className='scroll-mt-20 bg-gradient-to-b from-[#0D63C2] to-[#000814] text-white py-10'>
+      <footer
+        id='footer'
+        className='scroll-mt-20 b-gradient-to-bg from-[#0D63C2] via-[#063970] to-[#000814] text-white py-10'
+      >
         <div className='max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between items-start gap-8'>
           <div className='flex-1 mb-6 md:mb-0'>
             <div className='flex items-center gap-3 mb-4'>

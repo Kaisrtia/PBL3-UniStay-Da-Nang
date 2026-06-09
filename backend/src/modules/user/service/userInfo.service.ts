@@ -8,14 +8,49 @@ import {
   strongPasswordMessage
 } from '../../../core/utils/passwordPolicy';
 
+const validatePhone = (phone?: string) => {
+  const trimmedPhone = phone?.trim();
+
+  if (!trimmedPhone) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Phone number is required');
+  }
+
+  if (!/^\d{10}$/.test(trimmedPhone)) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Phone number must contain exactly 10 digits'
+    );
+  }
+
+  return trimmedPhone;
+};
+
+const validateDob = (dob?: string) => {
+  if (!dob) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Date of birth is required');
+  }
+
+  const parsedDob = new Date(dob);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (Number.isNaN(parsedDob.getTime()) || parsedDob >= today) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Date of birth must be before today'
+    );
+  }
+
+  return parsedDob;
+};
+
 export const setupProfile = async (
   user: user,
   data: {
     role: account_role;
-    gender?: string;
     dob?: string;
     phone?: string;
-    avatarUrl?: string;
+    gender?: string;
     universityId?: string;
   }
 ) => {
@@ -29,7 +64,17 @@ export const setupProfile = async (
     );
   }
 
-  if (data.role === account_role.STUDENT && data.universityId) {
+  const phone = validatePhone(data.phone);
+  const dob = validateDob(data.dob);
+
+  if (data.role === account_role.STUDENT && !data.universityId) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'University is required for students'
+    );
+  }
+
+  if (data.universityId && data.role === account_role.STUDENT) {
     const university = await prismaClient.university.findUnique({
       where: { id: data.universityId }
     });
@@ -40,40 +85,39 @@ export const setupProfile = async (
 
   const updatedUser = await prismaClient.$transaction(async (tx) => {
     const currentUser = await tx.user.findUnique({
-      where: { id: user.id }
+      where: { id: user.id },
+      include: {
+        student: true,
+        hosts: true
+      }
     });
 
-    if (!currentUser || currentUser.status !== account_status.SET_UP) {
-      throw new AppError(
-        HttpStatus.BAD_REQUEST,
-        'User profile is already set up or locked'
-      );
+    if (!currentUser) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
     }
 
     const userUpdated = await tx.user.update({
       where: { id: user.id },
       data: {
         role: data.role,
-        gender: data.gender,
-        dob: data.dob ? new Date(data.dob) : null,
-        phone: data.phone,
-        avatarUrl: data.avatarUrl,
+        dob,
+        phone,
+        gender: data.gender || null,
         status: account_status.ACTIVE
       }
     });
 
     if (data.role === account_role.STUDENT) {
-      await tx.student.create({
-        data: {
-          studentId: user.id,
-          ...(data.universityId && { universityId: data.universityId })
-        }
+      await tx.student.upsert({
+        where: { studentId: user.id },
+        update: { universityId: data.universityId },
+        create: { studentId: user.id, universityId: data.universityId }
       });
     } else if (data.role === account_role.HOST) {
-      await tx.host.create({
-        data: {
-          hostId: user.id
-        }
+      await tx.host.upsert({
+        where: { hostId: user.id },
+        update: {},
+        create: { hostId: user.id }
       });
     }
 
@@ -117,14 +161,18 @@ export const updateProfile = async (
     }
   }
 
+  const phone =
+    data.phone === undefined ? undefined : validatePhone(data.phone);
+  const dob = data.dob === undefined ? undefined : validateDob(data.dob);
+
   const updatedUser = await prismaClient.$transaction(async (tx) => {
     const userUpdated = await tx.user.update({
       where: { id: user.id },
       data: {
         ...(data.fullName && { fullName: data.fullName }),
-        ...(data.phone && { phone: data.phone }),
+        ...(phone && { phone }),
         ...(data.gender && { gender: data.gender }),
-        ...(data.dob && { dob: new Date(data.dob) }),
+        ...(dob && { dob }),
         ...(data.avatarUrl && { avatarUrl: data.avatarUrl })
       }
     });

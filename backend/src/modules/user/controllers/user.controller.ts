@@ -26,14 +26,13 @@ export const handleGetUserProfile = async (req: Request, res: Response) => {
 };
 
 export const handleSetupProfile = async (req: Request, res: Response) => {
-  const { role, gender, dob, phone, avatarUrl, universityId } = req.body;
+  const { role, dob, phone, gender, universityId } = req.body;
 
   const result = await userInfoService.setupProfile(req.user!, {
     role,
-    gender,
     dob,
     phone,
-    avatarUrl,
+    gender,
     universityId
   });
 

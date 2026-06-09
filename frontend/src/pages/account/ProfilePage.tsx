@@ -5,13 +5,12 @@ import {
   FaCheckCircle,
   FaEdit,
   FaEnvelope,
-  FaHome,
   FaIdCard,
   FaPhoneAlt,
   FaSave,
+  FaSpinner,
   FaUniversity,
-  FaUser,
-  FaUserGraduate
+  FaUser
 } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 
@@ -29,7 +28,7 @@ type ProfileFormState = {
   universityId: string
 }
 
-type SetupRole = '' | 'STUDENT' | 'HOST'
+type ProfileFieldErrors = Partial<Record<'fullName' | 'email' | 'phone', string>>
 
 const emptyForm: ProfileFormState = {
   fullName: '',
@@ -65,19 +64,16 @@ const ProfilePage = () => {
   const [form, setForm] = useState<ProfileFormState>(emptyForm)
   const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([])
   const [isEditing, setIsEditing] = useState(false)
-  const [setupRole, setSetupRole] = useState<SetupRole>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
 
   const isStudent = Boolean(profile?.roles?.includes('STUDENT'))
   const isHost = Boolean(profile?.roles?.includes('HOST'))
-  const needsProfileSetup = Boolean(
-    profile && (profile.status === 'SET_UP' || (!isStudent && !isHost && !profile.roles?.includes('ADMIN')))
-  )
-  const isStudentForm = isStudent || setupRole === 'STUDENT'
+  const isStudentForm = isStudent
   const hostInfo = profile?.hosts?.[0]
 
   const roleText = useMemo(
@@ -99,15 +95,6 @@ const ProfilePage = () => {
 
         if (currentProfile) {
           setProfile(currentProfile)
-          const existingRole = currentProfile.roles?.includes('STUDENT')
-            ? 'STUDENT'
-            : currentProfile.roles?.includes('HOST')
-              ? 'HOST'
-              : ''
-          setSetupRole(existingRole)
-          if (currentProfile.status === 'SET_UP' || (!existingRole && !currentProfile.roles?.includes('ADMIN'))) {
-            setIsEditing(true)
-          }
           setForm({
             fullName: currentProfile.fullName || '',
             phone: currentProfile.phone || '',
@@ -129,39 +116,36 @@ const ProfilePage = () => {
     void loadProfile()
   }, [])
 
+  const validateProfileForm = () => {
+    const nextErrors: ProfileFieldErrors = {}
+
+    if (!form.fullName.trim()) nextErrors.fullName = 'Họ và tên không được để trống.'
+    if (!profile?.email?.trim()) nextErrors.email = 'Email không được để trống.'
+    if (!form.phone.trim()) nextErrors.phone = 'Số điện thoại không được để trống.'
+
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSaving(true)
     setError('')
     setMessage('')
+    setFieldErrors({})
+
+    if (!validateProfileForm()) return
+
+    setSaving(true)
 
     try {
-      if (needsProfileSetup) {
-        if (!setupRole) {
-          setError('Vui lòng chọn vai trò Sinh viên hoặc Chủ trọ để hoàn tất hồ sơ.')
-          setSaving(false)
-          return
-        }
-
-        await userService.setupProfile({
-          role: setupRole,
-          fullName: form.fullName.trim(),
-          phone: form.phone.trim(),
-          dob: form.dob,
-          gender: form.gender,
-          avatarUrl: form.avatarUrl.trim(),
-          universityId: setupRole === 'STUDENT' ? form.universityId : undefined
-        })
-      } else {
-        await userService.updateProfile({
-          fullName: form.fullName.trim(),
-          phone: form.phone.trim(),
-          dob: form.dob,
-          gender: form.gender,
-          avatarUrl: form.avatarUrl.trim(),
-          universityId: isStudent ? form.universityId : undefined
-        })
-      }
+      await userService.updateProfile({
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        dob: form.dob,
+        gender: form.gender,
+        avatarUrl: form.avatarUrl.trim(),
+        universityId: isStudent ? form.universityId : undefined
+      })
 
       const refreshedProfile = await userService.getMyProfile()
       if (refreshedProfile) {
@@ -174,6 +158,7 @@ const ProfilePage = () => {
             fullName: refreshedProfile.fullName,
             phone: refreshedProfile.phone,
             avatarUrl: refreshedProfile.avatarUrl,
+            status: refreshedProfile.status,
             roles: refreshedProfile.roles
           })
         )
@@ -181,7 +166,7 @@ const ProfilePage = () => {
       }
 
       setIsEditing(false)
-      setMessage(needsProfileSetup ? 'Đã hoàn tất hồ sơ. Bạn có thể sử dụng các chức năng theo vai trò đã chọn.' : 'Đã cập nhật thông tin cá nhân.')
+      setMessage('Đã cập nhật thông tin cá nhân.')
     } catch {
       setError('Không thể cập nhật thông tin. Vui lòng kiểm tra lại các trường đã nhập.')
     } finally {
@@ -235,55 +220,18 @@ const ProfilePage = () => {
             className='inline-flex items-center gap-3 rounded-full bg-[#FFC300] px-6 py-3 text-sm font-extrabold text-[#001D3D] shadow-lg shadow-[#FFC300]/20 transition hover:bg-[#FFD60A]'
           >
             <FaEdit />
-            {needsProfileSetup ? 'Hoàn tất hồ sơ' : isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}
+            {isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}
           </button>
         </div>
 
-        {needsProfileSetup ? (
-          <section className='mt-6 rounded-2xl border border-[#FFC300]/60 bg-[#FFF7D6] px-6 py-5 shadow-sm'>
-            <div className='flex flex-wrap items-start justify-between gap-4'>
-              <div>
-                <h2 className='text-xl font-black text-[#001D3D]'>Hoàn tất hồ sơ Google</h2>
-                <p className='mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#6F5616]'>
-                  Tài khoản Google mới cần chọn vai trò để hệ thống cấp quyền sử dụng các chức năng như lưu bài, gửi yêu cầu thuê hoặc đăng tin.
-                </p>
-              </div>
-              <div className='flex flex-wrap gap-3'>
-                <button
-                  type='button'
-                  onClick={() => setSetupRole('STUDENT')}
-                  className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-extrabold transition ${
-                    setupRole === 'STUDENT'
-                      ? 'bg-[#001D3D] text-white'
-                      : 'bg-white text-[#001D3D] hover:bg-[#001D3D] hover:text-white'
-                  }`}
-                >
-                  <FaUserGraduate />
-                  Sinh viên
-                </button>
-                <button
-                  type='button'
-                  onClick={() => setSetupRole('HOST')}
-                  className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-extrabold transition ${
-                    setupRole === 'HOST'
-                      ? 'bg-[#001D3D] text-white'
-                      : 'bg-white text-[#001D3D] hover:bg-[#001D3D] hover:text-white'
-                  }`}
-                >
-                  <FaHome />
-                  Chủ trọ
-                </button>
-              </div>
-            </div>
-          </section>
+        {message ? (
+          <p className='mt-6 rounded-xl bg-green-50 px-5 py-3 text-sm font-bold text-green-700'>{message}</p>
         ) : null}
-
-        {message ? <p className='mt-6 rounded-xl bg-green-50 px-5 py-3 text-sm font-bold text-green-700'>{message}</p> : null}
         {error ? <p className='mt-6 rounded-xl bg-red-50 px-5 py-3 text-sm font-bold text-red-600'>{error}</p> : null}
 
         {loading ? (
-          <section className='mt-8 rounded-2xl bg-white p-10 text-center shadow-lg shadow-[#001D3D]/5'>
-            <p className='font-bold text-gray-500'>Đang tải thông tin cá nhân...</p>
+          <section className='mt-8 grid min-h-[320px] place-items-center rounded-2xl bg-white p-10 shadow-lg shadow-[#001D3D]/5'>
+            <FaSpinner className='animate-spin text-4xl text-[#001D3D]' aria-label='Đang tải' />
           </section>
         ) : profile ? (
           <section className='mt-8 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]'>
@@ -297,7 +245,10 @@ const ProfilePage = () => {
                   )}
                 </div>
                 <h2 className='mt-4 text-2xl font-black'>{profile.fullName}</h2>
-                <p className='mt-1 text-sm font-bold text-gray-500'>{roleText}</p>
+                <span className='mt-3 inline-flex items-center gap-2 rounded-full bg-[#FFF7D6] px-4 py-2 text-xs font-extrabold text-[#6F5616]'>
+                  <FaIdCard />
+                  {roleText}
+                </span>
                 {isHost && hostInfo?.isVerified ? (
                   <span className='mt-3 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-xs font-extrabold text-green-700'>
                     <FaCheckCircle />
@@ -340,6 +291,9 @@ const ProfilePage = () => {
                     disabled={!isEditing}
                     className='w-full min-w-0 rounded-xl border border-gray-200 px-4 py-3 font-bold outline-none focus:border-[#FFC300] disabled:bg-gray-50'
                   />
+                  {fieldErrors.fullName ? (
+                    <span className='text-xs font-bold text-red-600'>{fieldErrors.fullName}</span>
+                  ) : null}
                 </label>
                 <label className='grid min-w-0 gap-2 text-sm font-extrabold'>
                   Email
@@ -348,6 +302,9 @@ const ProfilePage = () => {
                     disabled
                     className='w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none'
                   />
+                  {fieldErrors.email ? (
+                    <span className='text-xs font-bold text-red-600'>{fieldErrors.email}</span>
+                  ) : null}
                 </label>
                 <label className='grid min-w-0 gap-2 text-sm font-extrabold'>
                   Số điện thoại
@@ -357,6 +314,9 @@ const ProfilePage = () => {
                     disabled={!isEditing}
                     className='w-full min-w-0 rounded-xl border border-gray-200 px-4 py-3 font-bold outline-none focus:border-[#FFC300] disabled:bg-gray-50'
                   />
+                  {fieldErrors.phone ? (
+                    <span className='text-xs font-bold text-red-600'>{fieldErrors.phone}</span>
+                  ) : null}
                 </label>
                 <label className='grid min-w-0 gap-2 text-sm font-extrabold'>
                   Ngày sinh

@@ -1,4 +1,4 @@
-import { type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -8,12 +8,18 @@ import useAuth, { getUserFromAuthResponse } from '@/hooks/useAuth'
 const shouldCompleteProfile = (response: unknown) => {
   const user = getUserFromAuthResponse(response as Parameters<typeof getUserFromAuthResponse>[0])
   const roles = user?.roles || []
-  return user?.status === 'SET_UP' || (!roles.includes('STUDENT') && !roles.includes('HOST') && !roles.includes('ADMIN'))
+  const isAdmin = roles.includes('ADMIN')
+  return (
+    user?.status === 'SET_UP' ||
+    (!roles.includes('STUDENT') && !roles.includes('HOST') && !isAdmin) ||
+    (!isAdmin && !String(user?.phone || '').trim())
+  )
 }
 
 const LoginForm = () => {
   const navigate = useNavigate()
   const { loading, login, loginWithGoogle } = useAuth()
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -22,6 +28,8 @@ const LoginForm = () => {
       return
     }
 
+    setErrorMessage('')
+
     const formData = new FormData(event.currentTarget)
     const response = await login({
       email: String(formData.get('email') || ''),
@@ -29,11 +37,11 @@ const LoginForm = () => {
     })
 
     if (response) {
-      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
+      navigate(shouldCompleteProfile(response) ? '/onboarding' : '/home')
       return
     }
 
-    alert('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
+    setErrorMessage('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
   }
 
   const handleGoogleCredential = async (idToken: string) => {
@@ -41,14 +49,16 @@ const LoginForm = () => {
       return
     }
 
+    setErrorMessage('')
+
     const response = await loginWithGoogle({ idToken })
 
     if (response) {
-      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
+      navigate(shouldCompleteProfile(response) ? '/onboarding' : '/home')
       return
     }
 
-    alert('Đăng nhập Google thất bại. Vui lòng thử lại.')
+    setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.')
   }
 
   return (
@@ -71,6 +81,9 @@ const LoginForm = () => {
           className='w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:ring-2 focus:ring-yellow-400'
         />
       </div>
+      {errorMessage ? (
+        <p className='rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold leading-5 text-red-600'>{errorMessage}</p>
+      ) : null}
       <div className='mb-2 flex items-center justify-between text-xs'>
         <label className='flex cursor-pointer items-center gap-1'>
           <input type='checkbox' className='accent-yellow-400' />
@@ -91,7 +104,7 @@ const LoginForm = () => {
         disabled={loading}
         text='signin_with'
         onCredential={(idToken) => void handleGoogleCredential(idToken)}
-        onError={(message) => alert(message)}
+        onError={(message) => setErrorMessage(message)}
       />
       <div className='mt-4 text-center text-xs text-gray-500'>
         Chưa có tài khoản?{' '}

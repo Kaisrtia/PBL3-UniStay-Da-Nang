@@ -9,7 +9,12 @@ import authService from '@/services/authService'
 const shouldCompleteProfile = (response: unknown) => {
   const user = getUserFromAuthResponse(response as Parameters<typeof getUserFromAuthResponse>[0])
   const roles = user?.roles || []
-  return user?.status === 'SET_UP' || (!roles.includes('STUDENT') && !roles.includes('HOST') && !roles.includes('ADMIN'))
+  const isAdmin = roles.includes('ADMIN')
+  return (
+    user?.status === 'SET_UP' ||
+    (!roles.includes('STUDENT') && !roles.includes('HOST') && !isAdmin) ||
+    (!isAdmin && !String(user?.phone || '').trim())
+  )
 }
 
 export const RegisterForm = () => {
@@ -65,7 +70,7 @@ export const RegisterForm = () => {
     const response = await loginWithGoogle({ idToken })
 
     if (response) {
-      navigate(shouldCompleteProfile(response) ? '/account/profile' : '/home')
+      navigate(shouldCompleteProfile(response) ? '/onboarding' : '/home')
       return
     }
 

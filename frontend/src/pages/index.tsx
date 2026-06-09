@@ -14,6 +14,7 @@ import ForgotPasswordPage from '@/pages/forgot-password/ForgotPasswordPage'
 import HomePage from '@/pages/home/HomePage'
 import LandingPage from '@/pages/landing/LandingPage'
 import LoginPage from '@/pages/login/LoginPage'
+import OnboardingPage from '@/pages/onboarding/OnboardingPage'
 import FavouritePostsPage from '@/pages/posts/favourites/FavouritePostsPage'
 import CreatePostPage from '@/pages/posts/create/CreatePostPage'
 import PostDetailPage from '@/pages/posts/detail/PostDetailPage'
@@ -38,6 +39,7 @@ export {
   HomePage,
   LandingPage,
   LoginPage,
+  OnboardingPage,
   ProfilePage,
   FavouritePostsPage,
   MyPostsPage,

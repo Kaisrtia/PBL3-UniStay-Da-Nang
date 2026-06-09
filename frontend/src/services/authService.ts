@@ -37,6 +37,8 @@ export type AuthUser = {
   id?: string
   email?: string
   fullName?: string
+  phone?: string | null
+  status?: string | null
   roles?: string[]
   [key: string]: unknown
 }
