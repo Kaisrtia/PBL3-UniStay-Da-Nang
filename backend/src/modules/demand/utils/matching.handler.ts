@@ -79,6 +79,30 @@ const calculateRangeScore = (
   return 10;
 };
 
+const calculatePriceScore = (
+  postPrice: number,
+  minPrice: number,
+  maxPrice: number
+) => {
+  if (
+    !Number.isFinite(postPrice) ||
+    !Number.isFinite(minPrice) ||
+    !Number.isFinite(maxPrice) ||
+    minPrice < 0 ||
+    maxPrice < minPrice ||
+    postPrice < minPrice ||
+    postPrice > maxPrice
+  ) {
+    return undefined;
+  }
+
+  if (minPrice === maxPrice) {
+    return 10;
+  }
+
+  return 10 * (1 - (postPrice - minPrice) / (maxPrice - minPrice));
+};
+
 const toRadians = (degree: number) => (degree * Math.PI) / 180;
 
 const calculateDistanceMeters = (
@@ -143,11 +167,15 @@ export const calculateScore = (
 ) => {
   const criteria: Array<{ score: number; coefficient: number }> = [];
 
-  // 1. Price. Keep the previous matching rule, but convert it to a 0-10 score.
+  // 1. Price is mandatory. Within the demand range, cheaper posts score higher.
   const postPrice = Number(post.price);
   const minPrice = Number(demand.minPrice);
   const maxPrice = Number(demand.maxPrice);
-  const priceScore = calculateRangeScore(postPrice, minPrice, maxPrice) ?? 0;
+  const priceScore = calculatePriceScore(postPrice, minPrice, maxPrice);
+
+  if (priceScore === undefined) {
+    return 0;
+  }
 
   criteria.push({
     score: Math.max(0, Math.min(priceScore, 10)),
