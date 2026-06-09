@@ -13,10 +13,10 @@ import { Response } from 'express';
 export const sendSuccess = (
   res: Response,
   statusCode: number,
-  data?: Record<string, any> | null,
+  data?: unknown,
   message?: string
 ) => {
-  const body: Record<string, any> = { success: true };
+  const body: Record<string, unknown> = { success: true };
 
   if (data !== undefined && data !== null) {
     body.data = data;

@@ -20,8 +20,9 @@ export const errorHandler = (
   err: Error,
   _req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ) => {
+  void next;
   // Handle known operational errors
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
