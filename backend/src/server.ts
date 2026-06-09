@@ -72,9 +72,40 @@ const closeBackgroundResources = async (force = false) => {
   ]);
 };
 
+const waitForCacheConnectionReady = async () => {
+  if (cacheConnection.status === 'ready') return;
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Redis cache connection timed out'));
+    }, 5000);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      cacheConnection.off('ready', handleReady);
+      cacheConnection.off('error', handleError);
+    };
+
+    const handleReady = () => {
+      cleanup();
+      resolve();
+    };
+
+    const handleError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    cacheConnection.once('ready', handleReady);
+    cacheConnection.once('error', handleError);
+  });
+};
+
 const startServer = async () => {
   try {
     await connectDB();
+    await waitForCacheConnectionReady();
     await cacheConnection.ping();
     await initCacheJob();
     await initDemandCacheJob();

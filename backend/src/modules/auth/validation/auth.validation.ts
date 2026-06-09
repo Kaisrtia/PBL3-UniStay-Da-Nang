@@ -1,6 +1,11 @@
 import Joi from 'joi';
 
-const email = Joi.string().trim().lowercase().email().max(255).required();
+const email = Joi.string()
+  .trim()
+  .lowercase()
+  .email({ tlds: { allow: false } })
+  .max(255)
+  .required();
 const password = Joi.string().min(8).max(72).required();
 
 export const registerSchema = {
