@@ -96,6 +96,18 @@ export const setupProfile = async (
       throw new AppError(HttpStatus.NOT_FOUND, 'User not found');
     }
 
+    const canRunSetup =
+      currentUser.status === account_status.SET_UP ||
+      (currentUser.status === account_status.ACTIVE &&
+        currentUser.role === account_role.USER);
+
+    if (!canRunSetup) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'User profile is already set up or locked'
+      );
+    }
+
     const userUpdated = await tx.user.update({
       where: { id: user.id },
       data: {

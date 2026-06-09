@@ -138,14 +138,16 @@ const ProfilePage = () => {
     setSaving(true)
 
     try {
-      await userService.updateProfile({
+      const updatePayload = {
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
-        dob: form.dob,
-        gender: form.gender,
-        avatarUrl: form.avatarUrl.trim(),
-        universityId: isStudent ? form.universityId : undefined
-      })
+        ...(form.dob && { dob: form.dob }),
+        ...(form.gender && { gender: form.gender }),
+        ...(form.avatarUrl.trim() && { avatarUrl: form.avatarUrl.trim() }),
+        ...(isStudent && form.universityId && { universityId: form.universityId })
+      }
+
+      await userService.updateProfile(updatePayload)
 
       const refreshedProfile = await userService.getMyProfile()
       if (refreshedProfile) {

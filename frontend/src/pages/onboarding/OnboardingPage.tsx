@@ -80,11 +80,17 @@ const getBackendErrorMessage = (error: unknown) => {
   return 'Không thể hoàn tất thiết lập.'
 }
 
+const getApplicationRole = (profile?: Pick<UserProfile, 'roles'> | null): SetupRole | '' => {
+  if (profile?.roles?.includes('STUDENT')) return 'STUDENT'
+  if (profile?.roles?.includes('HOST')) return 'HOST'
+  return ''
+}
+
 const OnboardingPage = () => {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<SetupRole | ''>('')
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null)
   const [form, setForm] = useState<OnboardingForm>(initialForm)
   const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -120,6 +126,12 @@ const OnboardingPage = () => {
   }, [isSetupComplete])
 
   const handleSelectRole = (nextRole: SetupRole) => {
+    const existingRole = getApplicationRole(currentProfile)
+    if (existingRole && currentProfile?.status !== 'SET_UP') {
+      setRole(existingRole)
+      return
+    }
+
     setRole(nextRole)
     setFieldErrors({})
     setForm((current) => ({
@@ -136,14 +148,11 @@ const OnboardingPage = () => {
           locationService.getUniversities()
         ])
 
-        if (profile) setProfile(profile)
+        setCurrentProfile(profile || null)
         setUniversities(universityOptions)
-        if (profile?.roles?.includes('STUDENT')) {
-          setRole('STUDENT')
-          setStep(2)
-        }
-        if (profile?.roles?.includes('HOST')) {
-          setRole('HOST')
+        const existingRole = getApplicationRole(profile)
+        if (existingRole) {
+          setRole(existingRole)
           setStep(2)
         }
 
@@ -208,16 +217,26 @@ const OnboardingPage = () => {
     setMessage('')
 
     try {
-      const response = await userService.setupProfile({
-        role,
+      const existingRole = getApplicationRole(currentProfile)
+      const shouldUpdateExistingProfile = currentProfile?.status !== 'SET_UP' && Boolean(existingRole)
+
+      const profilePayload = {
         phone: form.phone.trim(),
         dob: form.dob,
         gender: form.gender || undefined,
         universityId: role === 'STUDENT' ? form.universityId : undefined
-      })
+      }
+
+      const response = shouldUpdateExistingProfile
+        ? await userService.updateProfile(profilePayload)
+        : await userService.setupProfile({
+            role,
+            ...profilePayload
+          })
       const profile = await userService.getMyProfile()
 
       if (profile) {
+        setCurrentProfile(profile)
         localStorage.setItem(
           'authUser',
           JSON.stringify({
