@@ -100,7 +100,7 @@ model session {
 }
 
 model email_verification {
-  email     String    @id @unique
+  email     String    @id
   code      String?
   expiresAt DateTime?
 }
@@ -213,6 +213,9 @@ model comment {
   comment   comment?       @relation("ReplyRelation", fields: [parentId], references: [id])
   replies   comment[]      @relation("ReplyRelation")
   reports   report[]
+
+  @@index([postId, status, parentId, createdAt])
+  @@index([parentId, status, createdAt])
 }
 
 model post {
@@ -248,6 +251,13 @@ model post {
   studentFavoritePosts student_favorite_post[]
   accomodationRequests accomodation_request[]
   reports              report[]
+
+  @@index([status, createdAt])
+  @@index([status, wardId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, price])
+  @@index([status, area])
+  @@index([createdAt])
 }
 
 model post_image {
@@ -257,6 +267,7 @@ model post_image {
   post     post   @relation(fields: [postId], references: [id])
 
   @@id([id, postId])
+  @@index([postId])
 }
 
 model amenity {
@@ -274,6 +285,7 @@ model post_amenity {
   amenity          amenity           @relation(fields: [amenityId], references: [id])
 
   @@id([postId, amenityId])
+  @@index([amenityId, postId])
 }
 
 model student_demand {
@@ -328,6 +340,8 @@ model accomodation_request {
   user      user                        @relation(fields: [userId], references: [id])
 
   @@id([postId, userId])
+  @@index([userId, createdAt])
+  @@index([postId, status, createdAt])
 }
 
 model report {
@@ -347,6 +361,9 @@ model report {
   admin     user?         @relation("handle", fields: [adminId], references: [id])
   post      post?         @relation(fields: [postId], references: [id])
   comment   comment?      @relation(fields: [commentId], references: [id])
+
+  @@index([postId])
+  @@index([status, createdAt])
 }
 
 model notification {
@@ -361,4 +378,6 @@ model notification {
   createdAt DateTime          @default(now())
   updatedAt DateTime?       
   user      user              @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
 }
