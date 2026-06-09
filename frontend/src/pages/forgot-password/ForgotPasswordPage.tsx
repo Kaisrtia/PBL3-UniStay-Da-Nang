@@ -6,11 +6,12 @@ import { Link } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import authService from '@/services/authService'
+import { translateAuthMessage } from '@/utils/authMessages'
 
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'Không thể gửi email đặt lại mật khẩu.'
+    return translateAuthMessage(data?.error?.message || data?.message) || 'Không thể gửi email đặt lại mật khẩu.'
   }
 
   return 'Không thể gửi email đặt lại mật khẩu.'
@@ -37,7 +38,9 @@ const ForgotPasswordPage = () => {
 
     try {
       const response = await authService.sendForgotPassword({ email })
-      setMessage(response.message || 'Đã gửi liên kết đặt lại mật khẩu. Vui lòng kiểm tra email của bạn.')
+      setMessage(
+        translateAuthMessage(response.message) || 'Đã gửi liên kết đặt lại mật khẩu. Vui lòng kiểm tra email của bạn.'
+      )
     } catch (forgotPasswordError) {
       setError(getErrorMessage(forgotPasswordError))
     } finally {

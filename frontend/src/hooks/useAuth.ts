@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import axios from 'axios'
 
@@ -8,6 +8,7 @@ import authService, {
   type LoginPayload,
   type RegisterPayload
 } from '@/services/authService'
+import { translateAuthMessage } from '@/utils/authMessages'
 
 type AuthAction = 'login' | 'register' | 'google'
 
@@ -18,7 +19,7 @@ export const getUserFromAuthResponse = (response: AuthResponse) => response.data
 
 const getSuccessMessage = (action: AuthAction, response: AuthResponse) => {
   if (response.message) {
-    return response.message
+    return translateAuthMessage(response.message)
   }
 
   if (action === 'register') {
@@ -31,7 +32,7 @@ const getSuccessMessage = (action: AuthAction, response: AuthResponse) => {
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.'
+    return translateAuthMessage(data?.error?.message || data?.message) || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.'
   }
 
   return 'Đã có lỗi xảy ra. Vui lòng thử lại.'
@@ -41,11 +42,13 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const lastErrorRef = useRef('')
 
   const submitAuthRequest = async (action: AuthAction, payload: LoginPayload | RegisterPayload | GoogleLoginPayload) => {
     setLoading(true)
     setError('')
     setSuccess('')
+    lastErrorRef.current = ''
 
     try {
       const response =
@@ -69,6 +72,7 @@ export const useAuth = () => {
       return response
     } catch (authError) {
       const message = getErrorMessage(authError)
+      lastErrorRef.current = message
       setError(message)
       return null
     } finally {
@@ -88,7 +92,8 @@ export const useAuth = () => {
     register,
     loginWithGoogle,
     setError,
-    setSuccess
+    setSuccess,
+    getLastError: () => lastErrorRef.current
   }
 }
 

@@ -22,47 +22,62 @@ const RECOMMENDATION_SCORE_THRESHOLD = 0.6;
 const buildApprovedPostWhere = (
   filters: PostFilters,
   blockedUserIds: string[]
-): Prisma.postWhereInput => ({
-  status: 'APPROVED',
-  ...((filters.userId || blockedUserIds.length > 0) && {
-    userId: {
-      ...(filters.userId && { equals: filters.userId }),
-      ...(blockedUserIds.length > 0 && { notIn: blockedUserIds })
-    }
-  }),
-  ...(filters.purpose && { purpose: filters.purpose }),
-  ...(filters.wardId !== undefined && { wardId: filters.wardId }),
-  ...((filters.minArea !== undefined || filters.maxArea !== undefined) && {
-    area: {
-      ...(filters.minArea !== undefined && { gte: filters.minArea }),
-      ...(filters.maxArea !== undefined && { lte: filters.maxArea })
-    }
-  }),
-  ...((filters.minPrice !== undefined || filters.maxPrice !== undefined) && {
-    price: {
-      ...(filters.minPrice !== undefined && { gte: filters.minPrice }),
-      ...(filters.maxPrice !== undefined && { lte: filters.maxPrice })
-    }
-  }),
-  ...(filters.roomType && { roomType: filters.roomType }),
-  ...(filters.verifiedHost === true && {
-    user: { hosts: { some: { isVerified: true } } }
-  }),
-  ...(filters.amenities?.length && {
-    postAmenities: {
-      some: { amenityId: { in: filters.amenities } }
-    }
-  }),
-  ...(filters.hasMedia === true && {
-    postImages: { some: {} }
-  })
-});
+): Prisma.postWhereInput => {
+  const keyword = filters.keyword?.trim();
+
+  return {
+    status: 'APPROVED',
+    ...((filters.userId || blockedUserIds.length > 0) && {
+      userId: {
+        ...(filters.userId && { equals: filters.userId }),
+        ...(blockedUserIds.length > 0 && { notIn: blockedUserIds })
+      }
+    }),
+    ...(filters.purpose && { purpose: filters.purpose }),
+    ...(filters.wardId !== undefined && { wardId: filters.wardId }),
+    ...(keyword && {
+      OR: [
+        { title: { contains: keyword, mode: 'insensitive' } },
+        { description: { contains: keyword, mode: 'insensitive' } },
+        { detailAddress: { contains: keyword, mode: 'insensitive' } },
+        { exactAddress: { contains: keyword, mode: 'insensitive' } },
+        { city: { contains: keyword, mode: 'insensitive' } },
+        { ward: { name: { contains: keyword, mode: 'insensitive' } } }
+      ]
+    }),
+    ...((filters.minArea !== undefined || filters.maxArea !== undefined) && {
+      area: {
+        ...(filters.minArea !== undefined && { gte: filters.minArea }),
+        ...(filters.maxArea !== undefined && { lte: filters.maxArea })
+      }
+    }),
+    ...((filters.minPrice !== undefined || filters.maxPrice !== undefined) && {
+      price: {
+        ...(filters.minPrice !== undefined && { gte: filters.minPrice }),
+        ...(filters.maxPrice !== undefined && { lte: filters.maxPrice })
+      }
+    }),
+    ...(filters.roomType && { roomType: filters.roomType }),
+    ...(filters.verifiedHost === true && {
+      user: { hosts: { some: { isVerified: true } } }
+    }),
+    ...(filters.amenities?.length && {
+      postAmenities: {
+        some: { amenityId: { in: filters.amenities } }
+      }
+    }),
+    ...(filters.hasMedia === true && {
+      postImages: { some: {} }
+    })
+  };
+};
 
 export interface PostFilters {
   userId?: string;
   purpose?: post_purpose;
   status?: post_status; // Used for admin-level filtering
   wardId?: number;
+  keyword?: string;
 
   minArea?: number;
   maxArea?: number;
@@ -85,6 +100,8 @@ export interface NearbyPostFilters {
   limit?: number;
 }
 
+export type AdminPostSort = 'newest' | 'oldest' | 'statusAsc' | 'statusDesc';
+
 export interface RoutePathInput {
   fromLatitude: number;
   fromLongitude: number;
@@ -102,6 +119,27 @@ interface OsrmRouteResponse {
     };
   }[];
 }
+
+const buildPaginationMeta = (
+  totalItems: number,
+  itemCount: number,
+  currentPage: number,
+  itemsPerPage: number
+) => {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  return {
+    totalItems,
+    itemCount,
+    itemsPerPage,
+    totalPages,
+    currentPage,
+    // Backward-compatible aliases for existing frontend/admin consumers.
+    total: totalItems,
+    page: currentPage,
+    limit: itemsPerPage
+  };
+};
 
 const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
@@ -152,12 +190,7 @@ export const getPosts = async (
 
   return {
     data: posts,
-    meta: {
-      total: totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit)
-    }
+    meta: buildPaginationMeta(totalCount, posts.length, page, limit)
   };
 };
 
@@ -326,21 +359,30 @@ export const getRecommendedPosts = async (
 
   return {
     data: paginatedPosts,
-    meta: {
-      total: scoredPosts.length,
+    meta: buildPaginationMeta(
+      scoredPosts.length,
+      paginatedPosts.length,
       page,
-      limit,
-      totalPages: Math.ceil(scoredPosts.length / limit)
-    }
+      limit
+    )
   };
 };
 
 export const getPostsForAdmin = async (
   status?: post_status,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  sort: AdminPostSort = 'newest'
 ) => {
   const skip = (page - 1) * limit;
+  const orderBy: Prisma.postOrderByWithRelationInput[] =
+    sort === 'oldest'
+      ? [{ createdAt: 'asc' }]
+      : sort === 'statusAsc'
+        ? [{ status: 'asc' }, { createdAt: 'desc' }]
+        : sort === 'statusDesc'
+          ? [{ status: 'desc' }, { createdAt: 'desc' }]
+          : [{ createdAt: 'desc' }];
 
   const where: Prisma.postWhereInput = {};
   if (status) {
@@ -352,7 +394,7 @@ export const getPostsForAdmin = async (
       where,
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       include: {
         user: {
           select: {
@@ -373,12 +415,7 @@ export const getPostsForAdmin = async (
 
   return {
     data: posts,
-    meta: {
-      total: totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit)
-    }
+    meta: buildPaginationMeta(totalCount, posts.length, page, limit)
   };
 };
 
@@ -580,11 +617,6 @@ export const getMyPosts = async (
 
   return {
     data: posts,
-    meta: {
-      total: totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit)
-    }
+    meta: buildPaginationMeta(totalCount, posts.length, page, limit)
   };
 };

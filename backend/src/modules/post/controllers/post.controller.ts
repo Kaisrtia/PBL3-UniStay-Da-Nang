@@ -8,11 +8,29 @@ import { room_type, post_purpose, post_status } from '@prisma/client';
 
 // -- Post Listing --
 
+const parsePaginationQuery = (query: {
+  page?: unknown;
+  limit?: unknown;
+}) => {
+  const pageValue = Number(query.page);
+  const limitValue = Number(query.limit);
+
+  const page =
+    Number.isFinite(pageValue) && pageValue > 0 ? Math.floor(pageValue) : 1;
+  const limit =
+    Number.isFinite(limitValue) && limitValue > 0
+      ? Math.min(100, Math.floor(limitValue))
+      : 10;
+
+  return { page, limit };
+};
+
 export const handleGetPosts = async (req: Request, res: Response) => {
   const {
     userId,
     purpose,
     wardId,
+    keyword,
 
     minArea,
     maxArea,
@@ -46,6 +64,9 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   }
 
   if (wardId !== undefined) filters.wardId = Number(wardId);
+  if (keyword !== undefined && typeof keyword === 'string') {
+    filters.keyword = keyword;
+  }
 
   if (minArea !== undefined) filters.minArea = Number(minArea);
   if (maxArea !== undefined) filters.maxArea = Number(maxArea);
@@ -79,9 +100,9 @@ export const handleGetPosts = async (req: Request, res: Response) => {
       .filter((n) => !isNaN(n));
   }
 
-  if (page !== undefined) filters.page = Math.max(1, Number(page));
-  if (limit !== undefined)
-    filters.limit = Math.min(100, Math.max(1, Number(limit)));
+  const pagination = parsePaginationQuery({ page, limit });
+  filters.page = pagination.page;
+  filters.limit = pagination.limit;
 
   const validSortFields = ['createdAt', 'price', 'area', 'viewCount'];
   if (sortBy !== undefined && validSortFields.includes(sortBy as string)) {
@@ -190,8 +211,7 @@ export const handleGetRecommendedPosts = async (
   req: Request,
   res: Response
 ) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePaginationQuery(req.query);
 
   const result = await postQueryService.getRecommendedPosts(
     req.user!,
@@ -208,8 +228,7 @@ export const handleGetRecommendedPosts = async (
 };
 
 export const handleGetMyPosts = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { page, limit } = parsePaginationQuery(req.query);
 
   const result = await postQueryService.getMyPosts(req.user!, page, limit);
 
@@ -220,9 +239,8 @@ export const handleGetPostsByStatusForAdmin = async (
   req: Request,
   res: Response
 ) => {
-  const { status } = req.query;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const { status, sort } = req.query;
+  const { page, limit } = parsePaginationQuery(req.query);
 
   let postStatus: post_status | undefined;
   if (status) {
@@ -236,10 +254,21 @@ export const handleGetPostsByStatusForAdmin = async (
     postStatus = status as post_status;
   }
 
+  const validSorts: postQueryService.AdminPostSort[] = [
+    'newest',
+    'oldest',
+    'statusAsc',
+    'statusDesc'
+  ];
+  const selectedSort = validSorts.includes(sort as postQueryService.AdminPostSort)
+    ? (sort as postQueryService.AdminPostSort)
+    : 'newest';
+
   const result = await postQueryService.getPostsForAdmin(
     postStatus,
     page,
-    limit
+    limit,
+    selectedSort
   );
 
   sendSuccess(

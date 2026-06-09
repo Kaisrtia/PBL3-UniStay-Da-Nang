@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { logo } from '@/assets/images'
 import locationService from '@/services/locationService'
-import userService, { type UserProfile } from '@/services/userService'
+import userService, { type AuthenticatedUserProfile } from '@/services/userService'
 import { clearAuthSession } from '@/utils/authSession'
 
 type SetupRole = 'STUDENT' | 'HOST'
@@ -80,7 +80,7 @@ const getBackendErrorMessage = (error: unknown) => {
   return 'Không thể hoàn tất thiết lập.'
 }
 
-const getApplicationRole = (profile?: Pick<UserProfile, 'roles'> | null): SetupRole | '' => {
+const getApplicationRole = (profile?: Pick<AuthenticatedUserProfile, 'roles'> | null): SetupRole | '' => {
   if (profile?.roles?.includes('STUDENT')) return 'STUDENT'
   if (profile?.roles?.includes('HOST')) return 'HOST'
   return ''
@@ -90,7 +90,7 @@ const OnboardingPage = () => {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<SetupRole | ''>('')
-  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null)
+  const [currentProfile, setCurrentProfile] = useState<AuthenticatedUserProfile | null>(null)
   const [form, setForm] = useState<OnboardingForm>(initialForm)
   const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})

@@ -1,10 +1,15 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { toast } from 'react-toastify'
 
 export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:6969/api/v1').replace(/\/$/, '')
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
   _skipAuthRefresh?: boolean
+}
+
+type JwtPayload = {
+  exp?: number
 }
 
 export const api = axios.create({
@@ -15,8 +20,40 @@ export const api = axios.create({
   withCredentials: true
 })
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
+const getJwtPayload = (token: string) => {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decodedPayload = window.atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '='))
+    return JSON.parse(decodedPayload) as JwtPayload
+  } catch {
+    return null
+  }
+}
+
+const isTokenExpiredOrExpiringSoon = (token: string) => {
+  const payload = getJwtPayload(token)
+  if (!payload?.exp) return false
+
+  return payload.exp * 1000 <= Date.now() + 30_000
+}
+
+api.interceptors.request.use(async (config) => {
+  let token = localStorage.getItem('accessToken')
+
+  if (token && !shouldSkipRefresh(config) && isTokenExpiredOrExpiringSoon(token)) {
+    try {
+      refreshSessionRequest = refreshSessionRequest || refreshSession()
+      token = await refreshSessionRequest
+    } catch {
+      clearStoredAuthSession()
+      token = null
+    } finally {
+      refreshSessionRequest = null
+    }
+  }
 
   if (token) {
     config.headers = config.headers || {}
@@ -65,10 +102,37 @@ const refreshSession = async () => {
   return accessToken
 }
 
+const getRetryAfterSeconds = (retryAfter?: string) => {
+  if (!retryAfter) return null
+
+  const seconds = Number(retryAfter)
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.ceil(seconds)
+  }
+
+  const retryDate = new Date(retryAfter)
+  if (Number.isNaN(retryDate.getTime())) return null
+
+  const secondsUntilRetry = Math.ceil((retryDate.getTime() - Date.now()) / 1000)
+  return secondsUntilRetry > 0 ? secondsUntilRetry : null
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined
+
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers?.['retry-after']
+      const retryAfterValue = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter
+      const retryAfterSeconds = getRetryAfterSeconds(retryAfterValue)
+
+      toast.error(
+        retryAfterSeconds
+          ? `Vui lòng đợi ${retryAfterSeconds} giây trước khi thử lại.`
+          : 'Bạn đang thao tác quá nhanh. Vui lòng đợi một chút rồi thử lại.'
+      )
+    }
 
     if (error.response?.status !== 401 || !originalRequest || originalRequest._retry || shouldSkipRefresh(originalRequest)) {
       return Promise.reject(error)

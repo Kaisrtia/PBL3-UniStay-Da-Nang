@@ -4,9 +4,12 @@ import { FaArrowLeft, FaBath, FaBed, FaBolt, FaMapMarkerAlt, FaRulerCombined } f
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import Pagination from '@/components/pagination/Pagination'
 import postService, { type Post, type PostFilters, type PostPurpose, type RoomType } from '@/services/postService'
 
 type ResultTab = 'all' | PostPurpose | 'recommended'
+
+const POSTS_PER_PAGE = 24
 
 const tabs: { label: string; value: ResultTab }[] = [
   { label: 'Tất cả', value: 'all' },
@@ -113,6 +116,9 @@ const SearchResultsPage = () => {
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<ResultTab>('all')
   const [posts, setPosts] = useState<Post[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -129,6 +135,7 @@ const SearchResultsPage = () => {
 
     return {
       wardId: parseNumberParam(searchParams.get('wardId')),
+      keyword: searchParams.get('keyword')?.trim() || undefined,
       purpose: isPostPurpose(purposeParam) ? purposeParam : undefined,
       roomType: isRoomType(roomTypeParam) ? roomTypeParam : undefined,
       minArea: parseNumberParam(searchParams.get('minArea')),
@@ -141,12 +148,15 @@ const SearchResultsPage = () => {
     }
   }, [searchParams])
 
-  const keyword = searchParams.get('keyword')?.trim().toLowerCase() || ''
-
   useEffect(() => {
     const purpose = searchParams.get('purpose')
     setActiveTab(isPostPurpose(purpose) ? purpose : 'all')
+    setCurrentPage(1)
   }, [searchParams])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [queryFilters])
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -156,27 +166,25 @@ const SearchResultsPage = () => {
 
         const result =
           activeTab === 'recommended'
-            ? await postService.getRecommendedPosts({ limit: 24 })
+            ? await postService.getRecommendedPosts({ page: currentPage, limit: POSTS_PER_PAGE })
             : await postService.getPosts({
                 ...queryFilters,
                 purpose: activeTab === 'all' ? undefined : activeTab,
-                limit: 24,
+                page: currentPage,
+                limit: POSTS_PER_PAGE,
                 sortBy: queryFilters.sortBy || 'createdAt',
                 sortOrder: queryFilters.sortOrder || 'desc'
               })
 
-        const nextPosts = keyword
-          ? result.data.filter((post) => {
-              const searchText = [post.title, post.description, post.detailAddress, post.ward?.name]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase()
+        const nextTotalPages = Math.max(1, result.meta?.totalPages || 1)
 
-              return searchText.includes(keyword)
-            })
-          : result.data
+        setPosts(result.data)
+        setTotalPages(nextTotalPages)
+        setTotalItems(result.meta?.totalItems ?? result.meta?.total ?? result.data.length)
 
-        setPosts(nextPosts)
+        if (currentPage > nextTotalPages) {
+          setCurrentPage(nextTotalPages)
+        }
       } catch {
         setErrorMessage(
           activeTab === 'recommended'
@@ -189,7 +197,7 @@ const SearchResultsPage = () => {
     }
 
     void loadPosts()
-  }, [activeTab, keyword, queryFilters])
+  }, [activeTab, currentPage, queryFilters])
 
   const content = useMemo(() => {
     if (loading) {
@@ -234,7 +242,10 @@ const SearchResultsPage = () => {
               <button
                 key={tab.value}
                 type='button'
-                onClick={() => setActiveTab(tab.value)}
+                onClick={() => {
+                  setCurrentPage(1)
+                  setActiveTab(tab.value)
+                }}
                 className={`relative pb-5 text-lg font-extrabold transition ${
                   activeTab === tab.value ? 'text-[#181A20]' : 'text-[#181A20]/70 hover:text-[#181A20]'
                 }`}
@@ -245,7 +256,23 @@ const SearchResultsPage = () => {
             ))}
           </div>
 
-          <div className='px-12 py-12'>{content}</div>
+          <div className='px-12 py-12'>
+            {content}
+
+            {!loading && !errorMessage && posts.length > 0 ? (
+              <div className='mt-10 grid gap-4 border-t border-gray-100 pt-8'>
+                <p className='text-center text-sm font-semibold text-gray-500'>
+                  Hiển thị {posts.length} trong tổng số {totalItems} bài đăng
+                </p>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  disabled={loading}
+                />
+              </div>
+            ) : null}
+          </div>
         </section>
       </main>
 

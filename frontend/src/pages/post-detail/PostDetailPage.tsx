@@ -19,7 +19,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import PostLocationMap from '@/components/map/PostLocationMap'
 import adminService from '@/services/adminService'
-import { API_BASE_URL } from '@/services/api'
+import api from '@/services/api'
 import contactService from '@/services/contactService'
 import engagementService, { type PostComment } from '@/services/engagementService'
 import postService from '@/services/postService'
@@ -78,12 +78,6 @@ type PostDetail = {
   comments?: PostComment[]
   isBlockedByCurrentUser?: boolean
   status?: string
-}
-
-type ApiResponse<T> = {
-  success: boolean
-  data?: T
-  message?: string
 }
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -357,14 +351,12 @@ const PostDetailPage = () => {
         }
         setErrorMessage('')
 
-        const token = getAccessToken()
-        const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        const response = await api.get<{ success: boolean; data?: PostDetail; message?: string }>(`/posts/${postId}`, {
           signal
         })
-        const payload = (await response.json()) as ApiResponse<PostDetail>
+        const payload = response.data
 
-        if (!response.ok || !payload.success || !payload.data) {
+        if (!payload.success || !payload.data) {
           throw new Error(payload.message ?? 'Không thể tải chi tiết bài đăng.')
         }
 
@@ -388,11 +380,11 @@ const PostDetailPage = () => {
           }
         }
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        if (axios.isCancel(error) || (axios.isAxiosError(error) && error.code === 'ERR_CANCELED')) {
           return
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải chi tiết bài đăng.')
+        setErrorMessage(getBackendErrorMessage(error) || (error instanceof Error ? error.message : 'Không thể tải chi tiết bài đăng.'))
       } finally {
         setIsLoading(false)
       }

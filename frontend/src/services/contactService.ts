@@ -1,6 +1,6 @@
 import api from './api'
 import { type Post } from './postService'
-import { type UserProfile } from './userService'
+import { type AuthenticatedUserProfile } from './userService'
 
 type ApiResponse<T = unknown> = {
   success?: boolean
@@ -17,7 +17,7 @@ export type ReceivedContactRequest = {
   createdAt: string
   updatedAt?: string | null
   post: Post
-  user: UserProfile
+  user: AuthenticatedUserProfile
 }
 
 export type SentContactRequest = {
@@ -27,7 +27,7 @@ export type SentContactRequest = {
   createdAt: string
   updatedAt?: string | null
   post: Post & {
-    user?: UserProfile
+    user?: AuthenticatedUserProfile
   }
 }
 

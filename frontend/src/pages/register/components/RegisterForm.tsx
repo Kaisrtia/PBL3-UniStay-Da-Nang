@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton'
 import useAuth, { getUserFromAuthResponse } from '@/hooks/useAuth'
 import authService from '@/services/authService'
+import { translateAuthMessage } from '@/utils/authMessages'
 
 const shouldCompleteProfile = (response: unknown) => {
   const user = getUserFromAuthResponse(response as Parameters<typeof getUserFromAuthResponse>[0])
@@ -19,7 +20,7 @@ const shouldCompleteProfile = (response: unknown) => {
 
 export const RegisterForm = () => {
   const navigate = useNavigate()
-  const { loading, register, loginWithGoogle } = useAuth()
+  const { loading, register, loginWithGoogle, getLastError } = useAuth()
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -31,7 +32,13 @@ export const RegisterForm = () => {
     const formData = new FormData(event.currentTarget)
     const password = String(formData.get('password') || '')
     const confirmPassword = String(formData.get('confirmPassword') || '')
-    const email = String(formData.get('email') || '')
+    const email = String(formData.get('email') || '').trim().toLowerCase()
+    const fullName = String(formData.get('fullName') || '').trim()
+
+    if (!fullName || !email || !password) {
+      alert('Vui lòng nhập đầy đủ họ tên, email và mật khẩu.')
+      return
+    }
 
     if (password !== confirmPassword) {
       alert('Mật khẩu xác nhận không khớp.')
@@ -39,13 +46,13 @@ export const RegisterForm = () => {
     }
 
     const response = await register({
-      fullName: String(formData.get('fullName') || ''),
+      fullName,
       email,
       password
     })
 
     if (response) {
-      const message = response.message || 'Đăng ký thành công.'
+      const message = translateAuthMessage(response.message) || 'Đăng ký thành công.'
 
       try {
         await authService.sendEmailVerification({ email })
@@ -59,7 +66,7 @@ export const RegisterForm = () => {
       return
     }
 
-    alert('Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.')
+    alert(getLastError() || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.')
   }
 
   const handleGoogleCredential = async (idToken: string) => {
@@ -74,7 +81,7 @@ export const RegisterForm = () => {
       return
     }
 
-    alert('Đăng ký bằng Google thất bại. Vui lòng thử lại.')
+    alert(getLastError() || 'Đăng ký bằng Google thất bại. Vui lòng thử lại.')
   }
 
   return (

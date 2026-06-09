@@ -35,6 +35,10 @@ export type AdminUser = {
 export type PaginatedUsers = {
   data: AdminUser[]
   meta?: {
+    totalItems?: number
+    itemCount?: number
+    itemsPerPage?: number
+    currentPage?: number
     total?: number
     page?: number
     limit?: number
@@ -59,6 +63,10 @@ export type HostVerificationCandidate = {
 export type PaginatedHostVerificationCandidates = {
   data: HostVerificationCandidate[]
   meta?: {
+    totalItems?: number
+    itemCount?: number
+    itemsPerPage?: number
+    currentPage?: number
     total?: number
     page?: number
     limit?: number
@@ -91,6 +99,7 @@ export type AdminReport = {
   post?: Pick<Post, 'id' | 'title' | 'status'> | null
   comment?: {
     id: string
+    postId?: string
     content: string
     status?: string
   } | null
@@ -99,6 +108,10 @@ export type AdminReport = {
 export type PaginatedReports = {
   data: AdminReport[]
   meta?: {
+    totalItems?: number
+    itemCount?: number
+    itemsPerPage?: number
+    currentPage?: number
     total?: number
     page?: number
     limit?: number
@@ -118,11 +131,12 @@ export const adminService = {
     return response.data.data || {}
   },
 
-  getAdminPosts: async (params?: { status?: PostStatus | string; page?: number; limit?: number }) => {
+  getAdminPosts: async (params?: { status?: PostStatus | string; page?: number; limit?: number; sort?: string }) => {
     const search = new URLSearchParams()
     if (params?.status) search.set('status', params.status)
     if (params?.page) search.set('page', String(params.page))
     if (params?.limit) search.set('limit', String(params.limit))
+    if (params?.sort) search.set('sort', params.sort)
 
     const query = search.toString()
     const response = await api.get<ApiResponse<PaginatedPosts>>(`/posts/admin/all${query ? `?${query}` : ''}`)

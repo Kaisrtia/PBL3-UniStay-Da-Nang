@@ -15,8 +15,27 @@ export type ProfileUniversity = {
 
 export type UserProfile = {
   id: string
-  email: string
   fullName: string
+  avatarUrl?: string | null
+  role: string
+  createdAt: string
+  host?: {
+    hostId?: string
+    totalPost?: number
+    isVerified?: boolean
+    avgStar?: string | number
+  } | null
+  student?: {
+    studentId: string
+    totalPost?: number
+    universityId?: string | null
+    university?: ProfileUniversity | null
+  } | null
+  reviews?: HostReview[]
+}
+
+export type AuthenticatedUserProfile = Omit<UserProfile, 'role' | 'createdAt' | 'host'> & {
+  email: string
   phone?: string | null
   dob?: string | null
   gender?: string | null
@@ -26,19 +45,15 @@ export type UserProfile = {
   provider?: string | null
   status?: string | null
   roles?: string[]
-  student?: {
-    studentId: string
-    totalPost?: number
-    universityId?: string | null
-    university?: ProfileUniversity | null
-  } | null
   hosts?: Array<{
     hostId: string
     totalPost?: number
     isVerified?: boolean
     avgStar?: string | number
   }>
-  reviews?: HostReview[]
+  role?: string
+  createdAt?: string
+  host?: UserProfile['host']
 }
 
 export type HostReview = {
@@ -75,13 +90,13 @@ export type ChangePasswordPayload = {
 }
 
 export type BlockedUserItem = {
-  blockedUser: UserProfile
+  blockedUser: AuthenticatedUserProfile
   createdAt: string
 }
 
 export const userService = {
   getMyProfile: async () => {
-    const response = await api.get<ApiResponse<UserProfile>>('/users/me')
+    const response = await api.get<ApiResponse<AuthenticatedUserProfile>>('/users/me')
     return response.data.data
   },
 
@@ -91,12 +106,12 @@ export const userService = {
   },
 
   setupProfile: async (payload: SetupProfilePayload) => {
-    const response = await api.patch<ApiResponse<UserProfile>>('/users/setup', payload)
+    const response = await api.patch<ApiResponse<AuthenticatedUserProfile>>('/users/setup', payload)
     return response.data
   },
 
   updateProfile: async (payload: UpdateProfilePayload) => {
-    const response = await api.patch<ApiResponse<UserProfile>>('/users/update', payload)
+    const response = await api.patch<ApiResponse<AuthenticatedUserProfile>>('/users/update', payload)
     return response.data
   },
 

@@ -60,6 +60,7 @@ export const getReports = async (
         comment: {
           select: {
             id: true,
+            postId: true,
             content: true,
             status: true
           }

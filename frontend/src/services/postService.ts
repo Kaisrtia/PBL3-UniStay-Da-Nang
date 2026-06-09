@@ -73,6 +73,7 @@ export type PostFilters = {
   userId?: string
   purpose?: PostPurpose
   wardId?: number
+  keyword?: string
   minArea?: number
   maxArea?: number
   minPrice?: number
@@ -90,6 +91,10 @@ export type PostFilters = {
 export type PaginatedPosts = {
   data: Post[]
   meta?: {
+    totalItems?: number
+    itemCount?: number
+    itemsPerPage?: number
+    currentPage?: number
     total?: number
     page?: number
     limit?: number

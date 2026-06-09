@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 
-import { FaBan, FaMapMarkerAlt, FaPhoneAlt, FaSpinner, FaStar, FaUniversity, FaUserCircle } from 'react-icons/fa'
+import { FaBan, FaMapMarkerAlt, FaSpinner, FaStar, FaUniversity, FaUserCircle } from 'react-icons/fa'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -57,7 +57,7 @@ const getPostAddress = (post: Post) => {
 }
 
 const getAverageRating = (profile: UserProfile) => {
-  const hostRating = profile.hosts?.find((host) => host.avgStar !== undefined)?.avgStar
+  const hostRating = profile.host?.avgStar
   const numericHostRating = Number(hostRating)
 
   if (Number.isFinite(numericHostRating) && numericHostRating >= 0) {
@@ -167,9 +167,9 @@ const UserDetailPage = () => {
   const currentUserId = useMemo(() => getStoredUserId(), [])
 
   const isSelf = Boolean(currentUserId && currentUserId === id)
-  const roles = profile?.roles || []
-  const isStudent = roles.includes('STUDENT')
-  const isHost = roles.includes('HOST')
+  const role = profile?.role || 'USER'
+  const isStudent = role === 'STUDENT'
+  const isHost = role === 'HOST'
   const averageRating = profile ? getAverageRating(profile) : null
   const reviews = profile?.reviews || []
   const canLoadMorePosts = postsPage < postsTotalPages
@@ -324,17 +324,11 @@ const UserDetailPage = () => {
                     <div className='pb-2'>
                       <h1 className='text-3xl font-black text-gray-950'>{profile.fullName}</h1>
                       <div className='mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-gray-500'>
-                        <span>{roleLabels[roles[0] || 'USER'] || roles[0] || 'Người dùng'}</span>
+                        <span>{roleLabels[role] || role || 'Người dùng'}</span>
                         {isHost && averageRating !== null ? (
                           <span className='inline-flex items-center gap-1 text-[#001D3D]'>
                             <FaStar className='text-[#FFC300]' />
                             {averageRating.toFixed(1)} sao
-                          </span>
-                        ) : null}
-                        {profile.phone ? (
-                          <span className='inline-flex items-center gap-1'>
-                            <FaPhoneAlt className='text-[#FFC300]' />
-                            {profile.phone}
                           </span>
                         ) : null}
                       </div>

@@ -6,11 +6,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import authService from '@/services/authService'
+import { translateAuthMessage } from '@/utils/authMessages'
 
 const getErrorMessage = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
-    return data?.error?.message || data?.message || 'Không thể đặt lại mật khẩu.'
+    return translateAuthMessage(data?.error?.message || data?.message) || 'Không thể đặt lại mật khẩu.'
   }
 
   return 'Không thể đặt lại mật khẩu.'
@@ -52,7 +53,9 @@ const ResetPasswordPage = () => {
 
     try {
       const response = await authService.resetPassword({ token, newPassword })
-      setMessage(response.message || 'Đã đặt lại mật khẩu. Bạn có thể đăng nhập bằng mật khẩu mới.')
+      setMessage(
+        translateAuthMessage(response.message) || 'Đã đặt lại mật khẩu. Bạn có thể đăng nhập bằng mật khẩu mới.'
+      )
       event.currentTarget.reset()
     } catch (resetPasswordError) {
       setError(getErrorMessage(resetPasswordError))

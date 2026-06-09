@@ -18,7 +18,7 @@ const shouldCompleteProfile = (response: unknown) => {
 
 const LoginForm = () => {
   const navigate = useNavigate()
-  const { loading, login, loginWithGoogle } = useAuth()
+  const { loading, login, loginWithGoogle, getLastError } = useAuth()
   const [errorMessage, setErrorMessage] = useState('')
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -32,7 +32,7 @@ const LoginForm = () => {
 
     const formData = new FormData(event.currentTarget)
     const response = await login({
-      email: String(formData.get('email') || ''),
+      email: String(formData.get('email') || '').trim().toLowerCase(),
       password: String(formData.get('password') || '')
     })
 
@@ -41,7 +41,7 @@ const LoginForm = () => {
       return
     }
 
-    setErrorMessage('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
+    setErrorMessage(getLastError() || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
   }
 
   const handleGoogleCredential = async (idToken: string) => {
@@ -58,7 +58,7 @@ const LoginForm = () => {
       return
     }
 
-    setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.')
+    setErrorMessage(getLastError() || 'Đăng nhập Google thất bại. Vui lòng thử lại.')
   }
 
   return (

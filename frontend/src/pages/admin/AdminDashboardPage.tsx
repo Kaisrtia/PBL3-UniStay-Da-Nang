@@ -4,6 +4,7 @@ import { FaCheck, FaClipboardList, FaEye, FaShieldAlt, FaSyncAlt, FaTimes, FaUse
 import { Link, useLocation } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
+import Pagination from '@/components/pagination/Pagination'
 import adminService, {
   type AdminReport,
   type AdminReportStatus,
@@ -60,6 +61,7 @@ const getPostCountByStatus = (stats: AdminPostStatistic, status: string) =>
   stats.byStatus?.find((item) => item.status === status)?.count || 0
 
 const REPORTS_PER_PAGE = 10
+const ADMIN_TABLE_PAGE_SIZE = 10
 const ADMIN_POSTS_ANALYTICS_LIMIT = 1000
 
 type ChartPoint = {
@@ -68,7 +70,7 @@ type ChartPoint = {
   approved: number
 }
 
-type AdminPostSort = 'newest' | 'statusPriority' | 'reportsDesc'
+type AdminPostSort = 'newest' | 'oldest' | 'statusAsc' | 'statusDesc'
 
 const getPostDate = (post: Post) => {
   const date = post.createdAt ? new Date(post.createdAt) : null
@@ -101,50 +103,6 @@ const getPostStatusPriority = (post: Post) => {
 
   return priorities[String(post.status)] ?? 5
 }
-
-const sortAdminPosts = (posts: Post[], sort: AdminPostSort) => {
-  const sortedPosts = [...posts]
-
-  if (sort === 'statusPriority') {
-    return sortedPosts.sort(
-      (a, b) =>
-        getPostStatusPriority(a) - getPostStatusPriority(b) ||
-        getPostReportCount(b) - getPostReportCount(a) ||
-        (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0)
-    )
-  }
-
-  if (sort === 'reportsDesc') {
-    return sortedPosts.sort(
-      (a, b) =>
-        getPostReportCount(b) - getPostReportCount(a) ||
-        getPostStatusPriority(a) - getPostStatusPriority(b) ||
-        (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0)
-    )
-  }
-
-  return sortedPosts.sort((a, b) => (getPostDate(b)?.getTime() || 0) - (getPostDate(a)?.getTime() || 0))
-}
-
-const SortHeaderButton = ({
-  label,
-  active,
-  onClick
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) => (
-  <button
-    type='button'
-    onClick={onClick}
-    className={`ml-2 rounded-full px-2 py-1 text-[10px] font-extrabold transition ${
-      active ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-    }`}
-  >
-    {label}
-  </button>
-)
 
 const buildDailyChartData = (posts: Post[]): ChartPoint[] => {
   const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
@@ -474,22 +432,35 @@ const AdminPostsContent = () => {
   const [postSort, setPostSort] = useState<AdminPostSort>('newest')
   const [stats, setStats] = useState<AdminPostStatistic>({})
   const [posts, setPosts] = useState<Post[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalPosts, setTotalPosts] = useState(0)
+  const [loadingPosts, setLoadingPosts] = useState(false)
   const [message, setMessage] = useState('')
 
   const loadPosts = useCallback(async () => {
+    setLoadingPosts(true)
     const [statResult, postResult] = await Promise.all([
       adminService.getPostStatistics(period),
       adminService.getAdminPosts({
         status: statusFilter === 'ALL' ? undefined : statusFilter,
-        limit: ADMIN_POSTS_ANALYTICS_LIMIT
+        page: currentPage,
+        limit: ADMIN_TABLE_PAGE_SIZE,
+        sort: postSort
       })
     ])
     setStats(statResult)
     setPosts(postResult.data)
-  }, [period, statusFilter])
+    setTotalPages(Math.max(1, postResult.meta?.totalPages || 1))
+    setTotalPosts(postResult.meta?.totalItems ?? postResult.meta?.total ?? postResult.data.length)
+    setLoadingPosts(false)
+  }, [currentPage, period, postSort, statusFilter])
 
   useEffect(() => {
-    void loadPosts().catch(() => setMessage('Không tải được danh sách bài đăng admin.'))
+    void loadPosts().catch(() => {
+      setLoadingPosts(false)
+      setMessage('Không tải được danh sách bài đăng admin.')
+    })
   }, [loadPosts])
 
   const handleCensor = async (postId: string, status: PostStatus) => {
@@ -508,8 +479,6 @@ const AdminPostsContent = () => {
   const periodPosts = useMemo(() => getPostsInStatsPeriod(posts, stats), [posts, stats])
   const dailyChartData = useMemo(() => buildDailyChartData(periodPosts), [periodPosts])
   const hourlyChartData = useMemo(() => buildHourlyChartData(periodPosts), [periodPosts])
-  const sortedPosts = useMemo(() => sortAdminPosts(posts, postSort), [postSort, posts])
-
   return (
     <AdminShell activeTab='posts'>
       {message ? (
@@ -523,7 +492,6 @@ const AdminPostsContent = () => {
         </div>
         <aside className='grid content-start gap-8'>
           <PeriodControls period={period} onChange={setPeriod} />
-          <DateFilterCard />
           <section className='rounded-2xl bg-white p-5 shadow-lg shadow-black/15'>
             <p className='text-sm font-extrabold'>Lọc trạng thái</p>
             <div className='mt-4 grid grid-cols-2 gap-3'>
@@ -531,7 +499,10 @@ const AdminPostsContent = () => {
                 <button
                   key={status}
                   type='button'
-                  onClick={() => setStatusFilter(status)}
+                  onClick={() => {
+                    setCurrentPage(1)
+                    setStatusFilter(status)
+                  }}
                   className={`rounded-full px-4 py-2 text-xs font-extrabold ${
                     statusFilter === status ? 'bg-[#001D3D] text-white' : 'bg-gray-100 text-gray-600'
                   }`}
@@ -553,38 +524,42 @@ const AdminPostsContent = () => {
               {getPostCountByStatus(stats, 'PENDING')}
             </p>
           </div>
-          <p className='text-sm text-gray-500'>
-            Các quyết định xử lý sẽ được ghi nhận và gửi thông báo cho người đăng.
-          </p>
+          <div className='flex flex-wrap items-center justify-end gap-3'>
+            <p className='max-w-md text-sm text-gray-500'>
+              Các quyết định xử lý sẽ được ghi nhận và gửi thông báo cho người đăng.
+            </p>
+            <label className='flex items-center gap-2 rounded-full bg-gray-50 px-4 py-2 text-xs font-extrabold text-[#181A20]'>
+              <span>Sắp xếp</span>
+              <select
+                value={postSort}
+                onChange={(event) => {
+                  setCurrentPage(1)
+                  setPostSort(event.target.value as AdminPostSort)
+                }}
+                className='bg-transparent text-xs font-extrabold outline-none'
+              >
+                <option value='newest'>Mới nhất</option>
+                <option value='oldest'>Cũ nhất</option>
+                <option value='statusAsc'>Trạng thái: chờ duyệt trước</option>
+                <option value='statusDesc'>Trạng thái: đảo chiều</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div className='mt-6 overflow-x-auto'>
           <table className='w-full min-w-[980px] text-left text-sm'>
             <thead>
               <tr className='text-sm font-extrabold text-[#181A20]'>
                 <th className='py-3'>Người dùng</th>
-                <th className='py-3'>
-                  Trạng thái
-                  <SortHeaderButton
-                    label='chờ trước'
-                    active={postSort === 'statusPriority'}
-                    onClick={() => setPostSort((current) => (current === 'statusPriority' ? 'newest' : 'statusPriority'))}
-                  />
-                </th>
+                <th className='py-3'>Trạng thái</th>
                 <th className='py-3'>Bài đăng</th>
                 <th className='py-3'>Khu vực</th>
-                <th className='py-3'>
-                  Báo cáo
-                  <SortHeaderButton
-                    label='nhiều nhất'
-                    active={postSort === 'reportsDesc'}
-                    onClick={() => setPostSort((current) => (current === 'reportsDesc' ? 'newest' : 'reportsDesc'))}
-                  />
-                </th>
+                <th className='py-3'>Báo cáo</th>
                 <th className='py-3 text-right'>Quyết định</th>
               </tr>
             </thead>
             <tbody>
-              {sortedPosts.map((post) => (
+              {posts.map((post) => (
                 <tr key={post.id} className='border-t border-gray-100'>
                   <td className='py-4 font-semibold'>{post.user?.fullName || post.userId || 'Người dùng'}</td>
                   <td className='py-4'>
@@ -628,6 +603,19 @@ const AdminPostsContent = () => {
             </tbody>
           </table>
         </div>
+        {totalPosts > 0 ? (
+          <div className='mt-6 grid gap-4 border-t border-gray-100 pt-5'>
+            <p className='text-center text-sm font-semibold text-gray-500'>
+              Showing {formatNumber(posts.length)} / {formatNumber(totalPosts)} posts
+            </p>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              disabled={loadingPosts}
+            />
+          </div>
+        ) : null}
       </section>
     </AdminShell>
   )
@@ -635,16 +623,27 @@ const AdminPostsContent = () => {
 
 const AdminUsersContent = () => {
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [message, setMessage] = useState('')
 
-  const loadUsers = async () => {
-    const result = await adminService.getUsers({ limit: 24 })
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true)
+    const result = await adminService.getUsers({ page: currentPage, limit: ADMIN_TABLE_PAGE_SIZE })
     setUsers(result.data)
-  }
+    setTotalPages(Math.max(1, result.meta?.totalPages || 1))
+    setTotalUsers(result.meta?.totalItems ?? result.meta?.total ?? result.data.length)
+    setLoadingUsers(false)
+  }, [currentPage])
 
   useEffect(() => {
-    void loadUsers().catch(() => setMessage('Không tải được danh sách người dùng admin.'))
-  }, [])
+    void loadUsers().catch(() => {
+      setLoadingUsers(false)
+      setMessage('Không tải được danh sách người dùng admin.')
+    })
+  }, [loadUsers])
 
   const handleToggleUser = async (user: AdminUser) => {
     try {
@@ -704,6 +703,19 @@ const AdminUsersContent = () => {
             </tbody>
           </table>
         </div>
+        {totalUsers > 0 ? (
+          <div className='mt-6 grid gap-4 border-t border-gray-100 pt-5'>
+            <p className='text-center text-sm font-semibold text-gray-500'>
+              Showing {formatNumber(users.length)} / {formatNumber(totalUsers)} users
+            </p>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              disabled={loadingUsers}
+            />
+          </div>
+        ) : null}
       </section>
     </AdminShell>
   )
@@ -725,7 +737,7 @@ const AdminReportsContent = () => {
     const result = await adminService.getReports({ status: statusFilter, page, limit: REPORTS_PER_PAGE })
     setReports(result.data)
     setTotalPages(Math.max(1, result.meta?.totalPages || 1))
-    setTotalReports(result.meta?.total || result.data.length)
+    setTotalReports(result.meta?.totalItems ?? result.meta?.total ?? result.data.length)
     setLoading(false)
   }, [page, statusFilter])
 
@@ -825,7 +837,9 @@ const AdminReportsContent = () => {
               <tbody>
                 {reports.map((report) => {
                   const isPending = report.status === 'PENDING'
-                  const relatedPostPath = report.postId ? `/posts/${report.postId}` : ''
+                  const relatedPostId = report.postId || report.comment?.postId
+                  const relatedPostPath = relatedPostId ? `/posts/${relatedPostId}` : ''
+                  const reportContent = report.post?.title || report.comment?.content
 
                   return (
                     <tr key={report.id} className='border-t border-gray-100 align-top'>
@@ -838,16 +852,16 @@ const AdminReportsContent = () => {
                         <p className='mt-1 text-xs font-semibold text-gray-500'>{report.reportedUser?.email}</p>
                       </td>
                       <td className='max-w-xs py-4'>
-                        {report.post ? (
+                        {reportContent && relatedPostPath ? (
                           <Link
                             to={relatedPostPath}
                             state={{ returnTo: '/admin/reports', returnLabel: 'Quay lại báo cáo' }}
-                            className='font-extrabold text-[#003566] hover:underline'
+                            className='line-clamp-3 font-extrabold text-[#003566] hover:underline'
                           >
-                            {report.post.title}
+                            {reportContent}
                           </Link>
-                        ) : report.comment ? (
-                          <p className='line-clamp-3 font-semibold text-gray-700'>{report.comment.content}</p>
+                        ) : reportContent ? (
+                          <p className='line-clamp-3 font-semibold text-gray-700'>{reportContent}</p>
                         ) : (
                           <span className='font-semibold text-gray-400'>Không có nội dung</span>
                         )}
@@ -919,27 +933,8 @@ const AdminReportsContent = () => {
                 <p className='text-sm font-semibold text-gray-500'>
                   Hiển thị {formatNumber(reports.length)} / {formatNumber(totalReports)} báo cáo
                 </p>
-                <div className='flex items-center gap-2'>
-                  <button
-                    type='button'
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page <= 1 || loading}
-                    className='rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-300'
-                  >
-                    Trước
-                  </button>
-                  <span className='rounded-full bg-[#FFF7D6] px-4 py-2 text-xs font-extrabold text-[#001D3D]'>
-                    {page} / {totalPages}
-                  </span>
-                  <button
-                    type='button'
-                    onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                    disabled={page >= totalPages || loading}
-                    className='rounded-full bg-gray-100 px-4 py-2 text-xs font-extrabold text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-300'
-                  >
-                    Sau
-                  </button>
-                </div>
+
+                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} disabled={loading} />
               </div>
             ) : null}
           </div>

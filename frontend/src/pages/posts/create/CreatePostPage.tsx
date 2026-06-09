@@ -5,6 +5,7 @@ import L from 'leaflet'
 import { FaChevronDown, FaImage, FaTimes } from 'react-icons/fa'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import 'leaflet/dist/leaflet.css'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
@@ -31,6 +32,7 @@ const amenityConditionOptions: { label: string; value: AmenityCondition }[] = [
 ]
 
 const defaultMapCenter: [number, number] = [16.0544, 108.2022]
+const MAX_POST_IMAGES = 10
 
 const mapTileAttribution =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -604,6 +606,11 @@ const CreatePostPage = () => {
 
     if (!isValidCoordinate(latitudeValue, longitudeValue)) {
       alert('Vui lòng chọn tọa độ hợp lệ trên bản đồ.')
+      return
+    }
+
+    if (existingImageUrls.length + mediaPreviews.length > MAX_POST_IMAGES) {
+      toast.error(`Mỗi bài đăng chỉ được tối đa ${MAX_POST_IMAGES} ảnh. Vui lòng xóa bớt ảnh trước khi đăng.`)
       return
     }
 

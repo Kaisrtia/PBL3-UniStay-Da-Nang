@@ -66,10 +66,20 @@ export const handleLogin = async (req: Request, res: Response) => {
 
 export const handleGoogleLogin = async (req: Request, res: Response) => {
   const { idToken } = req.body;
-  const ticket = await oauth2Client.verifyIdToken({
-    idToken,
-    audience: config.google.client_id
-  });
+  if (!idToken) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Google token is required');
+  }
+
+  let ticket;
+  try {
+    ticket = await oauth2Client.verifyIdToken({
+      idToken,
+      audience: config.google.client_id
+    });
+  } catch {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid Google token');
+  }
+
   const payload = ticket.getPayload();
 
   if (!payload) {

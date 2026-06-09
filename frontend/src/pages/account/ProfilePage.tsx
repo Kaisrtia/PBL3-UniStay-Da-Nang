@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom'
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import { uploadAvatarImage } from '@/services/cloudinaryService'
 import locationService from '@/services/locationService'
-import userService, { type UserProfile } from '@/services/userService'
+import userService, { type AuthenticatedUserProfile } from '@/services/userService'
 
 type ProfileFormState = {
   fullName: string
@@ -60,7 +60,7 @@ const formatDateInput = (value?: string | null) => {
 }
 
 const ProfilePage = () => {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<AuthenticatedUserProfile | null>(null)
   const [form, setForm] = useState<ProfileFormState>(emptyForm)
   const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([])
   const [isEditing, setIsEditing] = useState(false)

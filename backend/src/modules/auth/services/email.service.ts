@@ -55,11 +55,16 @@ export const sendEmailOtpCode = async (email: string) => {
   const expiresAt = new Date(
     Date.now() + Number(config.email.verification_ttl)
   );
-  await prismaClient.email_verification.update({
+  await prismaClient.email_verification.upsert({
     where: {
       email
     },
-    data: {
+    update: {
+      code,
+      expiresAt
+    },
+    create: {
+      email,
       code,
       expiresAt
     }

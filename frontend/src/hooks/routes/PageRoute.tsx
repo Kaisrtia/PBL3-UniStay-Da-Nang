@@ -30,12 +30,12 @@ import {
   UserDetailPage,
   VerifyEmailPage
 } from '@/pages/index.tsx'
-import userService, { type UserProfile } from '@/services/userService'
+import userService, { type AuthenticatedUserProfile } from '@/services/userService'
 import { clearAuthSession } from '@/utils/authSession'
 
 const ONBOARDING_PATH = '/onboarding'
 
-const isOnboardingRequired = (profile?: Pick<UserProfile, 'phone' | 'roles' | 'status'> | null) => {
+const isOnboardingRequired = (profile?: Pick<AuthenticatedUserProfile, 'phone' | 'roles' | 'status'> | null) => {
   if (!profile) return false
 
   const roles = profile.roles || []
@@ -48,13 +48,13 @@ const isOnboardingRequired = (profile?: Pick<UserProfile, 'phone' | 'roles' | 's
 const getStoredProfile = () => {
   try {
     const rawUser = localStorage.getItem('authUser')
-    return rawUser ? (JSON.parse(rawUser) as Pick<UserProfile, 'phone' | 'roles' | 'status'>) : null
+    return rawUser ? (JSON.parse(rawUser) as Pick<AuthenticatedUserProfile, 'phone' | 'roles' | 'status'>) : null
   } catch {
     return null
   }
 }
 
-const persistProfile = (profile: UserProfile) => {
+const persistProfile = (profile: AuthenticatedUserProfile) => {
   localStorage.setItem(
     'authUser',
     JSON.stringify({

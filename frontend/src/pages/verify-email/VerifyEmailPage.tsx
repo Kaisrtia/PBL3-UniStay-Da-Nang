@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 
+import axios from 'axios'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import authService from '@/services/authService'
+import { translateAuthMessage } from '@/utils/authMessages'
 
 const VerifyEmailPage = () => {
   const navigate = useNavigate()
@@ -20,13 +22,21 @@ const VerifyEmailPage = () => {
       }
 
       try {
-        await authService.verifyEmail({ email, code })
-        setStatus('Xác thực thành công.')
+        const response = await authService.verifyEmail({ email, code })
+        setStatus(translateAuthMessage(response.message) || 'Xác thực thành công.')
 
         window.setTimeout(() => {
           navigate('/login')
         }, 1500)
-      } catch {
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const data = error.response?.data as { error?: { message?: string }; message?: string } | undefined
+          const translatedMessage = translateAuthMessage(data?.error?.message || data?.message)
+
+          setStatus(translatedMessage || 'Xác thực thất bại hoặc token không hợp lệ.')
+          return
+        }
+
         setStatus('Xác thực thất bại hoặc token không hợp lệ.')
       }
     }

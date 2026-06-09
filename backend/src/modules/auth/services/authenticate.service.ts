@@ -51,19 +51,22 @@ export const signUp = async (
   password?: string,
   fullName?: string
 ) => {
-  if (!email) {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedFullName = fullName?.trim();
+
+  if (!normalizedEmail) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Email is required');
   }
   if (!password) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Password is required');
   }
-  if (!fullName) {
+  if (!normalizedFullName) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Full name is required');
   }
 
   const checkUserEmail = await prismaClient.user.findUnique({
     where: {
-      email
+      email: normalizedEmail
     }
   });
   if (checkUserEmail) {
@@ -74,14 +77,16 @@ export const signUp = async (
     prismaClient.user.create({
       data: {
         id: randomUUID(),
-        email,
+        email: normalizedEmail,
         hashedPassword: bcrypt.hashSync(password, 10),
-        fullName,
+        fullName: normalizedFullName,
         provider: provider.SYSTEM
       }
     }),
-    prismaClient.email_verification.create({
-      data: { email }
+    prismaClient.email_verification.upsert({
+      where: { email: normalizedEmail },
+      update: { code: null, expiresAt: null },
+      create: { email: normalizedEmail }
     })
   ]);
 };
@@ -141,15 +146,18 @@ export const googleLogin = async (
   fullName?: string,
   avatarUrl?: string
 ) => {
-  if (!email) {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedFullName = fullName?.trim();
+
+  if (!normalizedEmail) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Email is required');
   }
-  if (!fullName) {
+  if (!normalizedFullName) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Full name is required');
   }
   let user = await prismaClient.user.findUnique({
     where: {
-      email
+      email: normalizedEmail
     }
   });
   if (user) {
@@ -175,8 +183,8 @@ export const googleLogin = async (
     user = await prismaClient.user.create({
       data: {
         id: randomUUID(),
-        email,
-        fullName,
+        email: normalizedEmail,
+        fullName: normalizedFullName,
         avatarUrl,
         status: account_status.SET_UP,
         emailVerified: true,
