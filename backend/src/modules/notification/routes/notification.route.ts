@@ -3,6 +3,8 @@ import { sseHandler } from '../../../core/utils/sse.handler';
 import { asyncHandler } from '../../../core/middlewares/async.handler';
 import { verifyToken } from '../../../core/middlewares/auth.middleware';
 import * as notificationController from '../controllers/notification.controller';
+import { validate } from '../../../core/middlewares/validate.middleware';
+import { notificationIdParamSchema } from '../notification.validation';
 
 const notificationRouter = Router();
 
@@ -21,6 +23,7 @@ notificationRouter.patch(
 notificationRouter.patch(
   '/:id/read',
   verifyToken,
+  validate(notificationIdParamSchema),
   asyncHandler(notificationController.handleMarkNotificationAsRead)
 );
 

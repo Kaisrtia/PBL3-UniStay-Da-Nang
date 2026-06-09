@@ -3,7 +3,7 @@ import { connection } from '../../../core/config/redis.connection';
 import { createRequestSharedAccommodationNotification } from '../services/notification.service';
 import { pushNotificationIfOnline } from '../utils/pushNotification';
 
-new Worker(
+export const accommodationNotificationWorker = new Worker(
   'request-shared-accommodation-notification-queue',
   async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.name}`);
