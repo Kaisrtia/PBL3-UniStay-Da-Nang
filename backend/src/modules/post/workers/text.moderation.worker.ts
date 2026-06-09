@@ -4,8 +4,23 @@ import prismaClient from '../../../core/config/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import config from '../../../core/config/config';
 import { finalStatusQueue } from '../queues/moderation.queue';
+import {
+  createManualReviewResult,
+  parseAiModerationAnswer,
+  stringifyModerationResult
+} from '../utils/moderation.helper';
 
 const genAI = new GoogleGenerativeAI(config.ai_key.gemini);
+
+const markPostPendingManualReview = async (postId: string, reason: string) => {
+  await prismaClient.post.update({
+    where: { id: postId },
+    data: {
+      status: 'PENDING',
+      rejectionReason: reason
+    }
+  });
+};
 
 export const textModerationWorker = new Worker(
   'text-moderation-queue',
@@ -25,11 +40,15 @@ export const textModerationWorker = new Worker(
 
       if (!post) {
         console.log(`Post ${postId} not found. Skipping...`);
-        return { success: false, reason: 'Post not found' };
+        return stringifyModerationResult(
+          createManualReviewResult('text', 'Post not found')
+        );
       }
     } catch (error) {
       console.error(`Error fetching post ${postId}:`, error);
-      throw error;
+      return stringifyModerationResult(
+        createManualReviewResult('text', 'Unable to fetch post for moderation')
+      );
     }
 
     // term test
@@ -59,21 +78,32 @@ export const textModerationWorker = new Worker(
       const responseText = result.response.text();
 
       console.log(`Gemini moderation result for Post ${postId}:`, responseText);
-      return responseText;
+      return stringifyModerationResult(
+        parseAiModerationAnswer(responseText, 'text')
+      );
     } catch (error) {
-      console.error(`AI Image Moderation Error for Post ${postId}:`, error);
-      throw error; // Let BullMQ handle the failure & retry policies
+      console.error(`AI Text Moderation Error for Post ${postId}:`, error);
+      return stringifyModerationResult(
+        createManualReviewResult('text', 'Text moderation failed')
+      );
     }
   },
   { connection }
 );
 
-textModerationWorker.on('failed', async (job: Job | undefined) => {
-  if (job!.attemptsMade >= job!.opts.attempts!) {
+textModerationWorker.on('failed', async (job: Job | undefined, err) => {
+  if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
     console.log("Error for moderating post's description!");
-    // Send report for admin to handle manually
-    // ...
-    const parentKey = job!.parentKey;
+    try {
+      await markPostPendingManualReview(
+        job.data.postId,
+        `Automatic text moderation failed. Please review manually. ${err.message}`
+      );
+    } catch (updateErr) {
+      console.error('Error marking post for manual text review:', updateErr);
+    }
+
+    const parentKey = job.parentKey;
     if (parentKey) {
       try {
         // parentKey: "bull:queueName:jobId"

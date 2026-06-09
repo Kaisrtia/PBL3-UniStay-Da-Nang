@@ -95,6 +95,92 @@ export const handleGetPosts = async (req: Request, res: Response) => {
   sendSuccess(res, HttpStatus.OK, result, 'Posts fetched successfully');
 };
 
+const parseFiniteNumber = (value: unknown) => {
+  if (value === undefined || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : undefined;
+};
+
+export const handleGetNearbyPosts = async (req: Request, res: Response) => {
+  const latitude = parseFiniteNumber(req.query.lat);
+  const longitude = parseFiniteNumber(req.query.lng);
+  const radiusKm = parseFiniteNumber(req.query.radiusKm) ?? 3;
+  const limit = parseFiniteNumber(req.query.limit) ?? 80;
+
+  if (
+    latitude === undefined ||
+    longitude === undefined ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Valid lat and lng query parameters are required'
+    );
+  }
+
+  if (radiusKm <= 0 || radiusKm > 50) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'radiusKm must be greater than 0 and no more than 50'
+    );
+  }
+
+  const result = await postQueryService.getNearbyPosts(
+    {
+      latitude,
+      longitude,
+      radiusKm,
+      limit: Math.min(100, Math.max(1, Math.floor(limit)))
+    },
+    req.user?.id
+  );
+
+  sendSuccess(res, HttpStatus.OK, result, 'Nearby posts fetched successfully');
+};
+
+const isValidCoordinatePair = (latitude?: number, longitude?: number) => {
+  return (
+    latitude !== undefined &&
+    longitude !== undefined &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
+};
+
+export const handleGetRoutePath = async (req: Request, res: Response) => {
+  const fromLatitude = parseFiniteNumber(req.query.fromLat);
+  const fromLongitude = parseFiniteNumber(req.query.fromLng);
+  const toLatitude = parseFiniteNumber(req.query.toLat);
+  const toLongitude = parseFiniteNumber(req.query.toLng);
+
+  if (
+    !isValidCoordinatePair(fromLatitude, fromLongitude) ||
+    !isValidCoordinatePair(toLatitude, toLongitude)
+  ) {
+    throw new AppError(
+      HttpStatus.BAD_REQUEST,
+      'Valid fromLat, fromLng, toLat, and toLng query parameters are required'
+    );
+  }
+
+  const result = await postQueryService.getRoutePath({
+    fromLatitude: fromLatitude!,
+    fromLongitude: fromLongitude!,
+    toLatitude: toLatitude!,
+    toLongitude: toLongitude!
+  });
+
+  sendSuccess(res, HttpStatus.OK, result, 'Route path fetched successfully');
+};
+
 export const handleGetRecommendedPosts = async (
   req: Request,
   res: Response

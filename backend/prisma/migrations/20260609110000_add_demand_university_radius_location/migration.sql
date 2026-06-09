@@ -1,0 +1,3 @@
+ALTER TABLE "student_demand"
+ALTER COLUMN "wardId" DROP NOT NULL,
+ADD COLUMN "locationRadiusMeters" INTEGER NOT NULL DEFAULT 3000;

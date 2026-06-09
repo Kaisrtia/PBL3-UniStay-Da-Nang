@@ -4,8 +4,35 @@ import prismaClient from '../../../core/config/prisma';
 import { vl } from 'moondream';
 import config from '../../../core/config/config';
 import { finalStatusQueue } from '../queues/moderation.queue';
+import {
+  createManualReviewResult,
+  createModerationResult,
+  parseAiModerationAnswer,
+  stringifyModerationResult
+} from '../utils/moderation.helper';
 
 const moondreamClient = new vl({ apiKey: config.ai_key.moondream });
+const IMAGE_MODERATION_PROMPT = `
+  You are an AI moderator for a housing rental platform.
+  Analyze this image.
+  Are there any inappropriate contents, violent signs, or fake watermarks?
+  Or is it really a photograph depicting any space within a property?
+  Respond with JSON format:
+  "isApproved" (true if both conditions are met) and "reason" (short string explaining why).
+`;
+
+const buildImageReason = (imageIndex: number, reason: string) =>
+  `Image ${imageIndex + 1}: ${reason}`;
+
+const markPostPendingManualReview = async (postId: string, reason: string) => {
+  await prismaClient.post.update({
+    where: { id: postId },
+    data: {
+      status: 'PENDING',
+      rejectionReason: reason
+    }
+  });
+};
 
 export const imageModerationWorker = new Worker(
   'image-moderation-queue',
@@ -25,66 +52,113 @@ export const imageModerationWorker = new Worker(
 
       if (!post) {
         console.log(`Post ${postId} not found. Skipping...`);
-        return { success: false, reason: 'Post not found' };
+        return stringifyModerationResult(
+          createManualReviewResult('image', 'Post not found')
+        );
       }
     } catch (error) {
       console.error(`Error fetching post ${postId}:`, error);
-      throw error;
+      return stringifyModerationResult(
+        createManualReviewResult('image', 'Unable to fetch post for moderation')
+      );
     }
 
     // term test
     // return JSON.stringify({"isApproved":true, "reason":"everything will be okay"});
 
-    try {
-      let imageModerationResult = null;
-
-      if (post.postImages && post.postImages.length > 0) {
-        console.log(
-          `Analyzing first image for Post ${postId} using Moondream...`
-        );
-        const imageUrl = post.postImages[0].imageUrl;
-
-        try {
-          const response = await fetch(imageUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          const imageBuffer = Buffer.from(arrayBuffer);
-
-          const mdResponse = await moondreamClient.query({
-            image: imageBuffer,
-            question: `
-            You are an AI moderator for a housing rental platform. 
-            Analyze this image.
-            Are there any inappropriate contents, violent signs, or fake watermarks ?
-            Or is it really a photograph depicting any space within a property ?
-            Respond with JSON format:
-            "isApproved" (true if both condition are met) and "reason" (short string explaining why).
-          `
-          });
-
-          imageModerationResult = mdResponse.answer;
-          console.log(
-            `Moondream result for Post ${postId}:`,
-            imageModerationResult
-          );
-          return imageModerationResult;
-        } catch (mdError) {
-          console.warn(`Moondream failed for image ${imageUrl}: `, mdError);
-        }
-      }
-    } catch (error) {
-      console.error(`AI Image Moderation Error for Post ${postId}:`, error);
-      throw error; // Let BullMQ handle the failure & retry policies
+    if (!post.postImages || post.postImages.length === 0) {
+      return stringifyModerationResult(
+        createModerationResult('image', true, 'No images to moderate')
+      );
     }
+
+    const manualReviewReasons: string[] = [];
+    const rejectionReasons: string[] = [];
+
+    for (const [imageIndex, postImage] of post.postImages.entries()) {
+      const imageUrl = postImage.imageUrl;
+      console.log(
+        `Analyzing image ${imageIndex + 1}/${post.postImages.length} for Post ${postId} using Moondream...`
+      );
+
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          manualReviewReasons.push(
+            buildImageReason(
+              imageIndex,
+              `Unable to fetch image. HTTP status ${response.status}`
+            )
+          );
+          continue;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const imageBuffer = Buffer.from(arrayBuffer);
+
+        const mdResponse = await moondreamClient.query({
+          image: imageBuffer,
+          question: IMAGE_MODERATION_PROMPT
+        });
+
+        const moderationResult = parseAiModerationAnswer(
+          mdResponse.answer,
+          'image'
+        );
+        console.log(
+          `Moondream result for Post ${postId}, image ${imageIndex + 1}:`,
+          mdResponse.answer
+        );
+
+        if (moderationResult.requiresManualReview) {
+          manualReviewReasons.push(
+            buildImageReason(imageIndex, moderationResult.reason)
+          );
+        } else if (!moderationResult.isApproved) {
+          rejectionReasons.push(
+            buildImageReason(imageIndex, moderationResult.reason)
+          );
+        }
+      } catch (error) {
+        console.error(`AI Image Moderation Error for ${imageUrl}:`, error);
+        manualReviewReasons.push(
+          buildImageReason(imageIndex, 'Image moderation failed')
+        );
+      }
+    }
+
+    if (manualReviewReasons.length > 0) {
+      return stringifyModerationResult(
+        createManualReviewResult('image', manualReviewReasons.join('; '))
+      );
+    }
+
+    if (rejectionReasons.length > 0) {
+      return stringifyModerationResult(
+        createModerationResult('image', false, rejectionReasons.join('; '))
+      );
+    }
+
+    return stringifyModerationResult(
+      createModerationResult('image', true, 'All images approved')
+    );
   },
   { connection }
 );
 
-imageModerationWorker.on('failed', async (job: Job | undefined) => {
-  if (job!.attemptsMade >= job!.opts.attempts!) {
+imageModerationWorker.on('failed', async (job: Job | undefined, err) => {
+  if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
     console.log("Error for moderating post's images!");
-    // Send report for admin to handle manually
-    // ...
-    const parentKey = job!.parentKey;
+    try {
+      await markPostPendingManualReview(
+        job.data.postId,
+        `Automatic image moderation failed. Please review manually. ${err.message}`
+      );
+    } catch (updateErr) {
+      console.error('Error marking post for manual image review:', updateErr);
+    }
+
+    const parentKey = job.parentKey;
     if (parentKey) {
       try {
         // parentKey: "bull:queueName:jobId"

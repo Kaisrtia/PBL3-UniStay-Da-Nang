@@ -13,6 +13,8 @@ import {
   comment_status
 } from '@prisma/client';
 
+const RECOMMENDATION_SCORE_THRESHOLD = 0.6;
+
 export interface PostFilters {
   purpose?: post_purpose;
   status?: post_status; // Used for admin-level filtering
@@ -31,6 +33,53 @@ export interface PostFilters {
   sortBy?: 'createdAt' | 'price' | 'area' | 'viewCount';
   sortOrder?: 'asc' | 'desc';
 }
+
+export interface NearbyPostFilters {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  limit?: number;
+}
+
+export interface RoutePathInput {
+  fromLatitude: number;
+  fromLongitude: number;
+  toLatitude: number;
+  toLongitude: number;
+}
+
+interface OsrmRouteResponse {
+  code?: string;
+  routes?: {
+    distance?: number;
+    duration?: number;
+    geometry?: {
+      coordinates?: [number, number][];
+    };
+  }[];
+}
+
+const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+const calculateDistanceKm = (
+  originLatitude: number,
+  originLongitude: number,
+  targetLatitude: number,
+  targetLongitude: number
+) => {
+  const earthRadiusKm = 6371;
+  const latitudeDistance = degreesToRadians(targetLatitude - originLatitude);
+  const longitudeDistance = degreesToRadians(targetLongitude - originLongitude);
+
+  const a =
+    Math.sin(latitudeDistance / 2) * Math.sin(latitudeDistance / 2) +
+    Math.cos(degreesToRadians(originLatitude)) *
+      Math.cos(degreesToRadians(targetLatitude)) *
+      Math.sin(longitudeDistance / 2) *
+      Math.sin(longitudeDistance / 2);
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 export const getPosts = async (
   filters: PostFilters,
@@ -150,6 +199,146 @@ export const getPosts = async (
   };
 };
 
+export const getNearbyPosts = async (
+  filters: NearbyPostFilters,
+  currentUserId?: string
+) => {
+  const limit = filters.limit ?? 80;
+  const where: Prisma.postWhereInput = {
+    status: 'APPROVED'
+  };
+
+  const blockedPostFilter =
+    await blockService.getBlockedUserFilter(currentUserId);
+  if (Object.keys(blockedPostFilter).length > 0) {
+    where.AND = [blockedPostFilter];
+  }
+
+  const posts = await prismaClient.post.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      postImages: true,
+      postAmenities: {
+        include: { amenity: true }
+      },
+      ward: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          avatarUrl: true,
+          hosts: {
+            select: { isVerified: true }
+          }
+        }
+      },
+      _count: {
+        select: { comments: true }
+      }
+    }
+  });
+
+  const nearbyPosts = posts
+    .map((post) => {
+      const latitude = Number(post.latitude);
+      const longitude = Number(post.longitude);
+
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return null;
+      }
+
+      const distanceKm = calculateDistanceKm(
+        filters.latitude,
+        filters.longitude,
+        latitude,
+        longitude
+      );
+
+      return {
+        ...post,
+        distanceKm: Number(distanceKm.toFixed(2))
+      };
+    })
+    .filter(
+      (post): post is NonNullable<typeof post> =>
+        post !== null && post.distanceKm <= filters.radiusKm
+    )
+    .sort((first, second) => first.distanceKm - second.distanceKm)
+    .slice(0, limit);
+
+  return {
+    data: nearbyPosts,
+    meta: {
+      total: nearbyPosts.length,
+      limit,
+      radiusKm: filters.radiusKm,
+      origin: {
+        latitude: filters.latitude,
+        longitude: filters.longitude
+      }
+    }
+  };
+};
+
+export const getRoutePath = async (input: RoutePathInput) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const url = new URL(
+    `https://router.project-osrm.org/route/v1/driving/${input.fromLongitude},${input.fromLatitude};${input.toLongitude},${input.toLatitude}`
+  );
+  url.searchParams.set('overview', 'full');
+  url.searchParams.set('geometries', 'geojson');
+  url.searchParams.set('steps', 'false');
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) {
+      throw new AppError(
+        HttpStatus.BAD_GATEWAY,
+        'Routing service is currently unavailable'
+      );
+    }
+
+    const result = (await response.json()) as OsrmRouteResponse;
+    const route = result.routes?.[0];
+    const coordinates = route?.geometry?.coordinates;
+
+    if (
+      result.code !== 'Ok' ||
+      !route ||
+      route.distance === undefined ||
+      route.duration === undefined ||
+      !coordinates ||
+      coordinates.length === 0
+    ) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'Route path not found');
+    }
+
+    return {
+      distanceKm: Number((route.distance / 1000).toFixed(2)),
+      durationMinutes: Math.max(1, Math.round(route.duration / 60)),
+      geometry: coordinates.map(([longitude, latitude]) => [
+        latitude,
+        longitude
+      ])
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      HttpStatus.BAD_GATEWAY,
+      'Could not calculate route path'
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 export const getRecommendedPosts = async (
   currentUser: user,
   page: number = 1,
@@ -158,6 +347,7 @@ export const getRecommendedPosts = async (
   const demand = await prismaClient.student_demand.findUnique({
     where: { studentId: currentUser.id },
     include: {
+      university: true,
       student: {
         include: {
           demandAmenities: {
@@ -193,7 +383,7 @@ export const getRecommendedPosts = async (
       ...post,
       score: calculateScore(post, demand)
     }))
-    .filter((post: any) => post.score > 0);
+    .filter((post: any) => post.score >= RECOMMENDATION_SCORE_THRESHOLD);
 
   // Sort by score descending
   scoredPosts.sort((a: any, b: any) => b.score - a.score);

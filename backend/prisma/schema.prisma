@@ -84,6 +84,12 @@ enum notification_type {
   SYSTEM
 }
 
+enum demand_criterion_priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 // Models
 model session {
   id        String   @id @default(uuid())
@@ -158,6 +164,8 @@ model university {
   wardId         Int
   streetName     String           @db.VarChar(255)
   houseNumber    String           @db.VarChar(50)
+  latitude        Decimal?         @db.Decimal(9, 6)
+  longitude       Decimal?         @db.Decimal(9, 6)
   ward           ward             @relation(fields: [wardId], references: [id])
   students       student[]
   studentDemands student_demand[]
@@ -269,18 +277,27 @@ model post_amenity {
 }
 
 model student_demand {
-  studentId            String      @id
-  wardId               Int
+  studentId            String                    @id
+  wardId               Int?
   universityId         String?
-  minPrice             Decimal     @db.Decimal(15, 2)
-  maxPrice             Decimal     @db.Decimal(15, 2)
+  locationRadiusMeters Int                       @default(3000)
+  minPrice             Decimal                   @db.Decimal(15, 2)
+  maxPrice             Decimal                   @db.Decimal(15, 2)
+  minArea              Decimal?                  @db.Decimal(10, 2)
+  maxArea              Decimal?                  @db.Decimal(10, 2)
   roomType             room_type
-  isLookingForRoommate Boolean     @default(false)
-  roommateGender       String      @db.VarChar(10)
-  rommateCriteria      String      @db.Text
-  student              student     @relation(fields: [studentId], references: [studentId])
-  ward                 ward        @relation(fields: [wardId], references: [id])
-  university           university? @relation(fields: [universityId], references: [id])
+  isLookingForRoommate Boolean                   @default(false)
+  roommateGender       String                    @db.VarChar(10)
+  rommateCriteria      String                    @db.Text
+  pricePriority        demand_criterion_priority @default(MEDIUM)
+  locationPriority     demand_criterion_priority @default(MEDIUM)
+  areaPriority         demand_criterion_priority @default(MEDIUM)
+  roommatePriority     demand_criterion_priority @default(MEDIUM)
+  roomTypePriority     demand_criterion_priority @default(MEDIUM)
+  amenityPriority      demand_criterion_priority @default(MEDIUM)
+  student              student                   @relation(fields: [studentId], references: [studentId])
+  ward                 ward?                     @relation(fields: [wardId], references: [id])
+  university           university?               @relation(fields: [universityId], references: [id])
 }
 
 model demand_amenity {

@@ -95,6 +95,43 @@ export type PaginatedPosts = {
   }
 }
 
+export type NearbyPost = Post & {
+  distanceKm: number
+}
+
+export type NearbyPostFilters = {
+  lat: number
+  lng: number
+  radiusKm: number
+  limit?: number
+}
+
+export type NearbyPostsResponse = {
+  data: NearbyPost[]
+  meta?: {
+    total?: number
+    limit?: number
+    radiusKm?: number
+    origin?: {
+      latitude?: number
+      longitude?: number
+    }
+  }
+}
+
+export type RoutePathFilters = {
+  fromLat: number
+  fromLng: number
+  toLat: number
+  toLng: number
+}
+
+export type RoutePath = {
+  distanceKm: number
+  durationMinutes: number
+  geometry: [number, number][]
+}
+
 export type CreatePostPayload = {
   title: string
   wardId: number
@@ -127,7 +164,7 @@ export type PostResponse<T = unknown> = {
   }
 }
 
-const buildPostQuery = (filters: PostFilters = {}) => {
+const buildPostQuery = (filters: Record<string, unknown> = {}) => {
   const params = new URLSearchParams()
 
   Object.entries(filters).forEach(([key, value]) => {
@@ -163,6 +200,16 @@ export const postService = {
   getRecommendedPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'>) => {
     const response = await api.get<PostResponse<PaginatedPosts>>(`/posts/recommendations${buildPostQuery(filters)}`)
     return response.data.data || { data: [] }
+  },
+
+  getNearbyPosts: async (filters: NearbyPostFilters) => {
+    const response = await api.get<PostResponse<NearbyPostsResponse>>(`/posts/nearby${buildPostQuery(filters)}`)
+    return response.data.data || { data: [] }
+  },
+
+  getRoutePath: async (filters: RoutePathFilters) => {
+    const response = await api.get<PostResponse<RoutePath>>(`/posts/route${buildPostQuery(filters)}`)
+    return response.data.data
   },
 
   getMyPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'>) => {

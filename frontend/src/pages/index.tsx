@@ -19,6 +19,7 @@ import FavouritePostsPage from '@/pages/posts/favourites/FavouritePostsPage'
 import CreatePostPage from '@/pages/posts/create/CreatePostPage'
 import PostDetailPage from '@/pages/posts/detail/PostDetailPage'
 import MyPostsPage from '@/pages/posts/my-posts/MyPostsPage'
+import NearbyPostsPage from '@/pages/posts/nearby/NearbyPostsPage'
 import SearchResultsPage from '@/pages/posts/search/SearchResultsPage'
 import RegisterPage from '@/pages/register/RegisterPage'
 import ResetPasswordPage from '@/pages/reset-password/ResetPasswordPage'
@@ -43,6 +44,7 @@ export {
   ProfilePage,
   FavouritePostsPage,
   MyPostsPage,
+  NearbyPostsPage,
   PostDetailPage,
   RegisterPage,
   ResetPasswordPage,

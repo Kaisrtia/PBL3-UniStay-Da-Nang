@@ -2,10 +2,13 @@ import api from './api'
 import { type RoomType } from './postService'
 
 export type DemandPayload = {
-  wardId: number
-  universityId?: string
+  wardId?: number
+  universityId: string
+  locationRadiusMeters: number
   minPrice: number
   maxPrice: number
+  minArea?: number
+  maxArea?: number
   roomType: RoomType
   isLookingForRoommate?: boolean
   roommateGender?: string
