@@ -3,7 +3,7 @@ import { account_status, provider, type user as User } from '@prisma/client';
 import HttpStatus from 'http-status';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import crypto, { randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { AppError } from '../../../core/exceptions/AppError';
 import config from '../../../core/config/config';
 
@@ -13,23 +13,8 @@ const generateAccessToken = (user: Pick<User, 'id' | 'role'>) => {
   return jwt.sign(
     { id: user.id, roles: getUserRoles(user) },
     config.jwt.secret,
-    { expiresIn: Number(config.jwt.access_token_ttl) }
+    { expiresIn: config.jwt.access_token_ttl_seconds }
   );
-};
-
-const generateAuthTokens = async (user: Pick<User, 'id' | 'role'>) => {
-  const accessToken = generateAccessToken(user);
-  const refreshToken = crypto.randomBytes(64).toString('hex');
-
-  await prismaClient.session.create({
-    data: {
-      userId: user.id,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + Number(config.jwt.refresh_token_ttl))
-    }
-  });
-
-  return { accessToken, refreshToken };
 };
 
 export const signUp = async (
@@ -118,8 +103,8 @@ export const login = async (email?: string, password?: string) => {
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid email or password');
   }
 
-  const tokens = await generateAuthTokens(user);
-  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
+  const accessToken = generateAccessToken(user);
+  return { accessToken, user: { ...user, roles: getUserRoles(user) } };
 };
 
 export const googleLogin = async (
@@ -171,42 +156,6 @@ export const googleLogin = async (
     });
   }
 
-  const tokens = await generateAuthTokens(user);
-  return { ...tokens, user: { ...user, roles: getUserRoles(user) } };
-};
-
-export const logout = async (refreshToken: string) => {
-  await prismaClient.session.deleteMany({
-    where: {
-      token: refreshToken
-    }
-  });
-};
-
-export const refreshToken = async (refreshToken: string) => {
-  const session = await prismaClient.session.findUnique({
-    where: {
-      token: refreshToken
-    }
-  });
-
-  if (!session) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is required');
-  }
-
-  if (session.expiresAt <= new Date()) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is expired');
-  }
-
-  const user = await prismaClient.user.findUnique({
-    where: {
-      id: session.userId
-    }
-  });
-
-  if (!user) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'User not found');
-  }
-
-  return generateAccessToken(user);
+  const accessToken = generateAccessToken(user);
+  return { accessToken, user: { ...user, roles: getUserRoles(user) } };
 };

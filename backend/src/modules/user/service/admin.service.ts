@@ -14,15 +14,10 @@ export const banUser = async (userId: string) => {
     throw new AppError(HttpStatus.BAD_REQUEST, 'User is already banned');
   }
 
-  await prismaClient.$transaction([
-    prismaClient.user.update({
-      where: { id: userId },
-      data: { status: account_status.BANNED }
-    }),
-    prismaClient.session.deleteMany({
-      where: { userId }
-    })
-  ]);
+  await prismaClient.user.update({
+    where: { id: userId },
+    data: { status: account_status.BANNED }
+  });
 };
 
 const getUnbannedStatus = async (userId: string) => {

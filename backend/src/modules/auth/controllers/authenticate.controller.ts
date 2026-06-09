@@ -15,15 +15,6 @@ import { toUserResponseDto } from '../../user/dto/user-response.dto';
 
 // Auth Handlers
 
-const setRefreshTokenCookie = (res: Response, token: string) => {
-  res.cookie('refreshToken', token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'strict',
-    maxAge: Number(config.jwt.refresh_token_ttl)
-  });
-};
-
 export const handleRegister = async (req: Request, res: Response) => {
   const { email, password, fullName } = req.body;
   await authService.signUp(email, password, fullName);
@@ -38,8 +29,6 @@ export const handleRegister = async (req: Request, res: Response) => {
 export const handleLogin = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const result = await authService.login(email, password);
-
-  setRefreshTokenCookie(res, result.refreshToken);
 
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
@@ -65,33 +54,10 @@ export const handleGoogleLogin = async (req: Request, res: Response) => {
     payload.picture
   );
 
-  setRefreshTokenCookie(res, result.refreshToken);
-
   sendSuccess(res, HttpStatus.OK, {
     accessToken: result.accessToken,
     user: toUserResponseDto(result.user)
   });
-};
-
-export const handleDeleteSession = async (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.refreshToken;
-  if (!refreshToken) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Refresh token is required');
-  }
-
-  await authService.logout(refreshToken);
-  res.clearCookie('refreshToken');
-  res.status(HttpStatus.NO_CONTENT).send();
-};
-
-export const handleRefreshSession = async (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.refreshToken;
-  if (!refreshToken) {
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Refresh token is required');
-  }
-
-  const accessToken = await authService.refreshToken(refreshToken);
-  sendSuccess(res, HttpStatus.OK, { accessToken });
 };
 
 // Email Verification Handlers

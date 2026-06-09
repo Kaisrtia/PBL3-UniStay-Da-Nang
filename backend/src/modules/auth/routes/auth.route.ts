@@ -18,20 +18,6 @@ authRouter.post(
   asyncHandler(authController.handleGoogleLogin)
 );
 
-// -- Sessions --
-
-// Destroy the current session (logout)
-authRouter.delete(
-  '/sessions',
-  asyncHandler(authController.handleDeleteSession)
-);
-
-// Refresh the access token
-authRouter.post(
-  '/sessions/refresh',
-  asyncHandler(authController.handleRefreshSession)
-);
-
 // -- Email Verification --
 
 // Send OTP verification code

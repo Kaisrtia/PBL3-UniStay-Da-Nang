@@ -91,14 +91,6 @@ enum demand_criterion_priority {
 }
 
 // Models
-model session {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}
-
 model email_verification {
   email     String    @id
   code      String?

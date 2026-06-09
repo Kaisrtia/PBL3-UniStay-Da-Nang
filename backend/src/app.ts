@@ -1,8 +1,7 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
 import authRouter from './modules/auth/routes/auth.route';
 import { errorHandler } from './core/middlewares/error.handler';
 import userRouter from './modules/user/routes/user.route';
@@ -24,7 +23,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(cookieParser());
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 
@@ -52,7 +50,7 @@ app.use('/api/v1/notifications', notificationRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
-app.use((_req: Request, res: Response, _next: NextFunction) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: { code: 404, message: 'Route not found' }
