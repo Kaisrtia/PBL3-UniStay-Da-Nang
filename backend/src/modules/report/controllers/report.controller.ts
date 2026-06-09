@@ -4,22 +4,11 @@ import * as reportService from '../service/report.service';
 import { sendSuccess } from '../../../core/utils/response.handler';
 import { AppError } from '../../../core/exceptions/AppError';
 import { report_status } from '@prisma/client';
+import { parsePagination } from '../../../core/utils/pagination';
 
 export const handleGetReports = async (req: Request, res: Response) => {
-  const page = Number(req.query.page ?? 1);
-  const limit = Number(req.query.limit ?? 10);
+  const { page, limit } = parsePagination(req.query, 10, 100);
   const status = req.query.status as report_status | undefined;
-
-  if (!Number.isInteger(page) || page < 1) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'page must be a positive integer');
-  }
-
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new AppError(
-      HttpStatus.BAD_REQUEST,
-      'limit must be an integer between 1 and 100'
-    );
-  }
 
   if (status && !Object.values(report_status).includes(status)) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid report status');

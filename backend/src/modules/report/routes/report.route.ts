@@ -4,6 +4,11 @@ import { asyncHandler } from '../../../core/middlewares/async.handler';
 import { verifyToken } from '../../../core/middlewares/auth.middleware';
 import { authorize } from '../../../core/middlewares/role.middleware';
 import { account_role } from '@prisma/client';
+import { validate } from '../../../core/middlewares/validate.middleware';
+import {
+  createReportSchema,
+  tackleReportSchema
+} from '../report.validation';
 
 const reportRouter = Router();
 
@@ -20,6 +25,7 @@ reportRouter.patch(
   '/:id/tackle',
   verifyToken,
   authorize([account_role.ADMIN]),
+  validate(tackleReportSchema),
   asyncHandler(reportController.handleTackleReport)
 );
 
@@ -28,6 +34,7 @@ reportRouter.post(
   '/',
   verifyToken,
   authorize([account_role.USER, account_role.STUDENT, account_role.HOST]),
+  validate(createReportSchema),
   asyncHandler(reportController.handleCreateReport)
 );
 
