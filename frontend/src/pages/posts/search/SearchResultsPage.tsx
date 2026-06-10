@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import Pagination from '@/components/pagination/Pagination'
-import postService, { type Post, type PostFilters, type PostPurpose, type RoomType } from '@/services/postService'
+import postService, { type MatchLevel, type Post, type PostFilters, type PostPurpose, type RoomType } from '@/services/postService'
 
 type ResultTab = 'all' | PostPurpose | 'recommended'
 
@@ -16,6 +16,12 @@ const tabs: { label: string; value: ResultTab }[] = [
   { label: 'Cho thuê', value: 'RENT' },
   { label: 'Ở ghép', value: 'FIND_ROOMMATE' },
   { label: 'Gợi ý cho tôi', value: 'recommended' }
+]
+
+const matchLevelOptions: { label: string; value: MatchLevel }[] = [
+  { label: 'Mặc định (Low)', value: 'LOW' },
+  { label: 'Trung bình (Medium)', value: 'MEDIUM' },
+  { label: 'Cao (High)', value: 'HIGH' }
 ]
 
 const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=640&q=80'
@@ -119,6 +125,7 @@ const SearchResultsPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [matchLevel, setMatchLevel] = useState<MatchLevel>('LOW')
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -166,7 +173,7 @@ const SearchResultsPage = () => {
 
         const result =
           activeTab === 'recommended'
-            ? await postService.getRecommendedPosts({ page: currentPage, limit: POSTS_PER_PAGE })
+            ? await postService.getRecommendedPosts({ page: currentPage, limit: POSTS_PER_PAGE, level: matchLevel })
             : await postService.getPosts({
                 ...queryFilters,
                 purpose: activeTab === 'all' ? undefined : activeTab,
@@ -197,7 +204,7 @@ const SearchResultsPage = () => {
     }
 
     void loadPosts()
-  }, [activeTab, currentPage, queryFilters])
+  }, [activeTab, currentPage, matchLevel, queryFilters])
 
   const content = useMemo(() => {
     if (loading) {
@@ -237,23 +244,43 @@ const SearchResultsPage = () => {
           </Link>
         </div>
         <section className='mx-auto max-w-7xl overflow-hidden rounded-2xl bg-white shadow-sm'>
-          <div className='flex items-center gap-9 border-b border-gray-200 px-12 pt-8'>
-            {tabs.map((tab) => (
-              <button
-                key={tab.value}
-                type='button'
-                onClick={() => {
+          <div className='flex flex-wrap items-center justify-between gap-5 border-b border-gray-200 px-12 pt-8'>
+            <div className='flex flex-wrap items-center gap-9'>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.value}
+                  type='button'
+                  onClick={() => {
+                    setCurrentPage(1)
+                    setActiveTab(tab.value)
+                  }}
+                  className={`relative pb-5 text-lg font-extrabold transition ${
+                    activeTab === tab.value ? 'text-[#181A20]' : 'text-[#181A20]/70 hover:text-[#181A20]'
+                  }`}
+                >
+                  {tab.label}
+                  {activeTab === tab.value && <span className='absolute bottom-0 left-0 h-1 w-full bg-[#FFC300]' />}
+                </button>
+              ))}
+            </div>
+
+            <label className='mb-5 grid gap-1 text-xs font-extrabold text-[#181A20]'>
+              Mức độ phù hợp
+              <select
+                value={matchLevel}
+                onChange={(event) => {
                   setCurrentPage(1)
-                  setActiveTab(tab.value)
+                  setMatchLevel(event.target.value as MatchLevel)
                 }}
-                className={`relative pb-5 text-lg font-extrabold transition ${
-                  activeTab === tab.value ? 'text-[#181A20]' : 'text-[#181A20]/70 hover:text-[#181A20]'
-                }`}
+                className='h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#FFC300]'
               >
-                {tab.label}
-                {activeTab === tab.value && <span className='absolute bottom-0 left-0 h-1 w-full bg-[#FFC300]' />}
-              </button>
-            ))}
+                {matchLevelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className='px-12 py-12'>

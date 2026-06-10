@@ -17,7 +17,13 @@ import {
   comment_status
 } from '@prisma/client';
 
-const RECOMMENDATION_SCORE_THRESHOLD = 0.6;
+export type RecommendationLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+const RECOMMENDATION_SCORE_THRESHOLDS: Record<RecommendationLevel, number> = {
+  LOW: 0.6,
+  MEDIUM: 0.75,
+  HIGH: 0.9
+};
 
 const buildApprovedPostWhere = (
   filters: PostFilters,
@@ -311,7 +317,8 @@ export const getRoutePath = async (input: RoutePathInput) => {
 export const getRecommendedPosts = async (
   currentUser: user,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  level: RecommendationLevel = 'LOW'
 ) => {
   const demand = await prismaClient.student_demand.findUnique({
     where: { studentId: currentUser.id },
@@ -342,13 +349,15 @@ export const getRecommendedPosts = async (
     );
   }
 
+  const scoreThreshold = RECOMMENDATION_SCORE_THRESHOLDS[level];
+
   // Filter and score posts
   const scoredPosts = cachedPosts
     .map((post) => ({
       ...post,
       score: calculateScore(post, demand)
     }))
-    .filter((post) => post.score >= RECOMMENDATION_SCORE_THRESHOLD);
+    .filter((post) => post.score >= scoreThreshold);
 
   // Sort by score descending
   scoredPosts.sort((first, second) => second.score - first.score);

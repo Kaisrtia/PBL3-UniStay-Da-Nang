@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { SiteFooter, SiteHeader } from '@/components/layout/site-layout'
 import { defaultAmenityNames, defaultBenefitNames } from '@/constants/rentalFeatures'
 import amenityService, { type Amenity } from '@/services/amenityService'
-import demandService from '@/services/demandService'
+import demandService, { type DemandPriority, type SavedDemand } from '@/services/demandService'
 import locationService, { type University } from '@/services/locationService'
 import postService, { type Post, type RoomType } from '@/services/postService'
 
@@ -26,7 +26,8 @@ const moneyInputFormatter = new Intl.NumberFormat('vi-VN')
 const parseMoneyInput = (value: string) => Number(value.replace(/\D/g, ''))
 
 const formatMoneyInput = (value: string | number) => {
-  const numericValue = typeof value === 'number' ? value : parseMoneyInput(value)
+  const directNumber = typeof value === 'number' ? value : Number(value)
+  const numericValue = Number.isFinite(directNumber) ? directNumber : parseMoneyInput(String(value))
   return numericValue > 0 ? moneyInputFormatter.format(numericValue) : ''
 }
 
@@ -38,31 +39,128 @@ const parseOptionalNumberInput = (value: FormDataEntryValue | null) => {
   return Number.isFinite(parsedValue) ? parsedValue : undefined
 }
 
+const priorityOptions: { label: string; value: DemandPriority }[] = [
+  { label: 'Thấp', value: 'LOW' },
+  { label: 'Trung bình', value: 'MEDIUM' },
+  { label: 'Cao', value: 'HIGH' }
+]
+
+const PrioritySelect = ({
+  value,
+  onChange
+}: {
+  value: DemandPriority
+  onChange: (value: DemandPriority) => void
+}) => (
+  <select
+    value={value}
+    onChange={(event) => onChange(event.target.value as DemandPriority)}
+    className='h-9 rounded-full border border-gray-200 bg-white px-3 text-xs font-extrabold text-[#003566] outline-none focus:ring-2 focus:ring-[#FFC300]'
+  >
+    {priorityOptions.map((option) => (
+      <option key={option.value} value={option.value}>
+        {option.value} - {option.label}
+      </option>
+    ))}
+  </select>
+)
+
+const FieldHeader = ({
+  label,
+  priority,
+  onPriorityChange
+}: {
+  label: string
+  priority: DemandPriority
+  onPriorityChange: (value: DemandPriority) => void
+}) => (
+  <div className='flex flex-wrap items-center justify-between gap-2'>
+    <span className='text-sm font-bold'>{label}</span>
+    <PrioritySelect value={priority} onChange={onPriorityChange} />
+  </div>
+)
+
+const getDemandAmenityIds = (demand: SavedDemand) =>
+  demand.student?.demandAmenities
+    ?.map((item) => Number(item.amenityId ?? item.amenity?.id))
+    .filter((item) => Number.isInteger(item)) ?? []
+
+const getSavedPriority = (value?: DemandPriority | null): DemandPriority => value || 'MEDIUM'
+
 const DemandPage = () => {
   const [universities, setUniversities] = useState<University[]>([])
   const [amenities, setAmenities] = useState<Amenity[]>(fallbackAmenities)
   const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
   const [recommendedPosts, setRecommendedPosts] = useState<Post[]>([])
+  const [universityId, setUniversityId] = useState('')
+  const [locationRadiusKm, setLocationRadiusKm] = useState('3')
   const [minPriceDisplay, setMinPriceDisplay] = useState(formatMoneyInput(1500000))
   const [maxPriceDisplay, setMaxPriceDisplay] = useState(formatMoneyInput(3500000))
+  const [minArea, setMinArea] = useState('')
+  const [maxArea, setMaxArea] = useState('')
+  const [roomType, setRoomType] = useState<RoomType>('ROOM')
+  const [isLookingForRoommate, setIsLookingForRoommate] = useState(false)
+  const [locationPriority, setLocationPriority] = useState<DemandPriority>('MEDIUM')
+  const [pricePriority, setPricePriority] = useState<DemandPriority>('MEDIUM')
+  const [areaPriority, setAreaPriority] = useState<DemandPriority>('MEDIUM')
+  const [roomTypePriority, setRoomTypePriority] = useState<DemandPriority>('MEDIUM')
+  const [roommatePriority, setRoommatePriority] = useState<DemandPriority>('MEDIUM')
+  const [amenityPriority, setAmenityPriority] = useState<DemandPriority>('MEDIUM')
   const [message, setMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
+  const applySavedDemand = (demand: SavedDemand) => {
+    setUniversityId(demand.universityId || '')
+    setLocationRadiusKm(String(Number(demand.locationRadiusMeters || 3000) / 1000))
+    setMinPriceDisplay(formatMoneyInput(demand.minPrice))
+    setMaxPriceDisplay(formatMoneyInput(demand.maxPrice))
+    setMinArea(demand.minArea ? String(demand.minArea) : '')
+    setMaxArea(demand.maxArea ? String(demand.maxArea) : '')
+    setRoomType(demand.roomType || 'ROOM')
+    setIsLookingForRoommate(Boolean(demand.isLookingForRoommate))
+    setLocationPriority(getSavedPriority(demand.locationPriority))
+    setPricePriority(getSavedPriority(demand.pricePriority))
+    setAreaPriority(getSavedPriority(demand.areaPriority))
+    setRoomTypePriority(getSavedPriority(demand.roomTypePriority))
+    setRoommatePriority(getSavedPriority(demand.roommatePriority))
+    setAmenityPriority(getSavedPriority(demand.amenityPriority))
+    setSelectedAmenityIds(getDemandAmenityIds(demand))
+
+    const savedCriteria = String(demand.rommateCriteria || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    setSelectedBenefits(defaultBenefitNames.filter((benefit) => savedCriteria.includes(benefit)))
+  }
+
   useEffect(() => {
     const loadInitialData = async () => {
-      const [universityResult, amenityResult, recommendationResult] = await Promise.allSettled([
+      const [universityResult, amenityResult, demandResult] = await Promise.allSettled([
         locationService.getUniversities(),
         amenityService.getAmenities(),
-        postService.getRecommendedPosts({ limit: 4 })
+        demandService.getMyDemand()
       ])
 
       if (universityResult.status === 'fulfilled') setUniversities(universityResult.value)
       if (amenityResult.status === 'fulfilled' && amenityResult.value.length > 0) setAmenities(amenityResult.value)
-      if (recommendationResult.status === 'fulfilled') setRecommendedPosts(recommendationResult.value.data)
+      if (demandResult.status === 'fulfilled' && demandResult.value) applySavedDemand(demandResult.value)
     }
 
     void loadInitialData()
+  }, [])
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      try {
+        const recommendations = await postService.getRecommendedPosts({ limit: 4 })
+        setRecommendedPosts(recommendations.data)
+      } catch {
+        setRecommendedPosts([])
+      }
+    }
+
+    void loadRecommendations()
   }, [])
 
   const toggleAmenity = (amenityId: number) => {
@@ -86,45 +184,50 @@ const DemandPage = () => {
     setMessage('')
     setErrorMessage('')
 
-    const formData = new FormData(event.currentTarget)
     const selectedAmenityNames = amenities
       .filter((amenity) => selectedAmenityIds.includes(amenity.id))
       .map((amenity) => amenity.name)
     const criteria = [...selectedAmenityNames, ...selectedBenefits].join(', ')
-    const universityId = String(formData.get('universityId') || '')
-    const locationRadiusKm = parseOptionalNumberInput(formData.get('locationRadiusKm')) ?? 3
-    const locationRadiusMeters = Math.round(locationRadiusKm * 1000)
-    const minArea = parseOptionalNumberInput(formData.get('minArea'))
-    const maxArea = parseOptionalNumberInput(formData.get('maxArea'))
+    const selectedUniversityId = universityId
+    const parsedLocationRadiusKm = Number(locationRadiusKm || 3)
+    const locationRadiusMeters = Math.round(parsedLocationRadiusKm * 1000)
+    const parsedMinArea = parseOptionalNumberInput(minArea)
+    const parsedMaxArea = parseOptionalNumberInput(maxArea)
 
-    if (!universityId) {
+    if (!selectedUniversityId) {
       setErrorMessage('Hãy chọn trường đại học muốn ở gần.')
       return
     }
 
-    if (locationRadiusMeters <= 0) {
+    if (!Number.isFinite(parsedLocationRadiusKm) || locationRadiusMeters <= 0) {
       setErrorMessage('Bán kính quanh trường phải lớn hơn 0.')
       return
     }
 
-    if (minArea !== undefined && maxArea !== undefined && minArea > maxArea) {
+    if (parsedMinArea !== undefined && parsedMaxArea !== undefined && parsedMinArea > parsedMaxArea) {
       setErrorMessage('Diện tích tối thiểu không được lớn hơn diện tích tối đa.')
       return
     }
 
     try {
       await demandService.createOrUpdateDemand({
-        universityId,
+        universityId: selectedUniversityId,
         locationRadiusMeters,
         minPrice: parseMoneyInput(minPriceDisplay),
         maxPrice: parseMoneyInput(maxPriceDisplay),
-        minArea,
-        maxArea,
-        roomType: String(formData.get('roomType')) as RoomType,
-        isLookingForRoommate: formData.get('isLookingForRoommate') === 'on',
-        roommateGender: String(formData.get('roommateGender') || 'ANY'),
+        minArea: parsedMinArea,
+        maxArea: parsedMaxArea,
+        roomType,
+        isLookingForRoommate,
+        roommateGender: 'ANY',
         rommateCriteria: criteria || 'Không có tiêu chí thêm',
-        amenityIds: selectedAmenityIds
+        amenityIds: selectedAmenityIds,
+        locationPriority,
+        pricePriority,
+        areaPriority,
+        roomTypePriority,
+        roommatePriority,
+        amenityPriority
       })
 
       const recommendations = await postService.getRecommendedPosts({ limit: 4 })
@@ -158,109 +261,144 @@ const DemandPage = () => {
         <section className='mt-8 grid gap-8 lg:grid-cols-[520px_minmax(0,1fr)]'>
           <form onSubmit={handleSubmit} className='rounded-2xl bg-white p-7 shadow-lg shadow-[#001D3D]/5'>
             <div className='grid gap-5'>
-              <label className='grid gap-2 text-sm font-bold'>
-                Gần trường đại học
-                <select
-                  name='universityId'
-                  required
-                  className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                >
-                  <option value=''>Chọn trường</option>
-                  {universities.map((university) => (
-                    <option key={university.id} value={university.id}>
-                      {university.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className='grid gap-2 text-sm font-bold'>
-                Bán kính quanh trường (km)
-                <input
-                  name='locationRadiusKm'
-                  type='number'
-                  min='0.5'
-                  step='0.5'
-                  defaultValue='3'
-                  required
-                  className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                  placeholder='3'
-                />
-              </label>
-
-              <div className='grid gap-4 sm:grid-cols-2'>
+              <section className='grid gap-3'>
+                <FieldHeader label='Vị trí' priority={locationPriority} onPriorityChange={setLocationPriority} />
                 <label className='grid gap-2 text-sm font-bold'>
-                  Giá tối thiểu
-                  <input
-                    name='minPrice'
-                    type='text'
-                    inputMode='numeric'
-                    value={minPriceDisplay}
-                    onChange={(event) => handleMoneyInputChange(event.target.value, setMinPriceDisplay)}
+                  Gần trường đại học
+                  <select
+                    name='universityId'
+                    required
+                    value={universityId}
+                    onChange={(event) => setUniversityId(event.target.value)}
                     className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                    placeholder='1.500.000'
-                  />
+                  >
+                    <option value=''>Chọn trường</option>
+                    {universities.map((university) => (
+                      <option key={university.id} value={university.id}>
+                        {university.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <label className='grid gap-2 text-sm font-bold'>
-                  Giá tối đa
-                  <input
-                    name='maxPrice'
-                    type='text'
-                    inputMode='numeric'
-                    value={maxPriceDisplay}
-                    onChange={(event) => handleMoneyInputChange(event.target.value, setMaxPriceDisplay)}
-                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                    placeholder='3.500.000'
-                  />
-                </label>
-              </div>
 
-              <div className='grid gap-4 sm:grid-cols-2'>
                 <label className='grid gap-2 text-sm font-bold'>
-                  Diện tích tối thiểu (m²)
+                  Bán kính quanh trường (km)
                   <input
-                    name='minArea'
+                    name='locationRadiusKm'
                     type='number'
-                    inputMode='decimal'
-                    min='1'
+                    min='0.5'
                     step='0.5'
+                    value={locationRadiusKm}
+                    onChange={(event) => setLocationRadiusKm(event.target.value)}
+                    required
                     className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                    placeholder='18'
+                    placeholder='3'
                   />
                 </label>
-                <label className='grid gap-2 text-sm font-bold'>
-                  Diện tích tối đa (m²)
-                  <input
-                    name='maxArea'
-                    type='number'
-                    inputMode='decimal'
-                    min='1'
-                    step='0.5'
-                    className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
-                    placeholder='35'
-                  />
-                </label>
-              </div>
+              </section>
 
-              <label className='grid gap-2 text-sm font-bold'>
-                Loại phòng
+              <section className='grid gap-3'>
+                <FieldHeader label='Giá' priority={pricePriority} onPriorityChange={setPricePriority} />
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <label className='grid gap-2 text-sm font-bold'>
+                    Giá tối thiểu
+                    <input
+                      name='minPrice'
+                      type='text'
+                      inputMode='numeric'
+                      value={minPriceDisplay}
+                      onChange={(event) => handleMoneyInputChange(event.target.value, setMinPriceDisplay)}
+                      className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                      placeholder='1.500.000'
+                    />
+                  </label>
+                  <label className='grid gap-2 text-sm font-bold'>
+                    Giá tối đa
+                    <input
+                      name='maxPrice'
+                      type='text'
+                      inputMode='numeric'
+                      value={maxPriceDisplay}
+                      onChange={(event) => handleMoneyInputChange(event.target.value, setMaxPriceDisplay)}
+                      className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                      placeholder='3.500.000'
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className='grid gap-3'>
+                <FieldHeader label='Diện tích' priority={areaPriority} onPriorityChange={setAreaPriority} />
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <label className='grid gap-2 text-sm font-bold'>
+                    Diện tích tối thiểu (m²)
+                    <input
+                      name='minArea'
+                      type='number'
+                      inputMode='decimal'
+                      min='1'
+                      step='0.5'
+                      value={minArea}
+                      onChange={(event) => setMinArea(event.target.value)}
+                      className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                      placeholder='18'
+                    />
+                  </label>
+                  <label className='grid gap-2 text-sm font-bold'>
+                    Diện tích tối đa (m²)
+                    <input
+                      name='maxArea'
+                      type='number'
+                      inputMode='decimal'
+                      min='1'
+                      step='0.5'
+                      value={maxArea}
+                      onChange={(event) => setMaxArea(event.target.value)}
+                      className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
+                      placeholder='35'
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className='grid gap-2'>
+                <FieldHeader label='Loại phòng' priority={roomTypePriority} onPriorityChange={setRoomTypePriority} />
                 <select
                   name='roomType'
+                  value={roomType}
+                  onChange={(event) => setRoomType(event.target.value as RoomType)}
                   className='h-12 rounded-xl border border-gray-200 px-4 outline-none focus:ring-2 focus:ring-[#FFC300]'
                 >
                   <option value='ROOM'>Phòng trọ</option>
                   <option value='APARTMENT'>Căn hộ</option>
                   <option value='HOUSE'>Nhà nguyên căn</option>
                 </select>
-              </label>
+              </section>
 
-              <label className='flex items-center gap-3 rounded-xl bg-[#FFF7D6] px-4 py-3 text-sm font-bold'>
-                <input name='isLookingForRoommate' type='checkbox' className='accent-[#FFC300]' />
-                Tôi đang tìm bạn ở ghép
-              </label>
+              <section className='grid gap-2'>
+                <FieldHeader
+                  label='Mục đích tìm bạn ở ghép'
+                  priority={roommatePriority}
+                  onPriorityChange={setRoommatePriority}
+                />
+                <label className='flex items-center gap-3 rounded-xl bg-[#FFF7D6] px-4 py-3 text-sm font-bold'>
+                  <input
+                    name='isLookingForRoommate'
+                    type='checkbox'
+                    checked={isLookingForRoommate}
+                    onChange={(event) => setIsLookingForRoommate(event.target.checked)}
+                    className='accent-[#FFC300]'
+                  />
+                  Tôi đang tìm bạn ở ghép
+                </label>
+              </section>
 
               <section className='grid gap-3'>
-                <h2 className='text-sm font-bold'>Tiện ích mong muốn</h2>
+                <FieldHeader
+                  label='Tiện ích mong muốn'
+                  priority={amenityPriority}
+                  onPriorityChange={setAmenityPriority}
+                />
                 <div className='grid gap-2 sm:grid-cols-2'>
                   {amenities.map((amenity) => (
                     <label
@@ -299,7 +437,6 @@ const DemandPage = () => {
                 </div>
               </section>
 
-              <input name='roommateGender' type='hidden' value='ANY' />
               <button type='submit' className='rounded-xl bg-[#001D3D] px-5 py-4 text-sm font-extrabold text-white'>
                 Lưu nhu cầu và xem gợi ý
               </button>

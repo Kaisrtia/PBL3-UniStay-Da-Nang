@@ -181,3 +181,28 @@ export const createStudentDemand = async (
 
   return demand;
 };
+
+export const getStudentDemand = async (studentId: string) => {
+  const demand = await prismaClient.student_demand.findUnique({
+    where: { studentId },
+    include: {
+      student: {
+        include: {
+          demandAmenities: {
+            include: {
+              amenity: true
+            }
+          }
+        }
+      },
+      ward: true,
+      university: true
+    }
+  });
+
+  if (!demand) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Student demand not found');
+  }
+
+  return demand;
+};

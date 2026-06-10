@@ -4,6 +4,7 @@ export type RoomType = 'ROOM' | 'APARTMENT' | 'HOUSE'
 export type PostPurpose = 'RENT' | 'FIND_ROOMMATE'
 export type AmenityCondition = 'NEW' | 'GOOD' | 'OLD'
 export type PostStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'UPDATED' | 'HIDDEN'
+export type MatchLevel = 'LOW' | 'MEDIUM' | 'HIGH'
 
 export type PostImage = {
   id: number
@@ -204,7 +205,7 @@ export const postService = {
     return response.data.data
   },
 
-  getRecommendedPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'>) => {
+  getRecommendedPosts: async (filters?: Pick<PostFilters, 'page' | 'limit'> & { level?: MatchLevel }) => {
     const response = await api.get<PostResponse<PaginatedPosts>>(`/posts/recommendations${buildPostQuery(filters)}`)
     return response.data.data || { data: [] }
   },

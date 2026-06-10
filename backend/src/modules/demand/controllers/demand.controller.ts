@@ -7,6 +7,12 @@ import { demand_criterion_priority } from '@prisma/client';
 
 // -- Student Actions --
 
+export const handleGetStudentDemand = async (req: Request, res: Response) => {
+  const demand = await demandService.getStudentDemand(req.user!.id);
+
+  sendSuccess(res, HttpStatus.OK, demand, 'Student demand fetched successfully');
+};
+
 export const handleCreateStudentDemand = async (req: Request, res: Response) => {
   const {
     wardId,

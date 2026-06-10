@@ -239,11 +239,13 @@ export const handleGetRecommendedPosts = async (
   res: Response
 ) => {
   const { page, limit } = parsePagination(req.query, 10, 100);
+  const level = normalizeRecommendationLevel(req.query.level);
 
   const result = await postQueryService.getRecommendedPosts(
     req.user!,
     page,
-    limit
+    limit,
+    level
   );
 
   sendSuccess(
@@ -252,6 +254,25 @@ export const handleGetRecommendedPosts = async (
     result,
     'Recommended posts fetched successfully'
   );
+};
+
+const normalizeRecommendationLevel = (
+  value: unknown
+): postQueryService.RecommendationLevel => {
+  if (value === undefined || value === null || value === '') {
+    return 'LOW';
+  }
+
+  const normalizedValue = String(value).trim().toUpperCase();
+  if (
+    normalizedValue === 'LOW' ||
+    normalizedValue === 'MEDIUM' ||
+    normalizedValue === 'HIGH'
+  ) {
+    return normalizedValue;
+  }
+
+  throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid recommendation level');
 };
 
 export const handleGetMyPosts = async (req: Request, res: Response) => {

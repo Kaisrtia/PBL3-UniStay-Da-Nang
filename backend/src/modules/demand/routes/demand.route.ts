@@ -11,6 +11,14 @@ const demandRouter = Router();
 
 // -- Student Demands --
 
+// Get current student's saved accommodation demand (Student only)
+demandRouter.get(
+  '/me',
+  verifyToken,
+  authorize([account_role.STUDENT]),
+  asyncHandler(demandController.handleGetStudentDemand)
+);
+
 // Create or update accommodation demand (Student only)
 demandRouter.post(
   '/',
