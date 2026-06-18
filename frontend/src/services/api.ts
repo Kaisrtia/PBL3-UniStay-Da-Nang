@@ -1,7 +1,17 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { toast } from 'react-toastify'
 
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:6969/api/v1').replace(/\/$/, '')
+const resolveApiBaseUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL as string | undefined
+
+  if (!apiUrl && import.meta.env.PROD) {
+    throw new Error('VITE_API_URL is required for production builds.')
+  }
+
+  return (apiUrl || 'http://localhost:6969/api/v1').replace(/\/$/, '')
+}
+
+export const API_BASE_URL = resolveApiBaseUrl()
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean

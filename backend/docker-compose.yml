@@ -1,40 +1,81 @@
 services:
   app:
-    build: .
-    container_name: be-app
+    build:
+      context: .
+      target: runtime
+    container_name: unistay-backend
+    restart: unless-stopped
     ports:
-      - "6969:6969"
-    volumes:
-      - ./:/app
-      - /app/node_modules
+      - "127.0.0.1:${SERVER_PORT:-6969}:${SERVER_PORT:-6969}"
     env_file:
       - .env
     environment:
-      - REDIS_HOST=redis
-      - DATABASE_URL=postgresql://postgres:1@db:5432/uni-stay-dn-db
+      NODE_ENV: production
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}@db:5432/${DATABASE_NAME:-uni-stay-dn-db}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  migrate:
+    build:
+      context: .
+      target: build
+    profiles:
+      - tools
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}@db:5432/${DATABASE_NAME:-uni-stay-dn-db}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npx", "prisma", "migrate", "deploy"]
+
   db:
-    image: postgres:latest
+    image: postgres:16-alpine
+    container_name: unistay-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1
-      POSTGRES_DB: uni-stay-dn-db
-    ports:
-      - "3005:5432"
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
+      POSTGRES_DB: ${DATABASE_NAME:-uni-stay-dn-db}
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+
   redis:
-    image: redis
-    container_name: my-redis-server
-    ports:
-      - "6379:6379"
+    image: redis:7-alpine
+    container_name: unistay-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command:
+      - sh
+      - -c
+      - >
+        redis-server
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 256mb
+        --maxmemory-policy noeviction
+        --requirepass "$${REDIS_PASSWORD}"
     volumes:
-      - ./src/core/config/redis.conf:/usr/local/etc/redis/redis.conf
       - redis_data:/data
-    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:

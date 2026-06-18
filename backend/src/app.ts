@@ -20,6 +20,8 @@ import { cacheConnection } from './core/config/redis.connection';
 
 const app: Application = express();
 
+app.set('trust proxy', 1);
+
 // ─── Global Middlewares ──────────────────────────────────────────────────────
 
 app.use(express.json());
@@ -31,7 +33,7 @@ app.use(
   })
 );
 app.use(helmet());
-app.use(morgan('dev'));
+app.use(morgan(config.node_env === 'production' ? 'combined' : 'dev'));
 app.use(cookieParser());
 
 // ─── Health Check ────────────────────────────────────────────────────────────
