@@ -112,7 +112,12 @@ const downloadImage = async (url: URL, redirectsRemaining: number): Promise<Buff
           Accept: Array.from(ALLOWED_CONTENT_TYPES).join(', '),
           'User-Agent': 'UniStay-Image-Moderation/1.0'
         },
-        lookup: (_hostname, _options, callback) => {
+        lookup: (_hostname, options, callback) => {
+          if ((options as { all?: boolean }).all) {
+            callback(null, [resolvedAddress]);
+            return;
+          }
+
           callback(null, resolvedAddress.address, resolvedAddress.family);
         }
       },

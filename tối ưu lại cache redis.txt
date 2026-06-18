@@ -1,3 +1,0 @@
-- tối ưu lại cache redis, tạo khả năng truy vấn lọc như database
-- đọc hiểu thuật toán Harversine, Dijkstra, khoảng chấp nhận, bcrypt mã hóa mật khẩu
-- luồng đăng nhập, JWT
