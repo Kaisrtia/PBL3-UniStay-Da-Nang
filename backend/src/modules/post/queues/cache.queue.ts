@@ -18,17 +18,20 @@ export const addPostCacheRefreshJob = async () => {
 
 // Initialize the repeatable job to trace and cache approved posts
 export const initCacheJob = async () => {
-  await postCacheQueue.add('cacheApprovedPosts:startup', {}, {
-    removeOnComplete: true,
-    removeOnFail: false
-  });
+  const repeatableJobs = await postCacheQueue.getRepeatableJobs();
+  for (const job of repeatableJobs) {
+    if (job.name === 'cacheApprovedPosts') {
+      await postCacheQueue.removeRepeatableByKey(job.key);
+    }
+  }
 
   await postCacheQueue.add(
     'cacheApprovedPosts',
     {},
     {
       repeat: {
-        every: 5 * 60 * 1000 // 5 minutes in milliseconds
+        every: 5 * 60 * 1000, // 5 minutes in milliseconds
+        immediately: true
       },
       removeOnComplete: true,
       removeOnFail: false
