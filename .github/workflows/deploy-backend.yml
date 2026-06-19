@@ -12,7 +12,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: integrating new code (backend)
@@ -21,6 +21,6 @@ jobs:
 
           git pull origin develop
 
-          sudo docker compose --profile tools run --rm migrate
+          docker compose --profile tools run --rm migrate
 
-          sudo docker compose up -d --build app
+          docker compose up -d --build app
